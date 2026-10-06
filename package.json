@@ -1,0 +1,31 @@
+{
+  "name": "pocketkit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PocketKit: every everyday utility in one offline app",
+  "scripts": {
+    "serve": "npx -y http-server www -p 5173 -c-1",
+    "docs": "node scripts/copy-privacy.js",
+    "sync": "node scripts/copy-privacy.js && cap sync",
+    "android": "cap open android",
+    "coupons": "node tools/generate-coupons.js",
+    "release": "node scripts/release/build.js",
+    "release:phone-test": "node scripts/release/build.js --phone-test"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/filesystem": "^8.1.4",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/share": "^8.0.3",
+    "@capgo/capacitor-native-biometric": "^8.7.0",
+    "@capgo/native-purchases": "^8.8.1"
+  },
+  "devDependencies": {
+    "clean-css": "^5.3.3",
+    "html-minifier-terser": "^7.2.0",
+    "terser": "^5.51.2"
+  }
+}

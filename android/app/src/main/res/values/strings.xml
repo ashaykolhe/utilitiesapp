@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PocketKit</string>
+    <string name="title_activity_main">PocketKit</string>
+    <string name="package_name">com.atlasstudio.pocketkit</string>
+    <string name="custom_url_scheme">com.atlasstudio.pocketkit</string>
+</resources>

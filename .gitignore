@@ -1,0 +1,12 @@
+node_modules/
+.claude/
+*.log
+*.jks
+*.keystore
+local.properties
+android/keystore.properties
+release-build/
+*.xapk
+*.apk
+
+coupon-codes.txt
