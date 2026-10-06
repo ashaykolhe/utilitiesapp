@@ -12,7 +12,7 @@ const fmt = (ms, cs) => {
   return (hh ? pad(hh) + ':' : '') + pad(mm) + ':' + pad(ss) + (cs ? '.' + pad(Math.floor(ms % 1000 / 10)) : '');
 };
 
-Tools.register({ id: 'timer', name: 'Timer', icon: '⏳', cat: 'daily', desc: 'Count down from any time and get an alert when it ends.', needs: [], render(el) {
+Tools.register({ id: 'timer', name: 'Timer', icon: '⌛', cat: 'daily', desc: 'Count down from any time and get an alert when it ends.', needs: [], render(el) {
   el.innerHTML = `<div class="card"><div class="big" id="d">00:00</div>
     <div class="row"><input id="m" type="number" min="0" max="999" placeholder="min" value="5"><input id="s" type="number" min="0" max="59" placeholder="sec" value="0"></div></div>
     <div class="row"><button class="btn" id="go">Start</button><button class="btn alt" id="rs">Reset</button></div>`;

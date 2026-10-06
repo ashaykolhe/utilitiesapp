@@ -28,7 +28,7 @@ Tools.register({ id: 'compass', name: 'Compass', icon: '🧭', cat: 'navigate', 
   return () => { removeEventListener('deviceorientationabsolute', on); removeEventListener('deviceorientation', on); };
 } });
 
-Tools.register({ id: 'leveler', name: 'Leveler', icon: '📐', cat: 'navigate', desc: 'A bubble level for checking whether a surface is flat, with a zero button.', needs: ['motion'], render(el) {
+Tools.register({ id: 'leveler', name: 'Leveler', icon: '📶', cat: 'navigate', desc: 'A bubble level for checking whether a surface is flat, with a zero button.', needs: ['motion'], render(el) {
   el.innerHTML = `<div class="card center"><div style="position:relative;width:240px;height:240px;margin:0 auto;border:2px solid var(--line);border-radius:50%">
     <div style="position:absolute;left:50%;top:0;bottom:0;border-left:1px dashed var(--muted)"></div><div style="position:absolute;top:50%;left:0;right:0;border-top:1px dashed var(--muted)"></div>
     <div id="bub" style="position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px;border-radius:50%;background:var(--accent)"></div></div>

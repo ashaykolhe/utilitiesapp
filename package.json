@@ -10,7 +10,8 @@
     "android": "cap open android",
     "coupons": "node tools/generate-coupons.js",
     "release": "node scripts/release/build.js",
-    "release:phone-test": "node scripts/release/build.js --phone-test"
+    "release:phone-test": "node scripts/release/build.js --phone-test",
+    "features": "node scripts/build-docs.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
