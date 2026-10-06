@@ -18,7 +18,7 @@ const PRO_FEATURES = [
   { k: 'reminders', i: '🔔', t: 'Unlimited reminders', s: 'Free: 3 active reminders' },
   { k: 'notes', i: '📝', t: 'Unlimited notes', s: 'Free: 10 notes' },
   { k: 'recordings', i: '🎙️', t: 'Unlimited voice recordings', s: 'Free: 3 recordings' },
-  { k: 'pins', i: '📌', t: 'Unlimited pinned tools', s: 'Free: 4 pinned tools' },
+  { k: 'pins', i: '📌', t: 'Unlimited pinned tools and collections', s: 'Free: 4 pinned tools, no collections' },
   { k: 'accents', i: '🎨', t: 'All colour themes' }
 ];
 

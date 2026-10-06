@@ -42,6 +42,15 @@ let F = `# PocketKit: features\n\nPocketKit has ${tools.length} tools in ${CATS.
   `| **Pro** | One-time purchase \`pocketkit_pro\` through Google Play, or a trial code. Unlocks the Connect suite (planned), Motion cam, Stop motion, all colour themes and removes the free limits. |\n` +
   `| **Trial codes** | A code gives Pro until a fixed date. It is checked on the device against a built-in hash list, and the clock cannot be wound back to extend it. |\n` +
   `| **Free limits** | 4 pinned tools, 3 reminders, 10 notes, 3 voice recordings, 1 saved route, 3 locked files, 5 vault entries. |\n` +
+  `| **Tool of the day** | A different free tool is suggested on Home every day. |\n` +
+  `| **Filters and Surprise me** | Filter by Free, Pro, no permissions, camera, microphone, location or sensors, or open a random tool. |\n` +
+  `| **Collections (Pro)** | Make named groups of tools, for example Travel or Study, shown on Home. |\n` +
+  `| **Share** | A button in every tool shares the text on screen (results, inputs) through the Android share sheet. |\n` +
+  `| **App lock** | A 4 to 6 digit PIN (and optionally fingerprint or face) asked when the app opens or returns after 0 seconds, 30 seconds or 5 minutes. The PIN is stored only as a salted hash. 5 wrong tries cause a growing wait. |\n` +
+  `| **Backup and restore** | Saves settings and tool data to a file and restores it. Pro state, the PIN, recordings, locked files and the vault are not included. |\n` +
+  `| **Tour and What's new** | A three-step tour on first launch (replay in Settings) and a short note after updates. |\n` +
+  `| **Languages** | The app is built for translation packs; Hindi is planned. Missing text shows in English. |\n` +
+  `| **Haptics** | Optional vibration feedback, switchable in Settings. |\n` +
   `| **Privacy** | No accounts, no ads, no analytics. See privacy-policy.html. |\n\n`;
 for (const [id, label] of CATS) {
   const list = byCat(id); if (!list.length) continue;
@@ -59,6 +68,12 @@ let T = `# PocketKit: manual test\n\nTick each box on a real phone. Test on a de
   `- [ ] Open a tool, press the phone's Back button: it returns to Home. Press Back on Home: the app closes.\n- [ ] Settings: change Theme to Dark and Light; the whole app follows. Tap a locked colour: the Pro sheet opens.\n` +
   `- [ ] Settings > Privacy policy opens the policy page.\n- [ ] Open a Pro tool (Motion Cam): the Pro sheet opens with the feature highlighted.\n` +
   `- [ ] Pro sheet: enter a wrong code: "That code isn't valid". Enter a code from coupon-codes.txt for today: Pro turns on, locks disappear, Settings shows "Trial until ...".\n` +
+  `- [ ] First launch shows a 3-step tour; Settings > Show the tour again replays it.\n- [ ] Tap "Surprise me": a random free tool opens. Tool of the day card opens its tool.\n` +
+  `- [ ] Filter chips (Free, Pro, No permissions, Camera...) narrow the grid; All brings the categories back.\n` +
+  `- [ ] In a tool, tap the share button: the Android share sheet opens with the tool's text; the folder button opens Collections (free: asks for Pro; Pro: make "Travel", tick the tool, Done, see it on Home, delete it).\n` +
+  `- [ ] Settings > App lock: turn on, set a PIN twice. Leave the app for longer than the chosen time: the lock screen appears; wrong PIN shows an error; 5 wrong tries cause a wait; the right PIN unlocks. Fingerprint option appears only if the phone has one. Turn the lock off (asks for the PIN).\n` +
+  `- [ ] Settings > Back up saves a .json file through the share sheet; change something; Restore that file: the change is undone. A random .json file is refused.\n` +
+  `- [ ] Settings > Language appears only when a translation pack exists; switching it translates the home screen.\n` +
   `- [ ] Rotate the phone and send the app to the background and back: nothing breaks.\n- [ ] Turn on airplane mode: every tool except those marked "network" still works.\n\n`;
 let n = 1;
 for (const [id, label] of CATS) {
