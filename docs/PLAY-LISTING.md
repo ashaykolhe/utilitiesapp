@@ -16,7 +16,7 @@ PocketKit puts everything you reach for a phone to do into one app that works of
 
 **Scan and create.** QR and barcode scanner, QR and barcode generator, document scanner, image shrink and convert, collage, signature pad, pixel art, colour tools.
 
-**Sensors and measuring.** Compass, level, speedometer, altitude, ruler, protractor, height and distance finders, G-force and vibration meters, sound meter, light and magnetic sensors (where your phone supports them).
+**Sensors and measuring.** Compass, level, speedometer, altitude, ruler, protractor, height and distance finders, G-force and vibration meters, sound meter, metal detector, barometer, light, magnetic, gyroscope and proximity sensors, and Wi-Fi/mobile signal strength (where your phone has the sensor).
 
 **Daily helpers.** Timers, stopwatch, reminders, alarms, Pomodoro, world clock, notes, to-do and shopping lists, expenses, route recorder, parking saver, holiday calendar.
 
@@ -28,7 +28,7 @@ PocketKit puts everything you reach for a phone to do into one app that works of
 
 **Games.** More than 40 offline games and puzzles: 2048, Sudoku, Minesweeper, Snake, Wordle-style word game, Tetris-style blocks and many more.
 
-**Your data stays on your phone.** No ads, no tracking, no sign-up. Everyday tools are free. **PocketKit Pro** is a one-time purchase (no subscription) for extras such as Motion cam, stop-motion, collections, all colour themes and higher limits.
+**Your data stays on your phone.** No ads, no tracking, no sign-up. Everyday tools are free. **PocketKit Pro** is a one-time purchase (no subscription) that unlocks power tools (document scanner, time-lapse, motion cam and stop-motion, expense tracker, invoices, health log, flashcards, 2FA codes, pro audio and more), collections, all colour themes and higher limits.
 
 ## Data safety form (answers)
 - Does the app collect or share user data? **No.** All data stays on the device.

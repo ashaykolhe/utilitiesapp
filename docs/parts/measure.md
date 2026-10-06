@@ -193,7 +193,7 @@
 - category: measure
 - plan: free
 - needs: motion
-- what: Shows magnetic field strength in microtesla with X/Y/Z, peak and a graph, for finding magnets and metal. Works only on phones that expose the sensor to apps (the Android WebView often does not); otherwise it shows a clear message.
+- what: Shows magnetic field strength in microtesla with X/Y/Z, peak and a graph, for finding magnets and metal. Reads the phone's own sensor in the installed app. (the Android WebView often does not); otherwise it shows a clear message.
 - test:
   1. On a phone with the sensor the total reads about 25 to 65 microtesla away from metal.
   2. Move the phone near a speaker or magnet: the value jumps and the gauge fills.

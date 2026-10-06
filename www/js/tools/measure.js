@@ -751,58 +751,66 @@
   } });
 
   /* ================================================================== 16. Magnetometer */
-  Tools.register({ id: 'magnet', name: 'Magnetometer', icon: '🧲', cat: 'measure', desc: 'Magnetic field strength in microtesla, handy for finding magnets and metal. Works only on phones that expose the sensor to apps.', keys: ['magnetic', 'metal detector', 'tesla', 'field'], needs: ['motion'], render(el) {
+  Tools.register({ id: 'magnet', name: 'Magnetometer', icon: '🧲', cat: 'measure', desc: 'Magnetic field strength in microtesla, handy for finding magnets and metal. Uses the phone\'s own sensor in the installed app.', keys: ['magnetic', 'metal detector', 'tesla', 'field'], needs: ['motion'], render(el) {
     const LEN = 200, hist = []; let sensor = null, peak = 0, base = null;
     el.innerHTML = `<div style="${wrap}"><div class="card center" style="padding:14px 8px">${gaugeSVG('ga', 200)}<div style="margin-top:-130px;height:130px"><div class="big" id="v" style="margin:0;font-size:46px">--</div><div style="${MUTED}">µT total</div></div><div id="msg" style="${MUTED};min-height:18px">Starting sensor...</div></div>
       <div class="row"><div class="card center" style="padding:10px"><div style="${LBL}">X</div><div class="mid" id="x" style="font-size:22px">--</div></div><div class="card center" style="padding:10px"><div style="${LBL}">Y</div><div class="mid" id="y" style="font-size:22px">--</div></div><div class="card center" style="padding:10px"><div style="${LBL}">Z</div><div class="mid" id="z" style="font-size:22px">--</div></div></div>
       <div class="card"><canvas id="cv" style="${GRAPH_STYLE}"></canvas><div style="${MUTED};margin-top:8px">Peak <b id="pk" style="color:var(--text)">0</b> µT · Earth's field is about 25 to 65 µT</div></div>
       <button class="btn alt" id="rs">Zero baseline</button></div>`;
-    let last = 0;
-    if (!('Magnetometer' in window)) say(el, 'This phone does not expose a magnetic field sensor to apps.');
+    let last = 0, lastM = 0, nh = null, dead = false;
+    const paint = (x, y, z) => {
+      if (x == null || y == null || z == null) return;
+      const m = hyp(x, y, z), v = base == null ? m : Math.abs(m - base);
+      say(el, base == null ? 'Live reading' : 'Showing change from baseline');
+      $('#v', el).textContent = v.toFixed(0); $('#x', el).textContent = x.toFixed(0); $('#y', el).textContent = y.toFixed(0); $('#z', el).textContent = z.toFixed(0);
+      peak = Math.max(peak, v); $('#pk', el).textContent = peak.toFixed(0);
+      setGauge($('#ga', el), v / 200, v > 120 ? 'var(--danger)' : v > 80 ? '#f59e0b' : 'var(--accent)');
+      const n = performance.now(); if (n - last > 50) { last = n; hist.push(v); if (hist.length > LEN) hist.shift(); graph($('#cv', el), hist, { min: 0, max: Math.max(100, Math.ceil(peak / 50) * 50), len: LEN }); }
+      lastM = m;
+    };
+    if (typeof Sens !== 'undefined' && Sens.native()) { // the phone's real sensor through the native plugin
+      Sens.start('magnetic', ev => { if (!dead && ev.values && ev.values.length >= 3) paint(ev.values[0], ev.values[1], ev.values[2]); }, { minGapMs: 40 })
+        .then(h => { if (dead) { h.stop(); return; } nh = h; if (!h.available) say(el, 'This phone does not have a magnetic field sensor, or Android does not let apps read it.'); });
+    } else if (!('Magnetometer' in window)) say(el, 'This phone does not expose a magnetic field sensor to apps.');
     else {
       try {
         sensor = new window.Magnetometer({ frequency: 20 });
-        sensor.addEventListener('reading', () => {
-          const x = sensor.x, y = sensor.y, z = sensor.z;
-          if (x == null || y == null || z == null) return;
-          const m = hyp(x, y, z), v = base == null ? m : Math.abs(m - base);
-          say(el, base == null ? 'Live reading' : 'Showing change from baseline');
-          $('#v', el).textContent = v.toFixed(0); $('#x', el).textContent = x.toFixed(0); $('#y', el).textContent = y.toFixed(0); $('#z', el).textContent = z.toFixed(0);
-          peak = Math.max(peak, v); $('#pk', el).textContent = peak.toFixed(0);
-          setGauge($('#ga', el), v / 200, v > 120 ? 'var(--danger)' : v > 80 ? '#f59e0b' : 'var(--accent)');
-          const n = performance.now(); if (n - last > 50) { last = n; hist.push(v); if (hist.length > LEN) hist.shift(); graph($('#cv', el), hist, { min: 0, max: Math.max(100, Math.ceil(peak / 50) * 50), len: LEN }); }
-          sensor._m = m;
-        });
+        sensor.addEventListener('reading', () => paint(sensor.x, sensor.y, sensor.z));
         sensor.addEventListener('error', e => say(el, e.error && e.error.name === 'NotAllowedError' ? 'Magnetometer permission denied.' : 'Magnetometer not available on this device.'));
         sensor.start();
       } catch (e) { say(el, 'Magnetometer not available on this device.'); }
     }
-    $('#rs', el).onclick = () => { if (sensor && sensor._m) { base = base == null ? sensor._m : null; peak = 0; hist.length = 0; $('#rs', el).textContent = base == null ? 'Zero baseline' : 'Show absolute field'; } };
-    return () => { try { if (sensor) sensor.stop(); } catch (e) {} };
+    $('#rs', el).onclick = () => { if (lastM) { base = base == null ? lastM : null; peak = 0; hist.length = 0; $('#rs', el).textContent = base == null ? 'Zero baseline' : 'Show absolute field'; } };
+    return () => { dead = true; if (nh) nh.stop(); try { if (sensor) sensor.stop(); } catch (e) {} };
   } });
 
   /* ================================================================== 17. Light meter */
-  Tools.register({ id: 'lightmeter', name: 'Light Meter', icon: '🗒️', cat: 'measure', desc: 'Ambient light in lux with a plain-language label. Works only on phones that expose the sensor to apps.', keys: ['lux', 'brightness', 'illuminance', 'light'], needs: ['motion'], render(el) {
+  Tools.register({ id: 'lightmeter', name: 'Light Meter', icon: '🗒️', cat: 'measure', desc: 'Ambient light in lux with a plain-language label, read from the phone\'s light sensor in the installed app.', keys: ['lux', 'brightness', 'illuminance', 'light'], needs: ['motion'], render(el) {
     const LEN = 200, hist = []; let sensor = null, peak = 0;
     el.innerHTML = `<div style="${wrap}"><div class="card center" style="padding:14px 8px">${gaugeSVG('ga', 200)}<div style="margin-top:-130px;height:130px"><div class="big" id="v" style="margin:0;font-size:46px">--</div><div style="${MUTED}">lux</div></div><div id="lab" style="font-size:18px;font-weight:700">--</div><div id="msg" style="${MUTED};min-height:18px">Starting sensor...</div></div>
       <div class="card"><canvas id="cv" style="${GRAPH_STYLE}"></canvas><div style="${MUTED};margin-top:8px">Peak <b id="pk" style="color:var(--text)">0</b> lux</div></div>
       <div style="${NOTE}">Approximate. Many phones do not expose the light sensor to apps; if so this tool says so instead of guessing. Typical: candle-lit 10 lux, office 400, overcast day 1000 to 10000.</div></div>`;
-    if (!('AmbientLightSensor' in window)) say(el, 'This phone does not expose its light sensor to apps.');
+    let nh = null, dead = false;
+    const paint = (l) => {
+      if (l == null || !isFinite(l)) return;
+      say(el, 'Live reading'); peak = Math.max(peak, l);
+      $('#v', el).textContent = l < 10 ? l.toFixed(1) : Math.round(l); $('#lab', el).textContent = luxLabel(l); $('#pk', el).textContent = Math.round(peak);
+      setGauge($('#ga', el), Math.log10(1 + l) / 5);
+      hist.push(Math.log10(1 + l)); if (hist.length > LEN) hist.shift(); graph($('#cv', el), hist, { min: 0, max: 5, len: LEN });
+    };
+    if (typeof Sens !== 'undefined' && Sens.native()) { // the phone's real light sensor through the native plugin
+      Sens.start('light', ev => { if (!dead && ev.values) paint(ev.values[0]); }, { minGapMs: 100 })
+        .then(h => { if (dead) { h.stop(); return; } nh = h; if (!h.available) say(el, 'This phone does not have a light sensor, or Android does not let apps read it.'); });
+    } else if (!('AmbientLightSensor' in window)) say(el, 'This phone does not expose its light sensor to apps.');
     else {
       try {
         sensor = new window.AmbientLightSensor({ frequency: 10 });
-        sensor.addEventListener('reading', () => {
-          const l = sensor.illuminance; if (l == null || !isFinite(l)) return;
-          say(el, 'Live reading'); peak = Math.max(peak, l);
-          $('#v', el).textContent = l < 10 ? l.toFixed(1) : Math.round(l); $('#lab', el).textContent = luxLabel(l); $('#pk', el).textContent = Math.round(peak);
-          setGauge($('#ga', el), Math.log10(1 + l) / 5);
-          hist.push(Math.log10(1 + l)); if (hist.length > LEN) hist.shift(); graph($('#cv', el), hist, { min: 0, max: 5, len: LEN });
-        });
+        sensor.addEventListener('reading', () => paint(sensor.illuminance));
         sensor.addEventListener('error', e => say(el, e.error && e.error.name === 'NotAllowedError' ? 'Light sensor permission denied.' : 'Light sensor not available on this device.'));
         sensor.start();
       } catch (e) { say(el, 'Light sensor not available on this device.'); }
     }
-    return () => { try { if (sensor) sensor.stop(); } catch (e) {} };
+    return () => { dead = true; if (nh) nh.stop(); try { if (sensor) sensor.stop(); } catch (e) {} };
   } });
 
   if (typeof module !== 'undefined' && module.exports) module.exports = { elevationDeg, flatTiltDeg, foldDeg, plumbAngles, heightFromAngles, distanceFromAngle, slopeFromDeg, shadowHeight, speedOf, distOf, timeOf, hms, severity, rpmFromTaps, rpmFromEnvelope, unitPrice, stepLength, paceMinPerKm, luxLabel, DIST, SPEED };

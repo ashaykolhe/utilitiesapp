@@ -328,6 +328,15 @@ _Free. Needs: location (optional)_
 
 ## 3. Measure
 
+### Barometer
+_Free. Needs: motion_
+
+- [ ] Open the tool on a phone with a barometer: pressure appears (about 950 to 1050 hPa near sea level) and height shows in metres and feet.
+- [ ] Type your real height (for example 120) in "I am at this height" and press the button: the sea-level value updates and the estimate moves toward your real height.
+- [ ] Type 5000 in Sea-level pressure: the field is limited to 1100 and a message shows. Clear it: it falls back to 1013.25.
+- [ ] Climb a flight of stairs and wait: the height estimate changes by a few metres.
+- [ ] On a phone without a barometer a message says so.
+
 ### Distance Finder
 _Free. Needs: motion_
 
@@ -346,6 +355,14 @@ _Free. Needs: motion_
 - [ ] Tap Reset peak: peak and graph clear.
 - [ ] Tick "Remove gravity": the total drops to about 0 when still (if the phone provides it).
 - [ ] On a phone that does not report gravity-free acceleration, tick "Remove gravity": a message says so and the box unticks itself.
+
+### Gyroscope
+_Free. Needs: motion_
+
+- [ ] Lay the phone still: all numbers are close to 0.
+- [ ] Spin it flat on a table: Z shows a large number, the total follows, the graph rises and the peak keeps the highest value.
+- [ ] Tap "Reset peak": the peak goes back to 0.
+- [ ] Leave the tool: the sensor stops. On a phone without a gyroscope a message says so.
 
 ### Height Finder
 _Free. Needs: motion_
@@ -372,6 +389,15 @@ _Free. Needs: motion_
 - [ ] Tap "Zero baseline" to see only the change; tap again to go back to absolute.
 - [ ] On a device or browser without the API: "does not expose a magnetic field sensor" appears and nothing crashes.
 
+### Metal Detector
+_Free. Needs: motion_
+
+- [ ] Open the tool away from other metal: it sets a baseline by itself and the value is steady (about 25 to 65 µT on Earth).
+- [ ] Bring a steel object or a magnet near the top of the phone: the change number and bar grow and the beeps speed up and rise in pitch.
+- [ ] Move it away and press "Set baseline here": the change goes back to about 0.
+- [ ] Turn Sound and Vibrate off: no beeps or buzzes. Move the Sensitivity slider: the same object gives a smaller or bigger bar.
+- [ ] Leave the tool: beeping and sensor stop. On a phone without a magnetometer a message says so.
+
 ### Pendulum Bob
 _Free. Needs: motion_
 
@@ -389,12 +415,27 @@ _Free. Needs: motion (tilt mode only)_
 - [ ] On a device without a motion sensor the tilt mode shows "No motion sensor found".
 - [ ] In tilt mode lay the phone flat (or nearly): "Hold the phone upright" shows instead of a jumpy reading. Hold it upright and rotate through horizontal (0 and 180): the arm moves smoothly and does not jump to 90.
 
+### Proximity Test
+_Free. Needs: motion_
+
+- [ ] Open the tool and wave a hand over the top of the screen: the circle switches between NEAR and FAR and the phone buzzes briefly.
+- [ ] The covered counter goes up on each cover; "Reset counter" sets it to 0.
+- [ ] Leave the tool: the sensor stops. On a phone without a proximity sensor a message says so.
+
 ### Reaction Test
 _Free. Needs: storage (best time)_
 
 - [ ] Tap to start: the button turns red and says wait. Tap before green: "Too soon!".
 - [ ] Start again and tap when it turns green: your time in ms shows and Last, Average, Best fill in.
 - [ ] Leave and reopen: Best is remembered.
+
+### Room Temperature
+_Free. Needs: motion_
+
+- [ ] Open the tool: the label says either "Room temperature (phone sensor)" or "Battery temperature (no room sensor in this phone)".
+- [ ] Tap °F: the number and unit change; tap °C to go back.
+- [ ] Plug in the charger for a few minutes with the screen on (battery case): the battery temperature rises.
+- [ ] Leave the tool: the 5-second battery polling stops.
 
 ### RPM Counter
 _Free. Needs: microphone (mic mode only)_
@@ -422,6 +463,15 @@ _Free_
 - [ ] Tap "Dead pixel test": the screen turns red, green, blue, white, black on each tap and closes after black.
 - [ ] Rotate the phone: the viewport row updates.
 
+### Sensor List (Pro)
+_Pro. Needs: motion_
+
+- [ ] Unlock Pro (or use a trial code), open Sensor List. A list of sensors appears with a count ("NN sensors found").
+- [ ] Tap "Accelerometer": live numbers appear and change when you move the phone; tap Stop: they freeze and the sensor stops.
+- [ ] Tap a sensor you cannot stream (a wake-up or one-shot sensor): a message says it cannot be read live, and the app does not crash.
+- [ ] Leave the tool: readings stop (the phone's battery is not drained by a running sensor).
+- [ ] In a desktop browser the tool says it works only in the installed app.
+
 ### Shadow Height
 _Free_
 
@@ -429,6 +479,15 @@ _Free_
 - [ ] Switch to feet: the unit label changes.
 - [ ] Set the stick shadow to 0: result shows "--".
 - [ ] Enter 5000 in Stick height: a message shows and the value is limited to 1000. Enter 0 in a shadow: the result shows "--".
+
+### Signal Strength
+_Free. Needs: network_
+
+- [ ] On Wi-Fi: the kind shows "Wi-Fi", a negative dBm number (for example -55), bars, a quality word and the link speed.
+- [ ] Walk away from the router: the number drops (more negative) and the bars fall.
+- [ ] Turn Wi-Fi off with mobile data on: the kind changes to "Mobile data" and shows a dBm value (some phones do not report one: the tool then says Android did not report a signal level).
+- [ ] Turn on airplane mode: it shows "Not connected" and "No connection".
+- [ ] Leave the tool: the one-second polling stops.
 
 ### Slope Finder
 _Free. Needs: motion_

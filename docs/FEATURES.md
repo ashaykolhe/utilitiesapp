@@ -1,6 +1,6 @@
 # PocketKit: features
 
-PocketKit has 264 tools in 11 categories. Everything works offline and all data stays on the phone.
+PocketKit has 271 tools in 11 categories. Everything works offline and all data stays on the phone.
 **Free** = every everyday utility. **Pro** = a one-time purchase (no subscription) for the heavier features and higher limits.
 
 _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the parts files, not this file._
@@ -69,22 +69,29 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Speedometer** | Free | location | Live speed in km/h from GPS with top speed and trip distance. Distance only counts movement larger than the GPS noise, so walking adds up and standing still does not drift; speed is worked out from recent fixes when the phone gives no speed value. |
 | **Sunrise & Sunset** | Free | location (optional) | Computes sunrise, sunset, solar noon, civil dawn and dusk and day length for any latitude, longitude and date using the NOAA algorithm. Handles midnight sun and polar night. Times show in the phone's time zone. |
 
-## Measure (18)
+## Measure (25)
 
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
+| **Barometer** | Free | motion | Air pressure in hPa with a smoothed reading, a trend line, a "Rising / Falling / Steady" hint, and an estimate of your height above sea level that you can calibrate with a known height or the local sea-level pressure. |
 | **Distance Finder** | Free | motion | Finds the horizontal distance to an object by sighting its base and entering your eye height, using distance = eye height divided by tan of the angle downwards. |
 | **G Meter** | Free | motion | Live g-force on X, Y and Z plus the total, a gauge, peak hold and a scrolling line graph. |
+| **Gyroscope** | Free | motion | Shows how fast the phone turns around each axis in degrees per second with the total, a live graph and a peak hold with a reset button. |
 | **Height Finder** | Free | motion | Measures the height of a tree or building from the tilt angle to its top and its base. Uses your eye height to get the distance (or a distance you type) and shows the working. |
 | **Light Meter** | Free | motion (ambient light sensor) | Ambient light in lux with a plain-language label and a graph, using the ambient light sensor when the phone exposes it to apps (many do not). Approximate; shows a message instead of guessing when no sensor is available. |
-| **Magnetometer** | Free | motion | Shows magnetic field strength in microtesla with X/Y/Z, peak and a graph, for finding magnets and metal. Works only on phones that expose the sensor to apps (the Android WebView often does not); otherwise it shows a clear message. |
+| **Magnetometer** | Free | motion | Shows magnetic field strength in microtesla with X/Y/Z, peak and a graph, for finding magnets and metal. Reads the phone's own sensor in the installed app. (the Android WebView often does not); otherwise it shows a clear message. |
+| **Metal Detector** | Free | motion | Finds iron and steel near the top of your phone by the change in the magnetic field, with a bar, a graph and a beep and vibration that speed up as the change grows. Adjustable sensitivity and a "Set baseline here" button. It cannot find gold, silver, copper or aluminium. |
 | **Pendulum Bob** | Free | motion | A plumb line that swings from the top of the screen. It shows the angle from vertical plus the sideways and forward/back tilt, using the gravity vector. |
 | **Protractor** | Free | motion (tilt mode only) | A 0 to 180 degree on-screen protractor with an arm you drag, showing degrees, supplement and complement. Tilt mode uses the phone's gravity sensor to show the angle of the phone's long axis. |
+| **Proximity Test** | Free | motion | Tests the proximity sensor next to the speaker: a big circle shows NEAR or FAR, the reported distance in cm and how many times it was covered. |
 | **Reaction Test** | Free | storage (best time) | A reaction timer: tap as soon as the big button turns green and see your time in milliseconds, with last, average and best. |
+| **Room Temperature** | Free | motion | Shows the room temperature when the phone has an ambient temperature sensor (rare). Otherwise shows the battery temperature and says clearly that it is the battery. Humidity is shown too when the phone has a humidity sensor. °C and °F. |
 | **RPM Counter** | Free | microphone (mic mode only) | Tap once per revolution to read RPM averaged over the last taps, or use the microphone to estimate the repeating pulse rate of a sound such as a fan or engine. |
 | **Ruler** | Free | storage (saves the calibration) | An on-screen ruler with centimetre and inch scales, horizontal or vertical. Calibrate it by laying a credit card (85.6 mm) on the screen and dragging the round handle (only the handle drags, so the page can still scroll) to the card's far edge; Save and Reset sit above the calibration area so they stay visible. The calibration is saved. |
 | **Screen Info** | Free | - | Shows the screen resolution in pixels and dp, pixel ratio, density, viewport, estimated size in inches and aspect ratio, with a full-screen grid overlay and a dead pixel colour test. |
+| **Sensor List** | Pro | motion | Lists every hardware sensor in your phone with its type, maker and range, and shows live readings (with a graph) of any sensor you tap. Uses the native sensor plugin, so it works only in the installed app. |
 | **Shadow Height** | Free | - | Finds the height of a tree, pole or building from the length of its shadow compared with a stick of known height. |
+| **Signal Strength** | Free | network | Shows the strength of the current Wi-Fi or mobile connection in dBm with bars, a quality word, a live graph, link speed, band, estimated speeds and whether the internet works. Updates every second so you can walk around and find the best spot. |
 | **Slope Finder** | Free | motion | Measures roof pitch or ramp slope in degrees, percent, ratio (1:n) and rise per 12, by laying the phone on the surface or sighting along its edge. |
 | **Sound Intensity** | Free | microphone | Approximate sound level in decibels from the microphone with minimum and maximum. Reads the raw microphone (no noise suppression or auto gain) and ignores the first half second so Min does not stick at 0. |
 | **Speed Calc** | Free | - | Calculates speed from distance and time, distance from speed and time, or time from distance and speed, with km, m, miles, feet and nautical miles, and km/h, m/s, mph and knots. |

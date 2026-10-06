@@ -6,7 +6,8 @@
    so reinstalling cannot renew a trial. */
 const PRO_ID = 'pocketkit_pro';
 const PL = window.Capacitor && Capacitor.Plugins || {};
-const NP = PL.NativePurchases, PN = (window.Capacitor && Capacitor.registerPlugin) ? Capacitor.registerPlugin('PocketNative') : null;
+/* Native plugins are reached as Capacitor.Plugins.<Name> (the bridge makes them on demand). PN is the helper plugin: debug check, FLAG_SECURE, sensitive clipboard. */
+const NP = PL.NativePurchases, PN = PL.PocketNative || null;
 
 /* Free limits. Tools ask proLimit(name); Pro removes every one of them. */
 const FREE = { pins: 4, reminders: 3, notes: 10, recordings: 3, routes: 1, locker: 3, vault: 5 };
