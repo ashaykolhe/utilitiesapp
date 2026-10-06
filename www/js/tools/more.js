@@ -1163,7 +1163,7 @@ const mxInv = (A) => {
 };
 const mxParseCell = (s) => { s = String(s).trim(); if (!s) return 0; const m = /^(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)$/.exec(s); if (m) return +m[2] ? m[1] / m[2] : NaN; const n = Number(s.replace(',', '.')); return Number.isFinite(n) ? n : NaN; };
 // ==PURE-END==
-reg({ id: 'matrix', name: 'Matrix Calc', icon: '🔢', desc: 'Add, subtract and multiply matrices up to 4 by 4, and find determinants, inverses and transposes, with fractions accepted in cells.', keys: ['matrix', 'determinant', 'inverse', 'linear algebra', 'multiply', 'transpose', 'maths'], needs: [], render(el) {
+reg({ id: 'matrix', name: 'Matrix Calc', icon: '📑', desc: 'Add, subtract and multiply matrices up to 4 by 4, and find determinants, inverses and transposes, with fractions accepted in cells.', keys: ['matrix', 'determinant', 'inverse', 'linear algebra', 'multiply', 'transpose', 'maths'], needs: [], render(el) {
   const sz = ld('matrix.sz', { a: [2, 2], b: [2, 2] });
   const vals = { a: [['2', '1'], ['5', '3']], b: [['1', '0'], ['0', '1']] };
   const OPS = [['add', 'A + B'], ['sub', 'A − B'], ['mul', 'A × B'], ['det', 'det(A)'], ['inv', 'A⁻¹'], ['tr', 'Aᵀ'], ['bmul', 'B × A']];
