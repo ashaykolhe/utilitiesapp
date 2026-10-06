@@ -1,6 +1,6 @@
 # PocketKit: features
 
-PocketKit has 224 tools in 11 categories. Everything works offline and all data stays on the phone.
+PocketKit has 264 tools in 11 categories. Everything works offline and all data stays on the phone.
 **Free** = every everyday utility. **Pro** = a one-time purchase (no subscription) for the heavier features and higher limits.
 
 _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the parts files, not this file._
@@ -15,9 +15,18 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Pro** | One-time purchase `pocketkit_pro` through Google Play, or a trial code. Unlocks the Connect suite (planned), Motion cam, Stop motion, all colour themes and removes the free limits. |
 | **Trial codes** | A code gives Pro until a fixed date. It is checked on the device against a built-in hash list, and the clock cannot be wound back to extend it. |
 | **Free limits** | 4 pinned tools, 3 reminders, 10 notes, 3 voice recordings, 1 saved route, 3 locked files, 5 vault entries. |
+| **Tool of the day** | A different free tool is suggested on Home every day. |
+| **Filters and Surprise me** | Filter by Free, Pro, no permissions, camera, microphone, location or sensors, or open a random tool. |
+| **Collections (Pro)** | Make named groups of tools, for example Travel or Study, shown on Home. |
+| **Share** | A button in every tool shares the text on screen (results, inputs) through the Android share sheet. |
+| **App lock** | A 4 to 6 digit PIN (and optionally fingerprint or face) asked when the app opens or returns after 0 seconds, 30 seconds or 5 minutes. The PIN is stored only as a salted hash. 5 wrong tries cause a growing wait. |
+| **Backup and restore** | Saves settings and tool data to a file and restores it. Pro state, the PIN, recordings, locked files and the vault are not included. |
+| **Tour and What's new** | A three-step tour on first launch (replay in Settings) and a short note after updates. |
+| **Languages** | The app is built for translation packs; Hindi is planned. Missing text shows in English. |
+| **Haptics** | Optional vibration feedback, switchable in Settings. |
 | **Privacy** | No accounts, no ads, no analytics. See privacy-policy.html. |
 
-## Daily (22)
+## Daily (25)
 
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
@@ -28,18 +37,21 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Clipboard Pad** | Free | storage | A scratchpad for snippets you use often: save text, copy it back with one tap, pin favourites to the top and delete. Keeps up to 50 unpinned clips on the device. |
 | **Device Info** | Free | - | Shows screen size, pixel ratio, language, processor cores, memory, online state, touch points, battery and the browser string. |
 | **Expense Tracker** | Free | storage | Logs spending with category, note and date. Shows the month total, a bar for each category and a six-month column chart, with month navigation and a currency symbol. Stored locally. |
-| **Flashlight** | Free | camera | Turns the camera torch on and off. |
+| **Flashlight** | Free | camera | Turns the camera torch on and off. Double taps are ignored while the camera is starting, and leaving the tool during the permission prompt does not leave the camera on. |
+| **Holiday Calendar** | Free | storage | A month calendar showing fixed-date Indian holidays (Republic Day, Independence Day, Gandhi Jayanti and others), international fixed days, computed Easter, Good Friday and Easter Monday, and Mother's and Father's Day. Users can add their own dated events, optionally repeating yearly, which are saved on the device. Movable festivals such as Diwali are not computed, and the tool says so. |
+| **Life Calendar** | Free | storage | Shows a lifetime as a grid of weeks, one row per year of 52 weeks, from the birth date to an expected lifespan (default 80 years). Weeks already lived are filled, this week is outlined, and the stats show weeks lived, weeks left, percentage and days lived. The birth date and expected years are saved on the device. |
+| **Meeting Cost** | Free | - | A running clock that shows what a meeting costs in money, from the number of people and their average hourly rate, with a currency symbol of your choice. It also shows the cost per minute and per hour. Changing people or rate mid-meeting only affects time from then on, so money already spent is never rewritten. |
 | **Meeting Planner** | Free | storage | Lines up your day against up to five cities, colouring each hour as working hours, early or late, or night, and listing the hours that fall within 9 to 17 in every place. |
 | **Moon Phase** | Free | - | Draws the moon for any date with its phase name, age in days, percentage lit and the dates of the next new moon, first quarter, full moon and last quarter. Calculated on the device from the average lunar month (accurate to about half a day). |
 | **Multi Stopwatch** | Free | - | One clock for several runners: start it, tap a runner to record a lap, and see each runner's last lap, best lap and total. Up to 12 runners. |
 | **Pomodoro** | Free | notifications, storage | Focus, short break and long break timers with adjustable lengths, a four-session cycle indicator, and daily and all-time session counts. Uses end timestamps so it stays accurate when the screen is off; a notification and beep fire when a period ends. |
 | **Quick Timers** | Free | notifications, storage | One-tap countdown presets (soft egg, hard egg, tea, coffee, pasta, plank, workout, nap) plus a custom label and minutes. Several timers can run at once; each schedules a notification so it still alerts with the screen off. |
-| **Reminders** | Free (limit: 3 active reminders (Pro: unlimited)) | notifications | Set reminders with a date and time. On Android a notification is scheduled so it appears even when the app is closed. |
+| **Reminders** | Free (limit: 3 active reminders (Pro: unlimited)) | notifications | Set reminders with a date and time (text up to 80 characters, time within the next 5 years, at most 200 saved; finished ones are trimmed to the newest 20). On Android a notification is scheduled so it appears even when the app is closed; it can be a few minutes late on an idle phone. A line says so when notifications are blocked. |
 | **Screen Light** | Free | - | Turns the whole screen into a coloured lamp. Eight presets including a warm lamp, a custom colour picker, a brightness slider and an optional keep-awake (Screen Wake Lock). Tap the screen to hide or show the controls. |
 | **Shopping List** | Free | storage | A shopping list with quantity steppers, quick-add chips, check-off while you shop and one tap to remove everything in the basket. |
 | **Signal Light** | Free | camera (torch, optional) | Flashes the screen white and black and, when the device allows, the camera torch. Modes: SOS, your own Morse message and strobe, with a speed slider. A photosensitivity warning must be accepted before the strobe starts. |
 | **Stopwatch** | Free | - | Time anything to the hundredth of a second, with pause, resume, laps and reset. |
-| **Timer** | Free | - | Count down from any minutes and seconds with start, pause and reset. A tone and vibration play when time is up. |
+| **Timer** | Free | notifications | Count down from 0 to 999 minutes and 0 to 59 seconds with start, pause and reset. A tone and vibration play when time is up, and on Android a notification is scheduled for the end time so it alerts with the screen off (it can be a few minutes late when the phone is idle). A line says so when notifications are blocked. |
 | **Tip of the Day** | Free | - | A short practical tip or proverb for each day from a built-in list, with next, previous, random, copy and share. Works fully offline. |
 | **To-do List** | Free | storage | Tasks with a due date, category, done toggle, search, filter chips and a clear-completed button. Overdue tasks are highlighted. Stored locally. |
 | **World Clock** | Free | storage | Keeps the time in cities from a built-in list of 72 IANA time zones. Shows time, date, UTC offset, the difference from your own time and a sun or moon icon. Reorder, remove, 12 or 24 hour display, saved locally. |
@@ -48,13 +60,13 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
-| **Altitude** | Free | location | Height above sea level from GPS with latitude, longitude and accuracy. |
-| **Compass** | Free | motion | A compass dial that points to north with the heading in degrees and a direction label. |
+| **Altitude** | Free | location | Approximate height above sea level from GPS (labelled as approximate, with the altitude accuracy when the phone gives it), plus latitude, longitude and position accuracy. |
+| **Compass** | Free | motion | A compass dial that points to north with the heading in degrees and a direction label. The heading is tilt-compensated (uses the full orientation, so it stays right when the phone is not perfectly flat) and the dial turns the short way across north. |
 | **Leveler** | Free | motion | A bubble level that shows how far the phone is tilted in two directions, with a zero button. |
 | **My PIN Code** | Free | location, storage | Shows live latitude, longitude, accuracy and altitude, the Open Location Code (Plus Code, computed on the device) and a geo: link that opens in any map app. Copy and share buttons, plus named places (Home, Parking...) with live distance and compass bearing back to each one. |
 | **Parking Saver** | Free | location, notifications, storage | Saves the GPS spot of the parked car with an optional note and meter timer (15 min to 2 h or custom). A notification warns 5 minutes before and at expiry (scheduled with Android so it works with the app closed). Shows live distance, bearing and an arrow back to the car. |
 | **Route Recorder** | Free (limit: 1 saved route (Pro: unlimited routes and GPX export)) | location, storage | Records a GPS track with watchPosition and draws it live on a canvas (auto-scaled line, green start and red end markers) with distance, duration, average and max speed. Routes are saved in IndexedDB; GPX export is Pro. Recording works in the foreground only (app open, screen on) and the screen says so; an unsaved recording is recovered if you leave the tool. |
-| **Speedometer** | Free | location | Live speed in km/h from GPS with top speed and trip distance. |
+| **Speedometer** | Free | location | Live speed in km/h from GPS with top speed and trip distance. Distance only counts movement larger than the GPS noise, so walking adds up and standing still does not drift; speed is worked out from recent fixes when the phone gives no speed value. |
 | **Sunrise & Sunset** | Free | location (optional) | Computes sunrise, sunset, solar noon, civil dawn and dusk and day length for any latitude, longitude and date using the NOAA algorithm. Handles midnight sun and polar night. Times show in the phone's time zone. |
 
 ## Measure (18)
@@ -64,23 +76,23 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Distance Finder** | Free | motion | Finds the horizontal distance to an object by sighting its base and entering your eye height, using distance = eye height divided by tan of the angle downwards. |
 | **G Meter** | Free | motion | Live g-force on X, Y and Z plus the total, a gauge, peak hold and a scrolling line graph. |
 | **Height Finder** | Free | motion | Measures the height of a tree or building from the tilt angle to its top and its base. Uses your eye height to get the distance (or a distance you type) and shows the working. |
-| **Light Meter** | Free | motion (ambient light sensor) | Ambient light in lux with a plain-language label and a graph, using the ambient light sensor when the phone exposes it. Approximate; shows a message instead of guessing when no sensor is available. |
-| **Magnetometer** | Free | motion | Shows magnetic field strength in microtesla with X/Y/Z, peak and a graph, for finding magnets and metal. Shows a clear message when the phone does not expose a magnetometer to apps. |
+| **Light Meter** | Free | motion (ambient light sensor) | Ambient light in lux with a plain-language label and a graph, using the ambient light sensor when the phone exposes it to apps (many do not). Approximate; shows a message instead of guessing when no sensor is available. |
+| **Magnetometer** | Free | motion | Shows magnetic field strength in microtesla with X/Y/Z, peak and a graph, for finding magnets and metal. Works only on phones that expose the sensor to apps (the Android WebView often does not); otherwise it shows a clear message. |
 | **Pendulum Bob** | Free | motion | A plumb line that swings from the top of the screen. It shows the angle from vertical plus the sideways and forward/back tilt, using the gravity vector. |
 | **Protractor** | Free | motion (tilt mode only) | A 0 to 180 degree on-screen protractor with an arm you drag, showing degrees, supplement and complement. Tilt mode uses the phone's gravity sensor to show the angle of the phone's long axis. |
 | **Reaction Test** | Free | storage (best time) | A reaction timer: tap as soon as the big button turns green and see your time in milliseconds, with last, average and best. |
 | **RPM Counter** | Free | microphone (mic mode only) | Tap once per revolution to read RPM averaged over the last taps, or use the microphone to estimate the repeating pulse rate of a sound such as a fan or engine. |
-| **Ruler** | Free | storage (saves the calibration) | An on-screen ruler with centimetre and inch scales, horizontal or vertical. Calibrate it by laying a credit card (85.6 mm) on the screen and dragging a line to the card's far edge; the calibration is saved. |
+| **Ruler** | Free | storage (saves the calibration) | An on-screen ruler with centimetre and inch scales, horizontal or vertical. Calibrate it by laying a credit card (85.6 mm) on the screen and dragging the round handle (only the handle drags, so the page can still scroll) to the card's far edge; Save and Reset sit above the calibration area so they stay visible. The calibration is saved. |
 | **Screen Info** | Free | - | Shows the screen resolution in pixels and dp, pixel ratio, density, viewport, estimated size in inches and aspect ratio, with a full-screen grid overlay and a dead pixel colour test. |
 | **Shadow Height** | Free | - | Finds the height of a tree, pole or building from the length of its shadow compared with a stick of known height. |
 | **Slope Finder** | Free | motion | Measures roof pitch or ramp slope in degrees, percent, ratio (1:n) and rise per 12, by laying the phone on the surface or sighting along its edge. |
-| **Sound Intensity** | Free | microphone | Approximate sound level in decibels from the microphone with minimum and maximum. |
+| **Sound Intensity** | Free | microphone | Approximate sound level in decibels from the microphone with minimum and maximum. Reads the raw microphone (no noise suppression or auto gain) and ignores the first half second so Min does not stick at 0. |
 | **Speed Calc** | Free | - | Calculates speed from distance and time, distance from speed and time, or time from distance and speed, with km, m, miles, feet and nautical miles, and km/h, m/s, mph and knots. |
 | **Stride & Pace** | Free | storage | Calculates your step length from a known distance and step count, converts steps to distance, and calculates running pace (min/km) and speed. |
 | **Unit Price** | Free | - | Compares up to three products by price per 100 g, 100 ml or per piece and highlights the best value, handling kg, lb, oz, litres and fl oz. |
 | **Vibrometer** | Free | motion | Measures vibration of the surface the phone rests on (RMS acceleration), with a live graph, min and max values and a severity label from Still to Severe. |
 
-## Calculate (37)
+## Calculate (42)
 
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
@@ -88,8 +100,9 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Area & Volume** | Free | - | Area, perimeter, surface area, volume and diagonals for square, rectangle, triangle, circle, trapezoid, ellipse, cube, cuboid, cylinder, sphere, cone and square pyramid. |
 | **Billing** | Free | storage | Invoice maker with business name, customer, currency symbol, line items (quantity and price), tax percentage and a discount in percent or amount. Shows subtotal, discount, tax and total live. Saves the last 20 invoices on the device, where they can be viewed again, deleted, copied or shared as plain text. |
 | **Break-even** | Free | - | Units and revenue needed to cover fixed costs from price and variable cost per unit, the contribution margin, and optionally the units needed to reach a profit target. |
-| **Calculator** | Free | - | A simple calculator with add, subtract, multiply, divide, percent, backspace and clear. |
+| **Calculator** | Free | - | A simple calculator with add, subtract, multiply, divide, percent, backspace and clear. Leading zeros are fine (05+3), repeated operators collapse (2××3 is 2×3), percent after + or - is a share of the left value, and expressions are limited to 60 characters. |
 | **Cooking Units** | Free | - | Converts between cups, tablespoons, teaspoons, grams, kilograms, ounces and millilitres for common ingredients (flour, sugar, brown sugar, icing sugar, butter, rice, water/milk, honey, oil, salt, cocoa, oats). |
+| **Currency** | Free | storage | Converts between about 35 major currencies with no network, using a built-in table of approximate rates relative to the US dollar. The user can edit every rate, save them on the device, swap the two currencies and keep a favourites list that shows the converted amount for each. The date the rates were last edited is always shown and the tool states plainly that rates are manual. |
 | **Days Counter** | Free | storage | Shows the days between two dates with a weeks and years/months/days breakdown, adds or subtracts any number of days from a date (with the weekday), and keeps a list of named events with a live countdown. |
 | **Discount & GST** | Free | - | Final price after a discount and tax (GST or VAT). Works when the entered price excludes tax (tax is added) or includes tax (tax is split out). Shows what you save, the price before tax and the tax amount. |
 | **EMI Calculator** | Free | - | Works out the monthly loan instalment (EMI) from amount, yearly interest rate and tenure in years or months. Shows total interest, total payment and the first 12 months of the repayment schedule (principal, interest, balance). A 0% rate is handled as a plain split. |
@@ -102,7 +115,9 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Loan Compare** | Free | - | Compares two loan offers for the same amount (rate and months for each): EMI, total interest, total cost, and which offer is cheaper by how much. |
 | **Marks & GPA** | Free | - | Adds up exam marks (one subject per line, optionally as 42/50) into a total and percentage with a typical grade, and computes a credit-weighted GPA from letter grades or grade points. Inputs are remembered. |
 | **Markup & Margin** | Free | - | Profit, margin and markup from cost and selling price, and the selling price you need for a target margin (of price) or markup (on cost). |
+| **Matrix Calc** | Free | - | Matrix calculator for matrices up to 4 by 4: add, subtract and multiply (A times B or B times A), determinant, inverse and transpose. Cells accept integers, decimals and fractions like 1/2, results are tidied to fractions where possible, and clear messages explain size mismatches and singular matrices. |
 | **Net Worth** | Free | - | Type assets and debts, one per line with the amount at the end of the line, and see total assets, total debts and net worth. Lists are remembered on the device. |
+| **Number Patterns** | Free | - | Four visual explorers for number sequences. Fibonacci lists up to 150 terms (exact, using big integers) and shows how the ratio approaches the golden ratio. Primes shows a sieve grid up to 1000 with a count, and a factoriser for numbers up to about 10^12. Triangular numbers show a bar chart. Collatz shows the path, step count and highest value for any start up to a billion. |
 | **Number Words** | Free | - | Writes a number out in words (for cheques and invoices) using the Indian system (lakh, crore) or the international system (million, billion), including negatives and two decimal places. |
 | **Percentage** | Free | - | Four quick percentage calculators on one screen: X% of Y, X is what percent of Y, percent change between two values, and add or subtract a percentage from a value. |
 | **Power Cost** | Free | - | Electricity use and cost of an appliance per day, 30-day month and year from its watts, quantity, hours per day and price per kWh. |
@@ -110,6 +125,7 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Quadratic** | Free | - | Solves ax² + bx + c = 0 with real, repeated or complex roots, the discriminant and the vertex of the parabola. Also handles the linear case when a is 0. |
 | **Random** | Free | - | Draws random numbers in a range (one or many, optionally without repeats until the range is exhausted), picks one item from a list or shuffles the list, and picks a random date between two dates with its weekday. Uses the secure random generator. |
 | **Ratio** | Free | - | Simplifies a ratio to lowest terms, solves a proportion (a : b = c : x) and splits an amount in a given ratio. |
+| **Recipe Scaler** | Free | storage | Scales an ingredient list from the original servings to the number you want to serve. It understands amounts such as 1 1/2, 2.5, 3/4, unicode fractions and ranges like 2-3, keeps the units and prints results as kitchen fractions. Recipes can be saved and reopened from a list on the device. |
 | **Salary Convert** | Free | - | Converts pay between hourly, daily, weekly, monthly and yearly using your hours per week, weeks per year and days per week. |
 | **Scientific** | Free | - | Scientific calculator with brackets, sin/cos/tan and inverses in degrees or radians, log, ln, square root, power, factorial, pi, e, percent, Ans and memory keys (MC, MR, M+, M-). Uses a hand-written expression parser (no eval) and shows a live preview of the result. |
 | **Simple Interest** | Free | - | Simple interest and total amount for a principal, annual rate and time given in years, months or days. |
@@ -119,10 +135,11 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Time Calc** | Free | - | Adds and subtracts durations typed as 1:30, 2h 15m, 90m or 45s (a leading minus subtracts), and works out the hours between two clock times with an unpaid break, including shifts past midnight. |
 | **Tip Splitter** | Free | - | Splits a restaurant bill between any number of people with a tip percentage, and can round each person's share up to a whole number. |
 | **Triangle** | Free | - | Solves a triangle from three sides, or from two sides and the angle between them. Gives all three angles, type (scalene/isosceles/equilateral, acute/right/obtuse), area, perimeter, inradius and circumradius. |
-| **Unit Converter** | Free | - | Convert length, weight, volume, area, speed, data, time and temperature between common units. |
+| **Trig Circle** | Free | - | An interactive unit circle with a draggable point. For any angle it shows sine, cosine and tangent, the angle in radians (and as a multiple of pi for common angles) and exact values such as sqrt(3)/2 for multiples of 30 and 45 degrees. A table of exact values for the common angles lets you tap a row to jump to it. |
+| **Unit Converter** | Free | - | Convert length, weight, volume, area, speed, data, time and temperature between common units. The value, units and category all have labels; the value is limited to +-1 trillion. |
 | **Work Days** | Free | - | Finds the date after N working days (skipping weekends, negative numbers go backwards) and counts working days between two dates. The weekend can be Sat+Sun, Fri+Sat or Sun only. |
 
-## Text & Data (34)
+## Text & Data (38)
 
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
@@ -133,9 +150,11 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Case & Slug** | Free | - | Converts text into URL slug, camelCase, PascalCase, snake_case, kebab-case, CONSTANT_CASE or dot.case, line by line. Accents are removed for slugs. |
 | **Checklist** | Free | storage | A simple to-do or shopping list with tick boxes, a progress bar and Clear ticked, saved on the device (up to 300 items). |
 | **Colour Convert** | Free | - | Converts colours between HEX, RGB and HSL with a native colour picker and a large live swatch. Shows ready-to-copy CSS values. |
+| **Country Codes** | Free | - | A searchable offline list of about 110 countries showing flag, phone dial code, ISO 2 and 3 letter codes and currency code. Search matches the country name, ISO codes, currency code or dial code (with or without a plus sign), and tapping a country copies its dial code. |
 | **CSV Viewer** | Free | - | Shows pasted CSV (comma, semicolon, tab or pipe, auto-detected) as a scrollable table or converts it to JSON. Handles quoted fields, embedded commas and line breaks. |
 | **Emoji & Symbols** | Free | - | A keyboard of emoji and special characters (arrows, maths, currency, Greek, punctuation, shapes, box drawing, super and subscripts) with search. Tap characters to build text and copy it. |
 | **Fancy Text** | Free | - | Restyles your text into many Unicode looks (bold, italic, script, gothic, double-struck, monospace, circled, squared, fullwidth, small caps, upside down, strikethrough, underline) that can be pasted anywhere. |
+| **Flashcards** | Free | storage | Create decks and cards and study them with a five-box Leitner system: a correct answer moves a card up a box (review after 1, 2, 4, 8 then 16 days) and a miss sends it back to box 1. Shows due counts, per-box stats and accuracy, and decks can be imported from or exported as plain text in the form "front :: back". |
 | **Hash Maker** | Free | - | Computes SHA-1, SHA-256, SHA-384 and SHA-512 hashes of typed text or a chosen file, all on the device, and compares the result against a hash you paste. |
 | **JSON Tool** | Free | - | Pretty-prints (2 spaces, 4 spaces or tab), minifies and validates JSON. Errors show the line and column with a pointer, and the cursor jumps to the problem. |
 | **Lorem Ipsum** | Free | - | Generates placeholder text as paragraphs, sentences or words (1 to 100), optionally starting with the classic "Lorem ipsum dolor sit amet". |
@@ -147,6 +166,7 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Number Bases** | Free | - | Converts whole numbers between binary, octal, decimal and hex and any other base from 2 to 36, using big integers so very long numbers stay exact. Negative numbers work. |
 | **Number Sorter** | Free | - | Sorts a pasted list of numbers (separated by spaces, commas or lines), optionally removes duplicates, and shows count, sum, average, median, smallest and largest. |
 | **Password Maker** | Free | - | Creates random passwords of 4 to 64 characters using the secure random generator. Choose upper case, lower case, digits and symbols, optionally avoid look-alike characters, see a strength meter and copy. |
+| **Periodic Table** | Free | - | All 118 elements in a colour-coded periodic table (alkali metals, noble gases, lanthanides and more) with atomic number, symbol, name and atomic mass. A searchable list and a detail card show group, period, category and state at room temperature, and tapping a category chip highlights that family. |
 | **Phone Keypad** | Free | - | Converts text to old phone keypad key presses (multi-tap such as `44 33 555 555 666`, or single T9 digits) and decodes multi-tap digits back to text. |
 | **Pig Latin** | Free | - | Turns English text into Pig Latin, keeping capital letters and punctuation. |
 | **QR & Barcode** | Free | - | Makes QR codes from text, web links, Wi-Fi details, phone numbers, email and SMS templates, plus Code 128 and EAN-13 barcodes drawn on a canvas. The picture can be saved as a PNG or shared. |
@@ -159,9 +179,10 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Text Tools** | Free | - | Live counts of words, characters, characters without spaces, sentences, lines and paragraphs, plus one-tap UPPER, lower, Title and Sentence case, reverse, space clean-up, dedupe lines, sort lines and remove blank lines, with Undo and Copy. |
 | **Timestamp** | Free | - | Shows the live Unix time and converts timestamps (seconds or milliseconds, auto-detected) to UTC, local and ISO dates with a relative time, and converts a chosen date and time to seconds and milliseconds. |
 | **UUID Maker** | Free | - | Generates random version 4 UUIDs, 1 to 50 at a time, with upper-case and no-dash options. |
+| **Word Finder** | Free | - | An offline word helper with a built-in list of about 3,900 common English words. It finds anagrams of a word, words that can be made from a set of letters (use ? for a blank tile, minimum length adjustable), and words matching a pattern where ? is one letter and * is any run of letters. Results are grouped by length. |
 | **Word Frequency** | Free | - | Counts how often each word appears, ranks the top 40 with bars, and can skip common words like "the" and "and". Copy the list as tab-separated text. |
 
-## Audio (22)
+## Audio (23)
 
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
@@ -169,43 +190,46 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Binaural Beats** | Free | - | Plays a slightly different tone in each ear to create a binaural beat, with presets for delta, theta, alpha, beta and gamma, adjustable beat and carrier frequency, volume and an auto-stop timer. Needs headphones. |
 | **Chords & Scales** | Free | - | Reference for 11 chord types and 9 scales in all 12 keys. Shows the note names, highlights them on a two-octave keyboard and plays them (strummed chord or ascending scale). |
 | **Clap Counter** | Free | microphone | Counts claps or sharp sounds from the microphone with adjustable sensitivity, a level bar with threshold marker and a claps-per-minute rate. |
-| **Dog Whistle** | Free | - | High-pitched tone from 8 to 22 kHz with presets and steady, pulsing or sweeping patterns for attracting or training pets. Warns about volume and that many phone speakers cannot reach the top range. |
+| **Dog Whistle** | Free | - | High-pitched tone from 8 to 22 kHz with presets and steady, pulsing or sweeping patterns for attracting or training pets. Warns about volume and that many phone speakers cannot reach the top range. Output is limited to about half amplitude and starting above 70% volume asks for confirmation. |
 | **Drum Pad** | Free | - | Eight large synthesized drum pads (kick, snare, clap, hi-hat, open hat, tom, rim, cowbell) with multi-touch and a master volume. No sound files are used. |
 | **Hearing Test** | Free | - | A guided high-frequency hearing test: tones at 4, 8, 10, 12, 14, 15, 16, 17, 18, 19 and 20 kHz in both ears, left or right, and the highest tone you can hear is reported. It is for fun and not a medical test. |
 | **Metronome** | Free | - | Steady click from 30 to 300 BPM with an accented first beat, time signatures from 1/4 to 12/4 and tap tempo. Clicks are scheduled ahead with Web Audio so timing stays accurate, and beat dots show the current beat. |
 | **Mike** | Free | microphone | Uses the microphone as a loudspeaker: mic to phone speaker or headphones with a gain control up to 300%, a limiter, an echo-cancellation option and a level meter. Shows a strong feedback warning first. |
-| **Piano** | Free | - | Two-octave (25 key) on-screen piano with multi-touch chords, finger sliding between keys, octave shift of two octaves either way and four waveform sounds. |
+| **Morse Trainer** | Free | - | Plays a Morse code letter or digit as beeps using Web Audio and the user taps (or types) what they heard. Five levels grow from 4 letters to letters plus digits, speed is adjustable from 5 to 25 words per minute, and it tracks correct answers, accuracy and streak. The audio context is closed when leaving the tool. |
+| **Piano** | Free | - | On-screen piano with 15 wide keys (C to D an octave higher), multi-touch chords, finger sliding between keys, octave shift of two octaves either way and four waveform sounds. |
 | **Pitch Pipe** | Free | - | Plays a steady reference note for any of the 12 notes in octaves 3, 4 or 5, useful for tuning voice or an instrument by ear. Shows the note name and frequency. |
 | **Sleep Sounds** | Free | - | Looping relaxing sounds synthesized offline: white, pink and brown noise, rain, ocean waves and wind. Has a volume slider, a sleep timer (15 minutes to 8 hours) and a fade-out when the timer ends. |
-| **Speaker Cleaner** | Free | - | Plays a low 165 Hz tone (or a 100 to 450 Hz sweep for dust) for 15 seconds to 2 minutes to help shake water out of a phone speaker, with a countdown and progress bar. |
-| **Spectrum** | Free | microphone | Live frequency spectrum bars (48 log-spaced bands, 30 Hz to 16 kHz, with falling peak caps) and a waveform trace from the microphone, plus the loudest frequency in Hz. |
-| **Speech to Text** | Free | microphone | Turns your speech into text that you can copy. |
+| **Speaker Cleaner** | Free | - | Plays a low 165 Hz tone (or a 100 to 450 Hz sweep for dust) for 15 seconds to 2 minutes to help shake water out of a phone speaker, with a countdown and progress bar. Reminds you to unplug headphones; output is limited to about half amplitude. |
+| **Spectrum** | Free | microphone | Live frequency spectrum bars (48 log-spaced bands, 30 Hz to 16 kHz, with falling peak caps) and a waveform trace from the microphone, plus the loudest frequency in Hz (ignores the lowest bins and interpolates between them for a steadier reading). |
+| **Speech to Text** | Free | microphone | Turns your speech into text that you can copy. Many Android WebViews have no speech recognition; the tool says so up front and disables the button. Errors such as permission denied or no speech heard are explained in plain words. |
 | **Stereo Test** | Free | - | Checks speakers or headphones channel by channel with a tone or pink noise on left, right, both or alternating every second, with L and R indicators on screen. |
-| **Text to Speech** | Free | - | Reads typed text aloud with a choice of voice and speed. |
-| **Tone Generator** | Free | - | Plays a pure tone from 20 Hz to 20 kHz (log slider plus number box) as sine, square, triangle or sawtooth, with a volume control and an optional looping frequency sweep. Shows the nearest note and warns about loud sound. |
+| **Text to Speech** | Free | - | Reads typed text aloud (up to 5000 characters) with a choice of voice and speed. Speak with empty text shows a message. |
+| **Tone Generator** | Free | - | Plays a pure tone from 20 Hz to 20 kHz (log slider plus number box) as sine, square, triangle or sawtooth, with a volume control and an optional looping frequency sweep. Shows the nearest note and warns about loud sound. Output is capped at about half amplitude and runs through a limiter; a confirmation appears before playing above 70% volume at more than 1 kHz. |
 | **Tone Sequencer** | Free | - | A 16-step by 8-note pentatonic grid for composing a looping melody, with tempo from 60 to 200 BPM, four sounds, random and clear buttons. The pattern and tempo are remembered. |
 | **Tuner** | Free | microphone | Chromatic tuner using YIN pitch detection on the microphone. Shows note, frequency, cents off and a needle, and has guitar, ukulele, bass and violin presets that match your note to the nearest string. |
 | **Vocal Range** | Free | microphone | Sing your lowest and highest comfortable notes; the stable notes are tracked with pitch detection and the range is shown in notes, semitones and octaves with a rough voice type guess. The range is saved on the device. |
-| **Voice Recorder** | Free (limit: 3 saved recordings (Pro: unlimited)) | microphone, storage | Records voice memos with MediaRecorder with pause, resume and stop. Recordings are kept in IndexedDB on the device and listed with play, rename, share or download and delete. The free plan keeps 3 recordings, then shows the Pro sheet. |
+| **Voice Recorder** | Free (limit: 3 saved recordings (Pro: unlimited)) | microphone, storage | Records voice memos with MediaRecorder with pause, resume and stop. Recordings are kept in IndexedDB on the device and listed with play, rename, share or download and delete. The free plan keeps 3 recordings, then shows the Pro sheet. The Record button is disabled until the saved list has loaded and while a recording is starting, a recording stops by itself after 1 hour, and the free limit is checked again when a recording ends. |
 
-## Camera (19)
+## Camera (21)
 
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
-| **Blank Cam** | Free | camera, microphone | Records video from the front or rear camera while the whole screen is black so recording is discreet. A large dim Stop button ends the recording, then the video can be previewed and saved or shared. A clear note warns that recording others without consent may be illegal. |
-| **Code Scanner** | Free | camera | Scans QR codes and barcodes with the camera using the built-in BarcodeDetector when the phone has it, otherwise a bundled jsQR for QR codes. It shows the result, copies it, offers an Open link button only for http and https text, keeps a history, and can also scan a picture from the phone. |
+| **Blank Cam** | Free | camera, microphone | Records video from the front or rear camera while the whole screen is black so recording is discreet. A large dim Stop button ends the recording (automatic stop at 30 minutes), then the video can be previewed and saved or shared. The screen is kept awake while recording. If only the microphone is denied it records video without sound and says so. Leaving the tool mid-recording stops it and offers what was captured to the share sheet. A clear note warns that recording others without consent may be illegal. |
+| **Code Scanner** | Free | camera | Scans QR codes (bundled jsQR) and EAN-13, EAN-8, UPC-A, UPC-E and Code 128 product barcodes with the camera or from a picture, using its own built-in decoder that works without the browser's BarcodeDetector (when the phone has BarcodeDetector it is used first). The decoder tries many scanlines, slightly tilted and sideways ones, both directions (upside down) and light-on-dark codes, and checks the check digit. Camera 1D reads must repeat on a second scan before they are accepted. The result card shows the type (for example EAN-13 or UPC-A) and the digits, with Copy and, for http/https text, Open link. A history keeps the last 20; scanning a picture tries several sizes. |
 | **Collage** | Free | storage | Combine up to 9 pictures from the phone into one collage using layouts from two side by side up to 3 by 3, with spacing and background colour, a shuffle button, and save as JPEG. |
+| **Colour Blind Sim** | Free | storage | Choose a photo and see it next to a simulation of protanopia, deuteranopia, tritanopia or total colour blindness, calculated on the device with published colour-vision matrices applied in linear RGB. The simulated image can be saved as a PNG. |
 | **Colour Detector** | Free | camera | Live camera with a centre crosshair that shows the colour under it as HEX and RGB with the nearest of about 110 named colours. Tap the view to lock a colour, copy the HEX, and keep a history of the last 12 locked colours. |
 | **Doc Scanner** | Free | camera, storage | Take or pick a photo of a page, drag four corners over it, straighten it with a perspective correction, then choose colour, grey or black-and-white (adaptive threshold for uneven light), rotate and save as JPEG or PNG. |
 | **Eye Dropper** | Free | storage | Pick a picture, touch or drag over it to read any pixel colour as HEX and RGB with the nearest colour name, copy the HEX, and tap one of the six main colours automatically extracted from the picture. |
 | **Grid Cam** | Free | camera, motion | Camera with composition overlays (rule of thirds, 4 by 4 grid, cross, diagonals) and a live horizon line driven by the accelerometer that turns green when the phone is level. Capture a photo with front or rear camera. |
+| **Image Palette** | Free | storage | Pick a photo and extract its dominant colours (default six, adjustable from 2 to 10) using median cut with k-means refinement. Shows a strip with each colour in proportion, then a list with HEX, RGB and share, and lets you copy one colour, all HEX codes or a CSS variable block. |
 | **Image Shrink** | Free | storage | Reduces picture file size by limiting the longest side and setting JPEG or WebP quality, for many pictures at once, showing the before and after sizes and the percentage saved. |
 | **Img Convert** | Free | storage | Converts pictures between PNG, JPEG and WebP, for several files at once. Transparent areas become white when saving as JPEG. |
 | **Magnifier** | Free | camera | Turns the rear camera into a magnifying glass with a zoom slider (real camera zoom when available, otherwise digital zoom), freeze frame, torch toggle, brightness and contrast sliders, and a button that saves the current view as a picture. |
 | **Mirror** | Free | camera | Uses the front camera as a mirror: the picture is flipped like a real mirror, with zoom, brightness, freeze and a switch to the rear camera. |
-| **Motion Cam** | Pro | camera | Watches the camera and detects movement by comparing small frames, ignoring small noise. When enough of the picture changes it beeps and vibrates, and saves a snapshot with the time to a log in the app. Sensitivity can be changed and the log entries can be saved. |
+| **Motion Cam** | Pro | camera | Watches the camera and detects movement by comparing small frames, ignoring small noise. When enough of the picture changes it beeps and vibrates, and keeps a snapshot with the time in a list for this session only (it is cleared when you leave the tool, so save entries you want). Sensitivity can be changed and the entries can be saved. The screen stays awake while watching. |
 | **Night Cam** | Free | camera | Brightens dark scenes live by boosting brightness, contrast and gamma on a canvas, with an optional green night-vision tint, a torch toggle when supported, and a button to capture a photo at full camera resolution. |
-| **Photo Cleaner** | Free | storage | Removes hidden metadata such as GPS location, camera model and time from photos by re-encoding them at full size, and tells you whether metadata was found in each JPEG. Nothing is uploaded. |
+| **Photo Cleaner** | Free | storage | Removes hidden metadata such as GPS location, camera model and time from photos by re-encoding them (pictures over 4096 px on the longest side are scaled down to 4096 px), and tells you whether metadata was found in each JPEG. Nothing is uploaded. |
 | **Photo FX** | Free | storage | Simple photo editor: look presets (grey, sepia, invert, vivid, cool, warm, soft), brightness, contrast and saturation sliders, rotate and flip, and save at full size as JPEG or PNG. |
 | **Pixel Ruler** | Free | camera, storage | Take or pick a photo, drag two points over it to measure the distance in image pixels, then calibrate with an object of known length (a coin or card) to show real units such as mm. |
 | **Stop Motion** | Pro | camera | Build stop-motion films: capture frames with a see-through onion-skin of the previous frame, delete or reorder frames, play them back at a chosen frames-per-second and export a WebM video recorded from a canvas. |
@@ -233,7 +257,7 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Mood Log** | Free | storage | Record how you feel each day with a face and an optional note, and see the last 14 days as coloured bars plus a recent list. Stored on the device. |
 | **Sleep Calculator** | Free | - | Suggests bedtimes for a wake-up time, or wake-up times for a bedtime, using 90 minute cycles and 15 minutes to fall asleep. |
 | **Step Counter** | Free | motion, storage | Counts steps with the motion sensor while the app is open, with a daily goal ring, distance and calorie estimates, and a 14 day history. It cannot count in the background and stops its sensor when you leave. |
-| **Waist-Hip Ratio** | Free | - | Waist-to-hip ratio with the WHO risk bands for men and women. |
+| **Waist-Hip Ratio** | Free | - | Waist-to-hip ratio against the WHO cut-offs (0.90 men, 0.85 women). |
 | **Water Tracker** | Free | storage | Track daily water with quick-add glass buttons, a custom amount, an animated water level, an adjustable goal and a 14 day bar history. |
 | **Workout Timer** | Free | storage | An interval timer for HIIT and circuits with work, rest and rounds, a 5 second get-ready, colour-coded phases, sound and vibration cues, pause and reset. |
 
@@ -242,57 +266,82 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
 | **2FA Codes** | Free | storage | An offline authenticator for two-step verification (TOTP, RFC 6238 with HMAC-SHA1, SHA-256 or SHA-512 through WebCrypto, 6 to 8 digits, 10 to 120 s periods). Accounts can be added from a base32 secret or an otpauth:// link. Secrets are stored encrypted under their own master password using the same AES-256-GCM vault scheme, with lockout, auto-lock and encrypted backup/import. Codes show a countdown and copy with a 30 s clipboard clear. The engine passes the RFC 6238 and RFC 4226 test vectors. |
-| **Checksum** | Free | storage | Hashes any chosen file with SHA-256, SHA-512, SHA-384 or SHA-1 using WebCrypto and compares it with a hash you paste (spaces, colons and case are ignored; the algorithm is picked from the hash length). The whole file is read into memory because WebCrypto cannot hash in a stream, so very large files may fail. |
+| **Checksum** | Free | storage | Hashes any chosen file with SHA-256, SHA-512, SHA-384 or SHA-1 using WebCrypto and compares it with a hash you paste (a whole sha256sum line or a "sha256:" prefix is accepted, case is ignored, the algorithm is picked from the hash length, and a hash of the wrong length for the chosen algorithm is reported as such). The whole file is read into memory because WebCrypto cannot hash in a stream, so very large files may fail. |
 | **Emergency Card** | Free | storage | A large, easy-to-read card with name, blood group, allergies, conditions, medicines, organ donor status and two emergency contacts with one-tap call buttons, stored locally on the phone (not encrypted, by design, so first responders can read it). |
-| **File Locker** | Free (limit: 3 locked files (Pro: unlimited)) | storage | Encrypts photos, videos and documents with AES-256-GCM using a key derived from a vault password (PBKDF2-SHA256, 600,000 rounds, random 16-byte salt, random 12-byte IV per file) and stores them, with encrypted names and thumbnails, in IndexedDB. Has a setup flow with strength hint and a no-recovery warning, a wrong-password lockout (30 s after 5 failures, doubling), preview, export (decrypt and share/download), delete, change password (re-encrypts every file in one transaction), optional biometric quick unlock when the NativeBiometric plugin exists, and auto-lock when leaving the tool or after 60 s in the background. Files over 100 MB show a warning. |
+| **File Locker** | Free (limit: 3 locked files (Pro: unlimited)) | storage | Encrypts photos, videos and documents with AES-256-GCM using a key derived from a vault password (PBKDF2-SHA256, 600,000 rounds, random 16-byte salt, random 12-byte IV per file) and stores them, with encrypted names and thumbnails, in IndexedDB. Has a setup flow with strength hint and a no-recovery warning, a wrong-password lockout (30 s after 5 failures, doubling), preview, export (decrypt and share/download), delete, change password (re-encrypts one file at a time into a scratch store, then switches everything in a single transaction, so a failure leaves the old password and data untouched), optional biometric quick unlock (the password is kept behind the phone's secure hardware and released only after a live fingerprint or face check; it stops working if biometrics change), and auto-lock when leaving the tool, after 2 minutes without use, or after 60 s in the background. Screenshots are blocked while it is unlocked. File names and thumbnails live in a separate encrypted store so the list opens without reading file contents. Files over 100 MB show a warning; files over 200 MB, and more than 1000 files, are refused. Passwords under about 50 bits of strength need an explicit "Use anyway". |
 | **Password Check** | Free | - | Live password strength checker that runs only on the phone. Shows a meter, entropy estimate in bits, estimated crack time for online guessing, slow-hash and fast-hash attacks, problems found (common passwords with leetspeak, dictionary words, repeats, sequences, keyboard runs, years) and suggestions. |
-| **Password Vault** | Free (limit: 5 entries (Pro: unlimited)) | storage | A master-password-protected store of logins (title, username, password, website, notes) encrypted with AES-256-GCM as one blob under its own salt and key. Includes search, show/hide, copy buttons that clear the clipboard after 30 s where Android allows it, a built-in password generator with a length field and strength meter, edit and delete, change master password, and an encrypted backup file (JSON with salt, iv, ciphertext) that can be exported and imported with a warning. |
-| **PIN & Passphrase** | Free | - | Generates random PINs (4 to 12 digits, optionally avoiding 0000 or 1234 style PINs), word passphrases from a built-in 789 word list (3 to 10 words, separator, capitalise, number) and random passwords (8 to 64 characters, choose character sets), all from crypto.getRandomValues with unbiased selection. Shows the bits of randomness and copies with a 30 s clipboard clear. |
+| **Password Vault** | Free (limit: 5 entries (Pro: unlimited)) | storage | A master-password-protected store of logins (title, username, password, website, notes) encrypted with AES-256-GCM as one blob under its own salt and key. Includes search, show/hide, copy buttons that clear the clipboard after 30 s where the phone supports it (the message says whether it will), a built-in password generator with a length field and strength meter, edit and delete, change master password, and an encrypted backup file (JSON with salt, iv, ciphertext) that can be exported and imported with a warning. |
+| **PIN & Passphrase** | Free | - | Generates random PINs (4 to 12 digits, optionally avoiding easy PINs: repeated digits, runs, doubled pairs such as 1122, ABAB such as 1212, years 19xx and 20xx and keypad lines such as 2580; the bits shown account for the PINs left out), word passphrases from a built-in 789 word list (3 to 10 words, 7 by default, about 9.6 bits per word; separator, capitalise, number) and random passwords (8 to 64 characters, choose character sets), all from crypto.getRandomValues with unbiased selection. Shows the bits of randomness and copies with a 30 s clipboard clear. |
 | **Privacy Checklist** | Free | storage | An interactive checklist of 25 phone privacy and security habits in five groups with a progress bar and percentage, saved on the device. |
 | **Secret Notes** | Free | storage | Private notes encrypted with AES-256-GCM under their own master password, separate from the regular Notes tool. Includes search, create, edit, delete, change password, lockout, auto-lock and encrypted backup/import. |
-| **Text Locker** | Free | - | Encrypts a text message with a password into a shareable Base64 string using AES-256-GCM and PBKDF2-SHA256 (600,000 rounds, random salt and IV, header authenticated), and decrypts such strings. A wrong password or any edit to the code makes decryption fail. |
+| **Text Locker** | Free | - | Encrypts a text message with a password into a shareable Base64 string using AES-256-GCM and PBKDF2-SHA256 (600,000 rounds, random salt and IV, header authenticated), and decrypts such strings. Messages are limited to 14,000 bytes of UTF-8; the box for pasting a locked code takes up to 100,000 characters. Weak passwords need an explicit "Use anyway"; files made with more than 1.2 million rounds are rejected as invalid. A wrong password or any edit to the code makes decryption fail. |
 
-## Create (1)
+## Create (5)
 
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
+| **ASCII Art** | Free | - | Converts any chosen photo into text art made of characters. The width (20 to 140 characters), character set (classic, detailed, simple, blocks) and an invert switch can be changed, with the result copied to the clipboard or saved as a text file. |
 | **Paint** | Free | storage | Draw with any colour and brush size, use an eraser, undo, clear and save the picture as an image. |
+| **Paint Mixer** | Free | - | Mixes two or three colours by ratio (parts 0 to 10) and shows the resulting HEX and RGB values. It then generates complementary, analogous, triadic, split-complementary and tetradic palettes from the mix, and any swatch can be copied. It explains that mixing is a screen-colour average and not real pigment mixing. |
+| **Pixel Art** | Free | storage | A pixel drawing board with a 16 by 16 or 32 by 32 grid, a 16 colour palette plus custom colour, pen, eraser, fill bucket and colour picker, plus undo and a grid toggle. Exports the artwork as a sharp, enlarged PNG (512 pixels wide) and automatically keeps the current drawing on the device. |
+| **Signature Pad** | Free | - | A smooth finger or mouse drawing pad for signing, with four ink colours and adjustable pen thickness. It exports the signature as a transparent PNG tightly cropped to the ink, ready to place on documents, and saves or shares it through the system share sheet. |
 
-## Fun (33)
+## Fun (54)
 
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
 | **2048** | Free | - | Swipe to slide and merge tiles with smooth sliding and pop animations. Score and best score (saved). Arrow keys also work on desktop. |
+| **24 Game** | Free | storage | Make exactly 24 from four numbers using + - x and / with each number used once. Every deal is guaranteed solvable, with exact fractions, undo, reset, a hint that shows one solution, a timer and a saved solve count and best time. |
+| **Balance Ball** | Free | motion, storage | Tilt the phone to roll a ball around an arena, collect stars (they add time) and avoid the moving red mines before the 45 seconds run out. Without a tilt sensor, drag a finger to pull the ball instead. The screen stays awake during play. Saved best score. |
 | **Bingo Caller** | Free | - | Calls bingo numbers 1 to 75 with the B-I-N-G-O letter, shows all called numbers on a board and the last few calls, optionally read aloud. Saved between sessions. |
+| **Blackjack** | Free | storage | Single-player blackjack against the dealer with saved chips: hit, stand or double down. Blackjack pays 3 to 2, the dealer stands on all 17s and aces count as 11 or 1. Chips and best chips are remembered; if you run out you can start again with 1000. |
+| **Block Stack** | Free | storage | A falling-blocks game. Move, rotate and drop the pieces to complete rows; the speed rises with the level. Control by dragging, tapping and swiping on the board or with the on-screen buttons (hold to repeat). Next-piece preview, ghost piece, pause and a saved best score. |
 | **Bottle Spinner** | Free | - | Spin a bottle in the middle of a circle of 2 to 12 numbered seats. It slows to a stop and highlights the seat it points at. |
+| **Breakout** | Free | storage | Bounce the ball off your paddle to smash every brick. Drag your finger to steer, three lives, faster balls and more rows each level, with a saved best score. |
 | **Coin Flip** | Free | - | Flip a gold 3D coin that spins and hops, landing on Heads or Tails. Keeps a saved tally with a heads/tails ratio bar. |
 | **Connect Four** | Free | - | Drop discs and connect four. Play a minimax phone at Easy, Normal or Hard, or two players on one phone. Score saved. |
+| **Daily Challenge** | Free | storage | One small puzzle per day, chosen from the device date: a word scramble, a number sequence or three quick sums. You get three tries, and a streak counter grows when you solve it on consecutive days. Streak, best streak and today's progress are saved on the device. |
 | **Dice Roller** | Free | - | Roll 1 to 6 dice of d4, d6, d8, d10, d12 or d20 with a tumbling animation. Shows each die (pips for d6), the total and a saved history of the last rolls. Uses crypto.getRandomValues. |
+| **Digit Span** | Free | storage | A memory span test: digits flash one at a time, then you type them back forwards or backwards. The sequence grows by one each round; two wrong answers end the run. The best length per mode is saved. |
+| **Dodge** | Free | motion, storage | Steer a ship left and right to dodge falling rocks and grab stars; it speeds up the longer you survive. Steer by dragging, or switch on tilt steering. The screen stays awake while tilt is on. Saved best score. |
+| **Dots and Boxes** | Free | storage | Take turns drawing lines between dots; closing the fourth side of a box claims it and gives another go. Play the phone on a 3x3, 4x4 or 5x5 grid at an easy or smart level. Wins are saved. |
 | **Finger Chooser** | Free | - | Everyone holds a finger on the screen; after a 3 second countdown the phone picks 1, 2 or 3 random fingers as the winners. |
 | **Flappy Tap** | Free | - | Tap to flap a bird between pipes. Canvas animation with gravity, scoring per pipe and a saved best. |
+| **Gem Match** | Free | storage | A match-3 puzzle on an 8x8 fruit board: swap neighbours (tap two, or swipe) to line up three or more. Matches clear, gems fall, new ones drop in and cascades score combo bonuses. 30 moves per game, hint button, automatic reshuffle when no moves are left and a saved best. |
 | **Hangman** | Free | - | Guess a hidden word from a built-in list of 80 words with a category hint. A gallows drawing builds up with each miss (6 lives). Win/loss and streaks saved. |
+| **Higher or Lower** | Free | storage | Will the next card be higher or lower? Build the longest streak you can through a shuffled 52-card deck. Aces are high and equal values are a push. Saved best streak. |
 | **Lights Out** | Free | - | Tap a light to toggle it and its four neighbours; turn them all off. Three difficulty levels, every level is solvable, best moves saved. |
 | **Lucky Numbers** | Free | - | Random number picker with presets for 6 of 49 and 5 of 50 plus 2 stars, or a custom amount from any range up to 1000. Balls pop in one by one, sorted and unique. |
 | **Magic 8-Ball** | Free | motion | Ask a question, then shake the phone or tap the ball for one of 20 classic answers shown in the blue window with a shaking animation. |
+| **Mastermind** | Free | storage | Crack the secret colour code. After each guess you get black pegs for the right colour in the right place and rings for the right colour in the wrong place. Every colour also has its own symbol so it works without colour vision. Three levels (4 pegs no repeats, 4 pegs with repeats, 5 pegs with 8 colours) and a saved best per level. |
 | **Math Sprint** | Free | - | Answer as many arithmetic questions as possible in 30 seconds with a built-in number pad. Auto-checks when you type enough digits. Three levels, best saved. |
+| **Maze Runner** | Free | storage | A new random maze every level, always solvable and growing from 8x8 up to 15x15. Swipe or use the arrows to run along the corridors to the flag; the runner stops at junctions and dead ends. Timer and a saved best level. |
 | **Memory Match** | Free | - | Flip cards to find matching emoji pairs on 3x4, 4x4 or 4x5 grids. Counts moves and time and saves the best result per size. |
 | **Minesweeper** | Free | - | Classic mine hunting at three sizes. Tap digs, long-press or Flag mode places flags. The first tap is always safe; best times are saved. |
+| **Nonogram** | Free | storage | Picross puzzles: use the number clues for each row and column to colour in a hidden picture. 5x5 and 10x10 sizes, built-in pictures or random puzzles, each checked to be solvable by logic alone. Fill and Mark-empty modes, drag to paint, a timer and a saved best time per size. |
 | **Number Guess** | Free | - | Guess the secret number from 1 to 50, 100 or 1000 using too-high / too-low hints, a narrowing range bar and a guess history. Best number of tries saved. |
+| **Peg Solitaire** | Free | storage | The classic English peg board: jump a peg over its neighbour into an empty hole to remove the neighbour, and finish with one peg, ideally in the centre. Undo, restart, stuck detection and a saved best (fewest pegs left). |
+| **Pong** | Free | storage | Table tennis against the phone. Drag your paddle along the bottom, beat the AI paddle at the top to seven points. Three AI levels and a saved count of games won. |
 | **Reaction Timer** | Free | - | Screen turns red, then green after a random delay. Tap as soon as it is green to get your time in ms, with best and average of the last 5 saved. |
+| **Reversi** | Free | storage | Outflank the phone's discs to flip them to your colour (you are black). Legal moves are shown as dots, with a look-ahead AI at three levels, automatic passing when someone cannot move and a saved win record. |
 | **RPS Showdown** | Free | - | Rock paper scissors against the phone with a shaking hands animation, win/draw/loss counts and a current and best winning streak (saved). |
 | **Scoreboard** | Free | - | Score keeper for any game: add up to 12 players, edit names, tap -1, +1 or add/subtract a custom amount. Leader gets a crown. Saved automatically. |
+| **Silly Names** | Free | storage | Generates silly nicknames, funny full names, team names and short story starters from built-in word lists. Results can be copied, and favourites are kept on the device. |
 | **Simon Says** | Free | - | Four coloured pads light up with musical tones in a growing pattern; repeat it from memory. Best round saved. |
 | **Slide Puzzle** | Free | - | Classic sliding tile puzzle in 3x3 and 4x4 with smooth tile movement. Shuffles are always solvable. Moves, time and best saved. |
 | **Snake** | Free | - | Steer a snake with swipes, the on-screen arrow pad or arrow keys to eat apples. Speeds up as you grow; best score saved. |
 | **Spin Wheel** | Free | - | A canvas wheel with coloured segments built from your own list of options. Spins with an easing slowdown, highlights the winner and can remove the winner after each spin. |
+| **Stroop Test** | Free | storage | A colour-word brain test: tap the button for the colour the word is printed in, not the word it spells. 30 seconds, with the number correct, accuracy and average reaction time; the best result is saved. |
 | **Sudoku** | Free | - | Generates a new Sudoku with exactly one solution at Easy, Medium or Hard. Conflicts show red, a number pad fills cells, hints and a check button help. Best times saved. |
 | **Team Maker** | Free | - | Paste names (lines or commas) and split them into 2 to 6 fair random teams. Duplicates are removed and names are remembered. |
 | **Tic-Tac-Toe** | Free | - | Play X and O against an unbeatable minimax phone (choose to play first or second) or against a friend on the same phone. Scoreboard is saved. |
 | **Tower of Hanoi** | Free | - | Move a stack of 3 to 7 discs to the right peg, one at a time, never a larger disc on a smaller one. Shows minimum moves; best saved. |
 | **Trivia Quiz** | Free | - | Ten random questions per round from 40 built-in general knowledge questions with four options each. Correct answer shown in green; best score saved. |
 | **Truth or Dare** | Free | - | Draws a family-friendly truth question or a silly dare from 30 of each, with a card flip animation. Surprise me chooses one randomly. |
+| **Typing Falls** | Free | storage | Words rain down: type each one before it reaches the ground to clear it. The word you are typing is highlighted; words get longer and faster as you level up. Five lives, pause, and a saved best score. |
 | **Typing Speed** | Free | storage | A typing test with 30 or 60 second modes. Shows live WPM and accuracy, colours each letter right or wrong, and keeps a personal best. |
 | **Whack-a-Mole** | Free | - | Tap moles popping from nine holes for 30 seconds; they appear faster as you score. Best score saved. |
+| **Word Guess** | Free | storage | Guess the hidden five-letter word in six tries with an on-screen keyboard (or a hardware keyboard). Tiles carry a tick or dot mark and a stripe pattern as well as colour, a blue/orange palette switch helps colour-blind players, repeated letters are scored correctly, and the result can be shared as an emoji grid. Played, win percent, streaks and a guess distribution are saved. |
 | **Word Scramble** | Free | - | Unscramble jumbled letters by tapping tiles into slots. Category hint, skip, streak and best streak saved. |
 | **Would You Rather** | Free | - | Two silly choices at a time from 30 built-in dilemmas. Tap one to pick it, then go to the next question. |
 

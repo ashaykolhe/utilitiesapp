@@ -16,6 +16,13 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06._
 - [ ] Settings > Privacy policy opens the policy page.
 - [ ] Open a Pro tool (Motion Cam): the Pro sheet opens with the feature highlighted.
 - [ ] Pro sheet: enter a wrong code: "That code isn't valid". Enter a code from coupon-codes.txt for today: Pro turns on, locks disappear, Settings shows "Trial until ...".
+- [ ] First launch shows a 3-step tour; Settings > Show the tour again replays it.
+- [ ] Tap "Surprise me": a random free tool opens. Tool of the day card opens its tool.
+- [ ] Filter chips (Free, Pro, No permissions, Camera...) narrow the grid; All brings the categories back.
+- [ ] In a tool, tap the share button: the Android share sheet opens with the tool's text; the folder button opens Collections (free: asks for Pro; Pro: make "Travel", tick the tool, Done, see it on Home, delete it).
+- [ ] Settings > App lock: turn on, set a PIN twice. Leave the app for longer than the chosen time: the lock screen appears; wrong PIN shows an error; 5 wrong tries cause a wait; the right PIN unlocks. Fingerprint option appears only if the phone has one. Turn the lock off (asks for the PIN).
+- [ ] Settings > Back up saves a .json file through the share sheet; change something; Restore that file: the change is undone. A random .json file is refused.
+- [ ] Settings > Language appears only when a translation pack exists; switching it translates the home screen.
 - [ ] Rotate the phone and send the app to the background and back: nothing breaks.
 - [ ] Turn on airplane mode: every tool except those marked "network" still works.
 
@@ -29,6 +36,7 @@ _Free. Needs: notifications, storage_
 - [ ] Add an alarm with Mon to Fri selected: the list shows the days and the next date.
 - [ ] Toggle an alarm off: it greys out and no notification fires. Toggle it on: it is rescheduled. Delete removes it.
 - [ ] Deny notification permission: a message asks you to allow notifications.
+- [ ] At most 50 alarms: adding the 51st shows a toast.
 
 ### Battery & Network
 _Free. Needs: network, storage_
@@ -79,7 +87,7 @@ _Free. Needs: storage_
 - [ ] The "Last 6 months" chart shows a bar for the current month. Set the currency to "EUR": amounts show it.
 - [ ] Add an expense dated last month: the view jumps to that month; use the arrows to return.
 - [ ] Delete an entry: totals and charts update.
-- [ ] Add with an empty or zero amount: a toast asks for an amount.
+- [ ] Add with an empty or zero amount: a toast asks for an amount. The amount is limited to 0.01 to 1,000,000,000 and the list to 5000 entries.
 
 ### Flashlight
 _Free. Needs: camera_
@@ -87,7 +95,38 @@ _Free. Needs: camera_
 - [ ] Tap Turn on and allow the camera. The torch lights and the button says Turn off.
 - [ ] Tap Turn off. The torch goes out.
 - [ ] Leave the tool while on. The torch goes out.
-- [ ] Deny the permission. A message says the torch is not available.
+- [ ] Deny the permission. A message says the camera permission was denied (a phone without a torch says the torch is not available).
+- [ ] Tap Turn on and leave the tool before answering the prompt, or double tap quickly. The camera indicator goes away and only one stream is used.
+
+### Holiday Calendar
+_Free. Needs: storage_
+
+- [ ] Open the tool and go to January 2026: 26 has an amber dot and tapping it lists Republic Day under India. Go to April 2025: Good Friday shows on the 18th and Easter Sunday on the 20th (purple dots).
+- [ ] Check Easter for several years using the arrows: 2024 is 31 March, 2026 is 5 April, 2027 is 28 March, 2028 is 16 April, 2029 is 1 April, 2030 is 21 April.
+- [ ] Untick the India checkbox: the amber dots and entries disappear; tick it again to restore them.
+- [ ] Add an event "Anniversary" on a chosen date with "Repeats every year" ticked: the calendar jumps to that month with a dot. Move to the same month in the next year: the event also appears. The bin button deletes it.
+- [ ] Try Add event with an empty title or no date: a message appears and nothing is added. Close and reopen the tool: events and filter choices persist.
+- [ ] The event date accepts 1900 to 2100 only; the month arrows stop at those years.
+
+### Life Calendar
+_Free. Needs: storage_
+
+- [ ] Enter a birth date of 1 Jan 1995: the grid appears with filled squares for the weeks lived, one row per year, with year labels at 10, 20 and so on; the numbers show weeks lived, weeks left and a percentage of 80 years.
+- [ ] Change Expected years to 90: the grid gets 10 more rows and the percentage drops.
+- [ ] Enter a birth date in the future or leave it empty: a message asks for a valid birth date in the past and the grid is hidden.
+- [ ] Enter an expected age younger than your age (for example 20 for someone aged 30): the grid is full, weeks left shows 0 and the percentage shows 100%.
+- [ ] Close and reopen: date and lifespan are remembered. Check both light and dark themes keep the grid readable.
+- [ ] The birth date picker stops at today and at 1900. Expected years 500 is limited to 120.
+
+### Meeting Cost
+_Free_
+
+- [ ] Set 6 people, rate 25, symbol $. Per minute reads $2.50 and per hour $150.00. Tap Start: the cost and the clock rise; after about 60 seconds the cost is about $2.50.
+- [ ] Tap Pause: the cost freezes. Tap Resume: it continues from where it stopped.
+- [ ] While running, change people to 12: the cost per minute doubles and the cost goes up faster, but the amount already spent does not jump.
+- [ ] Tap Reset: cost and clock return to zero. Enter 0 or empty people: it is treated as at least 1 person and no error appears. Change the symbol to a rupee sign: the displays use it.
+- [ ] Leave the tool while running: no timer keeps running. Reopen: people, rate and symbol are remembered.
+- [ ] Enter 99999999 as the hourly rate: it is limited to 1,000,000. People above 1000 is limited to 1000.
 
 ### Meeting Planner
 _Free. Needs: storage_
@@ -139,7 +178,8 @@ _Free (limit: 3 active reminders (Pro: unlimited)). Needs: notifications_
 - [ ] Add a reminder for 2 minutes from now. Allow notifications when asked. Close the app. A notification appears at the time.
 - [ ] Add reminders until there are 3 active ones, then add a fourth. The Pro sheet opens.
 - [ ] Delete a reminder with the cross. It disappears and no notification arrives for it.
-- [ ] Try a time in the past. A message says to enter a future time.
+- [ ] Try a time in the past. A message says to enter a future time. The date picker does not offer past dates or dates beyond 5 years.
+- [ ] Deny notifications: the reminder is saved, a toast and a red line say notifications are blocked.
 
 ### Screen Light
 _Free_
@@ -176,12 +216,14 @@ _Free_
 - [ ] Tap Reset. Time and laps clear.
 
 ### Timer
-_Free_
+_Free. Needs: notifications_
 
 - [ ] Open Timer, set 0 min 5 sec, tap Start. The display counts down and a tone plays at 00:00 with a "Time is up" message.
 - [ ] Start 1 min, tap Pause after 5 s, then Resume. It continues from where it stopped.
 - [ ] Tap Reset. The display shows the entered time again.
-- [ ] Leave the tool while running and come back. The timer is stopped (no sound plays later).
+- [ ] Start 2 min, leave the tool and come back: it is still counting. Tap Reset: the notification is cancelled.
+- [ ] Type 5000 minutes or -3: the field limits to 0..999 (message under the box); with 0 min 0 sec Start does nothing.
+- [ ] Deny notifications in Android settings: a red line says the alert only sounds while PocketKit is open.
 
 ### Tip of the Day
 _Free_
@@ -199,6 +241,7 @@ _Free. Needs: storage_
 - [ ] Add a task due yesterday: it shows "Overdue" in red and sorts first.
 - [ ] Type part of a task name in Search: the list narrows.
 - [ ] Tap Clear completed: ticked tasks disappear. Adding an empty task shows a toast.
+- [ ] The list holds 500 tasks; when full the oldest completed task is dropped (with a toast), and open tasks are never dropped.
 
 ### World Clock
 _Free. Needs: storage_
@@ -216,12 +259,14 @@ _Free. Needs: location_
 
 - [ ] Open it outdoors and allow location. Altitude, latitude, longitude and accuracy fill in.
 - [ ] On a phone without altitude data the value shows "n/a".
+- [ ] Deny location: "Location permission denied" shows. Turn GPS off: "Location unavailable" shows. A timeout shows its own message.
 
 ### Compass
 _Free. Needs: motion_
 
 - [ ] Hold the phone flat and turn around. The dial rotates and the heading changes. North matches another compass app within about 15 degrees.
 - [ ] On a phone without a compass sensor a message says so after a few seconds.
+- [ ] Tilt the phone about 30 degrees while turning: the heading stays steady. Turn slowly through north (359 to 0): the dial does not spin the long way round. Leave the tool right after opening: no errors.
 
 ### Leveler
 _Free. Needs: motion_
@@ -229,6 +274,7 @@ _Free. Needs: motion_
 - [ ] Lay the phone on a flat table. The bubble is near the centre and the angles are close to 0.
 - [ ] Lift one edge. The bubble moves toward the lower side and the angle grows.
 - [ ] Tap "Set current position as zero" on a slightly tilted surface. The readout becomes 0.
+- [ ] On a device without an orientation sensor (or with permission denied) a message says so after a few seconds.
 
 ### My PIN Code
 _Free. Needs: location, storage_
@@ -265,6 +311,8 @@ _Free. Needs: location_
 - [ ] Walk or ride. The speed and distance rise. Max speed keeps the highest value.
 - [ ] Tap Reset trip. Max and distance go back to 0.
 - [ ] Deny the permission. A message says location permission was denied.
+- [ ] Walk slowly for 100 m: distance reads about 0.10 km and speed about 4 to 6 km/h. Stand still for two minutes: the distance stays put. With a weak signal (accuracy 30 m or worse) "Weak GPS signal" shows and distance pauses.
+- [ ] With an odd GPS reading (no position) the numbers show "--" or stay put, never NaN.
 
 ### Sunrise & Sunset
 _Free. Needs: location (optional)_
@@ -284,6 +332,8 @@ _Free. Needs: motion_
 - [ ] Tap "Hold angle", move the phone: the result stays; tap Live to resume.
 - [ ] Aim at or above the horizon: the result shows "--".
 - [ ] Switch units to feet and check the label changes.
+- [ ] Switch to feet: the eye height converts. Aim almost straight down (over 85 degrees): "--" is shown.
+- [ ] Type 500 in Eye height: the value is limited to 10 with a short "Adjusted" message.
 
 ### G Meter
 _Free. Needs: motion_
@@ -292,6 +342,7 @@ _Free. Needs: motion_
 - [ ] Shake the phone: the gauge and graph spike and Peak increases.
 - [ ] Tap Reset peak: peak and graph clear.
 - [ ] Tick "Remove gravity": the total drops to about 0 when still (if the phone provides it).
+- [ ] On a phone that does not report gravity-free acceleration, tick "Remove gravity": a message says so and the box unticks itself.
 
 ### Height Finder
 _Free. Needs: motion_
@@ -300,6 +351,8 @@ _Free. Needs: motion_
 - [ ] Clear the marks, mark only the top, type a distance of 10: the height shows as eye + d x tan(top).
 - [ ] Switch to feet: the units on the labels and result change.
 - [ ] Mark a base angle that points upward (positive): no result appears (needs a downward base angle or a distance).
+- [ ] Switch to feet: the eye height converts (1.6 m becomes 5.25 ft). Aim almost straight up (over 85 degrees): the result shows "--" instead of a huge number.
+- [ ] Type 50 in Eye height: a message shows and the value is limited to 10. Type -5 in Distance: the minus sign is refused.
 
 ### Light Meter
 _Free. Needs: motion (ambient light sensor)_
@@ -314,13 +367,13 @@ _Free. Needs: motion_
 - [ ] On a phone with the sensor the total reads about 25 to 65 microtesla away from metal.
 - [ ] Move the phone near a speaker or magnet: the value jumps and the gauge fills.
 - [ ] Tap "Zero baseline" to see only the change; tap again to go back to absolute.
-- [ ] On a device or browser without the API: "does not provide a magnetic field sensor" appears and nothing crashes.
+- [ ] On a device or browser without the API: "does not expose a magnetic field sensor" appears and nothing crashes.
 
 ### Pendulum Bob
 _Free. Needs: motion_
 
 - [ ] Hold the phone upright: the bob hangs straight and the angle is near 0 and turns green when within 1 degree.
-- [ ] Tilt it sideways: the line swings the same way and the Sideways value changes.
+- [ ] Tilt it sideways: the line swings away from the lowered side, like a real plumb line hanging in front of the phone (bob moves left when Sideways is positive), and the Sideways value changes.
 - [ ] Tilt the top towards or away from you: the bob grows or shrinks and Forward / back changes.
 - [ ] Lay the phone flat: the angle reads about 90 degrees.
 
@@ -331,6 +384,7 @@ _Free. Needs: motion (tilt mode only)_
 - [ ] Drag to 90: the supplement and complement both read 90.
 - [ ] Tap "Tilt phone": hold the phone upright against a wall, the arm moves as you rotate it in the plane of the screen. Tap "Set current tilt as zero" and the reading becomes 0.
 - [ ] On a device without a motion sensor the tilt mode shows "No motion sensor found".
+- [ ] In tilt mode lay the phone flat (or nearly): "Hold the phone upright" shows instead of a jumpy reading. Hold it upright and rotate through horizontal (0 and 180): the arm moves smoothly and does not jump to 90.
 
 ### Reaction Test
 _Free. Needs: storage (best time)_
@@ -346,6 +400,7 @@ _Free. Needs: microphone (mic mode only)_
 - [ ] Tap Reset: taps return to 0 and RPM to "--".
 - [ ] Switch to Microphone and allow access. Hold the phone next to a steadily ticking clock or metronome set to 60 per minute: RPM reads about 60 after a few seconds.
 - [ ] Deny the microphone permission: "Microphone permission denied." shows.
+- [ ] Switch quickly between Tap and Microphone several times: the microphone indicator in the status bar goes off after you leave Microphone mode (no stream is left running).
 
 ### Ruler
 _Free. Needs: storage (saves the calibration)_
@@ -354,6 +409,7 @@ _Free. Needs: storage (saves the calibration)_
 - [ ] Tap "Calibrate with a credit card". Lay a real card lengthwise with its short edge on the top line, drag the handle to the card's other end, tap Save. The info line says "calibrated".
 - [ ] Hold the card against the ruler: it should measure 8.6 cm (3.4 in).
 - [ ] Leave the tool and reopen it: the calibration is still in place. Tap Reset: the info line says "not calibrated yet".
+- [ ] Open calibration on a small phone: Save and Reset are visible without scrolling past the card area, and swiping on the empty area scrolls the page instead of moving the line.
 
 ### Screen Info
 _Free_
@@ -369,6 +425,7 @@ _Free_
 - [ ] Stick 1 m with shadow 0.8 m, tree shadow 12 m: result 15.00 m.
 - [ ] Switch to feet: the unit label changes.
 - [ ] Set the stick shadow to 0: result shows "--".
+- [ ] Enter 5000 in Stick height: a message shows and the value is limited to 1000. Enter 0 in a shadow: the result shows "--".
 
 ### Slope Finder
 _Free. Needs: motion_
@@ -377,11 +434,12 @@ _Free. Needs: motion_
 - [ ] Tap "Zero here" on a surface to calibrate it to 0.
 - [ ] Tap Hold: the value freezes and the button says Release.
 - [ ] Switch to "Sight along edge" and tilt the top edge upward: the angle reads the elevation.
+- [ ] Turn the phone face down: the percent stays positive and the angle never exceeds 90. Tap Hold, then switch mode: the button goes back to "Hold".
 
 ### Sound Intensity
 _Free. Needs: microphone_
 
-- [ ] Open it and allow the microphone. The value changes with the sound around you.
+- [ ] Open it and allow the microphone. After half a second the value changes with the sound around you and Min is above 0.
 - [ ] Clap near the phone. The maximum jumps up.
 - [ ] Deny the permission. A message says it was denied.
 
@@ -392,6 +450,7 @@ _Free_
 - [ ] Distance tab: 60 km/h for 30 minutes gives 30 km.
 - [ ] Time tab: 100 km at 50 km/h gives 2 h 0 min 0 s.
 - [ ] Empty or zero fields show "--" and a hint, never an error.
+- [ ] Enter -5 in Distance (a minus sign is refused) and 99999999999 (a message shows and the value is limited). Result stays a number or "--", never NaN.
 
 ### Stride & Pace
 _Free. Needs: storage_
@@ -400,6 +459,7 @@ _Free. Needs: storage_
 - [ ] Steps 10000 with step length 0.71: about 7.14 km.
 - [ ] Running pace: 5 km in 30 minutes gives 6:00 per km and 10.0 km/h.
 - [ ] Zero steps or empty fields show "--".
+- [ ] Enter 3.5 in Steps taken: a "Whole numbers only" message shows. Step length above 3 m is limited to 3.
 
 ### Unit Price
 _Free_
@@ -407,6 +467,7 @@ _Free_
 - [ ] Product A: 2.00 for 500 g; Product B: 3.00 for 1 kg. A shows 0.400 per 100 g, B 0.300; B is outlined green as best value.
 - [ ] Change B's unit to ml: the message says mixed units cannot be compared.
 - [ ] Clear everything: "Fill in at least two products".
+- [ ] Enter -1 as a price (refused) and 99999999999 (limited to 1,000,000,000). Leave Amount at 0: that product shows "--".
 
 ### Vibrometer
 _Free. Needs: motion_
@@ -424,6 +485,7 @@ _Free_
 - [ ] Date of birth 1995-06-15, "Age on" 2026-10-06: shows 31 years 3 months 21 days, next birthday in 252 days (turning 32).
 - [ ] Set "Age on" to a birthday itself: it says "Today! Turning N".
 - [ ] Birth date 2000-02-29: it works in non-leap years (birthday counts as Mar 1).
+- [ ] The date fields accept 1900 to 2200 only; a date outside that shows an "Earliest is..." or "Latest is..." message.
 - [ ] Set "Age on" earlier than the birth date: shows the prompt, no error.
 
 ### Area & Volume
@@ -455,7 +517,7 @@ _Free_
 _Free_
 
 - [ ] Enter 12 + 30 × 2 and press =. The result is 72.
-- [ ] Press 50 % . The expression shows 0.5.
+- [ ] Press 50 % . The expression shows 0.5. Enter 50 + 10 % and press =: the result is 55.
 - [ ] Enter 1 ÷ 0 and press =. A message says the expression is invalid.
 - [ ] Use backspace and clear.
 
@@ -466,6 +528,16 @@ _Free_
 - [ ] 227 g of butter in grams: 1 cup.
 - [ ] Switch ingredient to honey with the same 1 cup: 340 g.
 - [ ] Amount 0 shows the prompt.
+
+### Currency
+_Free. Needs: storage_
+
+- [ ] Open the tool: 100 USD to INR shows 8,350 INR and "1 USD = 83.5 INR". The note says rates are manual and shows "(built-in, approximate)" as the last edited date.
+- [ ] Tap Swap: From becomes INR, To becomes USD and the result updates.
+- [ ] Tap Edit rates, change INR to 90, tap Save rates: the tool returns to the converter, 100 USD now gives 9,000 INR and the edited date is today. Close and reopen the tool: the rate and date persist.
+- [ ] In Edit rates, clear a field or enter 0 and tap Save: a message asks for a rate above 0 and nothing is saved. Reset restores built-in rates and the built-in date.
+- [ ] Pick a To currency and tap Add to favourites: it appears in Favourites with a converted value; the X button removes it. Empty amount shows "Enter an amount" without errors.
+- [ ] Enter -5 as Amount (refused) and 99999999999999 (limited to 1,000,000,000,000). In Edit rates a rate of 0 or above 1,000,000,000 is refused with a message.
 
 ### Days Counter
 _Free. Needs: storage_
@@ -491,6 +563,7 @@ _Free_
 - [ ] Set rate 0, loan 1200, tenure 12 months: EMI is 100.00 and total interest is 0.00.
 - [ ] Switch "Tenure in" to Months and enter 6: the table shows 6 rows ending with balance 0.00.
 - [ ] Clear the loan amount: the result is replaced by "Enter the values above." with no error.
+- [ ] Limits: type 250 in the interest field: a red "Maximum is 200" appears under it, the result says "enter a value from 0 up to 200", and leaving the field sets it back to 200. Tenure 101 years shows "Maximum is 100"; switching the unit to Months allows up to 1200. Letters, e and + cannot be typed.
 
 ### FD / RD
 _Free_
@@ -561,12 +634,31 @@ _Free_
 - [ ] Cost 80, 25% margin: price 106.67. Cost 80, 25% markup: price 100.
 - [ ] A margin of 100% or more shows the prompt.
 
+### Matrix Calc
+_Free_
+
+- [ ] Default A = [[2,1],[5,3]], B = identity. Tap A x B: result equals A. Tap det(A): result is 1. Tap A inverse: result is [[3,-1],[-5,2]].
+- [ ] Set B to [[1,2],[3,4]] and tap A x B: result is [[5,8],[14,22]]. A + B is [[3,3],[8,7]] and A - B is [[1,-1],[2,-1]].
+- [ ] Set A to 2 rows by 3 columns and B to 2 by 2 and tap A x B: the message says A has 3 columns but B has 2 rows. Tap det(A): the message says a square matrix is needed.
+- [ ] Set A to [[1,2],[2,4]] and tap A inverse: the message says it is singular. det(A) is 0 with a note.
+- [ ] Enter 1/2 and 1/3 into cells and tap Transpose: values stay exact. Enter "abc": an error line asks for numbers and nothing crashes. Test a 4x4 matrix with the inverse and multiply it back mentally or with A x B.
+- [ ] Type 20 characters in a cell: only 12 are kept. Type abc: the result says some cells are not numbers.
+
 ### Net Worth
 _Free_
 
 - [ ] Defaults: assets 450,000, debts 120,000, net worth 330,000.
 - [ ] Amounts with commas (1,500) and decimals (80.50) are read correctly; lines without a number are ignored.
 - [ ] Close and reopen: the lists are still there.
+
+### Number Patterns
+_Free_
+
+- [ ] Fibonacci with 20 terms: the list starts 0, 1, 1, 2, 3, 5 and ends 4181; the ratio reads about 1.618033. Set 101 terms: F(100) is 354224848179261915075.
+- [ ] Primes up to 100: 25 primes are highlighted (2, 3, 5, 7, 11 and so on). Factorise 360: result is 2 cubed x 3 squared x 5. Factorise 97: result says it is prime. Enter 1: a message asks for 2 or more.
+- [ ] Triangular with 6 terms shows 1, 3, 6, 10, 15, 21 and a growing bar chart.
+- [ ] Collatz with 27: 111 steps and highest value 9,232. Collatz with 1: 0 steps. Enter 0 or empty: it falls back to a valid default without errors.
+- [ ] Out of range numbers (for example 5000 terms) are clamped to the allowed maximum.
 
 ### Number Words
 _Free_
@@ -623,6 +715,16 @@ _Free_
 - [ ] Proportion 3 : 5 = 12 : x gives x = 20.
 - [ ] Split 1000 as 2 : 3: A gets 400.00 and B gets 600.00.
 - [ ] Decimals in the simplify box show "Use whole numbers".
+
+### Recipe Scaler
+_Free. Needs: storage_
+
+- [ ] Open the tool with the sample recipe (serves 4). Set "I want to serve" to 8: 2 cups flour becomes 4 cups, 1 1/2 tsp becomes 3 tsp, 3/4 cup becomes 1 1/2 cup, 2.5 tbsp becomes 5 tbsp and "Pinch of salt" is unchanged.
+- [ ] Tap Half: servings become 2 and amounts halve (3/4 cup becomes 3/8 cup).
+- [ ] Type "2-3 cloves garlic" and "1/3 cup oil" and scale to triple: results are "6-9 cloves garlic" and "1 cup oil".
+- [ ] Enter 0 in either servings box: the result says to enter servings above zero. Tap Save recipe with empty ingredients: a message asks for ingredients.
+- [ ] Name the recipe and tap Save recipe, tap New, then open it from Saved recipes: name, servings and text return. The bin icon deletes it. Copy scaled copies the scaled text.
+- [ ] Enter 0 or 5000 in a servings box: a message shows and the value is limited to the range 0.5 to 1000. At most 100 recipes can be saved.
 
 ### Salary Convert
 _Free_
@@ -696,13 +798,23 @@ _Free_
 - [ ] Switch to "Two sides and the angle": 3, 4 and 90 degrees gives side c = 5.
 - [ ] Angle 0 or 180 shows an error message.
 
+### Trig Circle
+_Free_
+
+- [ ] Open the tool (30 degrees): sin 0.5, cos 0.866, tan 0.5774, and the exact line reads sin = 1/2, cos = sqrt3/2, tan = sqrt3/3.
+- [ ] Drag the point around the circle: the angle, values and coloured sine and cosine lines update continuously. At 90 degrees tan shows "undefined".
+- [ ] Move the slider to 150: exact values show the negative cosine; radians show 5pi/6. Slide to 360: radians show 2pi.
+- [ ] Type 405 into Degrees: the point sits at 45 degrees. Type -30: it sits at 330 degrees. Typing non-numbers does nothing.
+- [ ] Tap a row in the exact values table (for example 225): the circle jumps there and sin and cos read -sqrt2/2.
+- [ ] Enter 9999999 in Degrees: a message shows and the value is limited to 100000. Choose a non-image or very large (over 40 MB) picture in the picture tools: a message says why it was refused.
+
 ### Unit Converter
 _Free_
 
 - [ ] Length: 1 mile to km gives 1.609344.
 - [ ] Temperature: 100 C to F gives 212.
 - [ ] Data: 1 GB to MB gives 1024.
-- [ ] Clear the number box. The result shows a dash.
+- [ ] Clear the number box. The result shows a dash. Type 1e30 or letters: the field refuses it or shows a limit message.
 
 ### Work Days
 _Free_
@@ -775,6 +887,15 @@ _Free_
 - [ ] Tap the picker, choose a colour: all fields update. The swatch text switches between black and white for readability.
 - [ ] Tap Copy on the `rgb(...)` line and paste elsewhere.
 
+### Country Codes
+_Free_
+
+- [ ] Open the tool: a list of countries with flags is shown with a count such as "109 of 109 countries".
+- [ ] Search "india": India with +91, IN, IND, INR. Search "+44": United Kingdom. Search "jp": Japan.
+- [ ] Search "EUR": many eurozone countries are listed. Search "+1": the US, Canada and others sharing the code.
+- [ ] Search "zzz": "No match" appears. Clear the box: the full list returns.
+- [ ] Tap a country: "Copied" appears and pasting elsewhere gives its dial code such as +91.
+
 ### CSV Viewer
 _Free_
 
@@ -798,6 +919,16 @@ _Free_
 - [ ] Type `Test 123`: every style updates, digits included where the style has digits.
 - [ ] Tap Copy on "Bold" and paste into a chat: bold-looking text appears.
 - [ ] "Upside down" reverses and flips the text; clearing the box falls back to `Hello World`.
+
+### Flashcards
+_Free. Needs: storage_
+
+- [ ] Create a deck "Spanish", open it, go to Cards and add "hola" / "hello" and "adios" / "bye". Review shows "Card 1 of 2" and "0 due" turns into 2 due on the home list.
+- [ ] Tap Show answer then Got it for both cards: "All caught up" appears. Stats shows both cards in Box 2 with 100% accuracy.
+- [ ] Start another review, answer one card with Missed it: the card returns later in the same session and goes to Box 1 in Stats.
+- [ ] Open the Text tab: export reads "# Spanish" followed by the cards. Paste "bonjour :: hello" in "Add cards from text" and add it: the card list grows. On the home screen, import "# French" with two lines to create a new deck.
+- [ ] Try adding a card with an empty side or importing text without "::": a message appears, nothing breaks. Delete this deck asks for confirmation.
+- [ ] Paste more than 50 decks, or enough cards to pass 2000 in a deck: a message says the limit and nothing is half-added. The import box takes at most 100,000 characters.
 
 ### Hash Maker
 _Free_
@@ -893,6 +1024,15 @@ _Free_
 - [ ] Untick everything except digits: the password is digits only. Untick the last option as well: it shows "Pick at least one option".
 - [ ] Tick "Avoid look-alikes": generate several times and confirm no `I`, `l`, `1`, `O`, `0`, `o`.
 - [ ] Tap Copy and paste elsewhere: the same password. Close and reopen the tool: your options are remembered.
+
+### Periodic Table
+_Free_
+
+- [ ] Open the tool: Carbon is selected and its detail card shows number 6, mass 12.011, Group 14, Period 2, Nonmetal, Solid.
+- [ ] Type "gold" in search: Au appears; tap it and the card shows number 79, mass 196.97. Search "Fe" and "26": iron is found. Search "xyz": "No match" appears.
+- [ ] Swipe the table sideways: the full 18 column layout is reachable; the two bottom rows are lanthanides and actinides. Count that the table has elements up to Og (118).
+- [ ] Tap the "Noble gas" chip: only He, Ne, Ar, Kr, Xe, Rn and Og stay bright; tap it again to clear.
+- [ ] Tap Hg: state shows Liquid. Tap U (actinide): period shows 7 and no group number.
 
 ### Phone Keypad
 _Free_
@@ -993,6 +1133,15 @@ _Free_
 - [ ] Set the count to 100: limited to 50. Set 0: becomes 1.
 - [ ] Tap Copy all and paste elsewhere.
 
+### Word Finder
+_Free_
+
+- [ ] Anagrams tab: type "listen": "silent" is found (the word itself is not listed).
+- [ ] From letters tab: type "tac": "cat", "act" and "at" appear, grouped by length. Raise the minimum length to 3: "at" disappears. Type "ca?": words such as "car" and "can" appear.
+- [ ] Pattern tab: "c?t" lists cat, cut, cot and not "cart". "un*ing" lists only words that start with un and end with ing. "?o?se" lists house and horse.
+- [ ] Type nothing or only symbols: the result area is empty or says no words found, with no error.
+- [ ] Switch tabs: the input clears and the mode is remembered when you reopen the tool.
+
 ### Word Frequency
 _Free_
 
@@ -1011,6 +1160,7 @@ _Free. Needs: storage_
 - [ ] During playback press Set A, then later Set B: the section A to B loops. Clear removes the loop.
 - [ ] Tap the "Bass boost" preset: bass is louder and the 60 Hz slider shows +8. Move a band slider manually.
 - [ ] With several files, let one end: the next one starts. Pick a non-audio file: a message says no audio files were chosen. Leaving stops playback.
+- [ ] Choose a non-audio file: it is ignored with a message. The playlist holds at most 100 tracks.
 
 ### Binaural Beats
 _Free_
@@ -1042,7 +1192,8 @@ _Free_
 - [ ] Set 12000 Hz and press Play: a high tone is clearly audible. Raise the frequency: it becomes fainter or inaudible to you.
 - [ ] Tap the 15k, 17k, 19k and 21k presets: the frequency value and slider update, the sound changes live.
 - [ ] Choose Pulsing: the tone beeps on and off. Choose Sweep: the pitch glides around the chosen value.
-- [ ] Press Stop or leave the tool: sound stops.
+- [ ] Raise volume above 70% and press Play: a confirmation appears.
+- [ ] Press Stop or leave the tool: sound fades out and stops.
 
 ### Drum Pad
 _Free_
@@ -1079,13 +1230,23 @@ _Free. Needs: microphone_
 - [ ] Move the volume boost slider: the voice gets louder or quieter. At 0% it is silent.
 - [ ] Press Stop: sound stops and the bar empties. Leave the tool while running: the microphone is released.
 - [ ] Deny the permission: a message says the microphone permission was denied.
+- [ ] Double tap Start quickly. Expected: only one loop starts (no doubled echo) and Stop silences everything. The sound fades in over about a third of a second.
+
+### Morse Trainer
+_Free_
+
+- [ ] Open the tool and tap Play next: a short beep pattern plays and the display shows "?". Tap Repeat: the same letter plays again.
+- [ ] Tap the correct letter: the letter shows in green with its dots and dashes, "Correct!" appears, counters update and the next letter plays after about a second.
+- [ ] Tap a wrong letter: the display turns red and says what you answered and what it was; streak resets to 0.
+- [ ] Change Level to level 3 or 5: the keypad grows. Move the speed slider to 25: the beeps are visibly faster. On a keyboard, typing a letter also answers.
+- [ ] Leave the tool and come back: no sound continues after leaving. Tap letters before pressing Play: nothing happens and no error appears.
 
 ### Piano
 _Free_
 
 - [ ] Tap white and black keys: the matching notes sound and the key highlights while pressed.
 - [ ] Press three keys with different fingers: all three sound together (chord) and release independently.
-- [ ] Press Oct + : labels change to the next range (for example C5 to C7) and the pitch is higher. Oct - at the lowest range does nothing more.
+- [ ] Press Oct + : labels change to the next range (for example C5 to D6) and the pitch is higher. Oct - at the lowest range does nothing more.
 - [ ] Change Sound to Retro: the timbre changes on the next key press.
 - [ ] Slide a finger across the keys: notes change as the finger crosses each key, with no stuck notes after lifting.
 
@@ -1109,7 +1270,7 @@ _Free_
 ### Speaker Cleaner
 _Free_
 
-- [ ] Read the 3-step instructions, turn media volume up and press Start: a loud low tone plays and the countdown runs down.
+- [ ] Read the instructions (including "Unplug headphones and earbuds first"), turn media volume up and press Start: a low tone plays and the countdown runs down.
 - [ ] Pick the sweep mode and start: the pitch wobbles slowly between low notes.
 - [ ] Press Stop early: sound stops and the progress resets.
 - [ ] Let it finish: sound stops, the display says Done, the phone vibrates and a message appears.
@@ -1129,6 +1290,7 @@ _Free. Needs: microphone_
 - [ ] Tap Start listening, allow the microphone and speak a sentence. The words appear.
 - [ ] Tap Copy and paste elsewhere. The text is pasted.
 - [ ] On a phone without speech recognition a message says it is not available.
+- [ ] Dictate for a long time: the text stops growing at 20,000 characters instead of freezing the app.
 
 ### Stereo Test
 _Free_
@@ -1152,7 +1314,9 @@ _Free_
 - [ ] Drag the slider while playing: the pitch changes smoothly and the number box follows. Type 1000 in the box: pitch jumps to 1 kHz. Type 5 or 99999: it clamps to 20 or 20000.
 - [ ] Change waveform to square: the timbre becomes buzzier. Raise volume above 70%: label shows "(loud!)".
 - [ ] Tick Sweep, set To 2000 and 5 seconds, press Play: the frequency glides up and down repeatedly and the readout moves.
-- [ ] Leave the tool while playing: sound stops.
+- [ ] Set volume above 70% and press Play at 5000 Hz: a confirmation about hearing damage appears; Cancel keeps it stopped.
+- [ ] Leave the tool while playing: sound fades out without a click.
+- [ ] Enter 99999 in Frequency: a message shows and the value is limited to 20000. Clear the field and leave it: it returns to 440.
 
 ### Tone Sequencer
 _Free_
@@ -1188,6 +1352,7 @@ _Free (limit: 3 saved recordings (Pro: unlimited)). Needs: microphone, storage_
 - [ ] Press the bin once: it turns into "Sure?"; press again to delete. Without the second press it resets after 3 seconds.
 - [ ] As a free user with 3 recordings, press Record: the Pro sheet opens and nothing records.
 - [ ] Deny the microphone: a permission message shows.
+- [ ] Double tap Record quickly: only one recording starts.
 
 ## 7. Camera
 
@@ -1198,16 +1363,16 @@ _Free. Needs: camera, microphone_
 - [ ] Choose a camera, keep Record sound ticked and tap Start recording; allow permissions. Expected: the screen goes fully black with a faint timer and a Stop button.
 - [ ] Wait ten seconds, then tap Stop. Expected: the black screen closes and a video player with the file size appears.
 - [ ] Tap Save / share video. Expected: the share sheet or a download of a WebM file.
-- [ ] Untick Record sound and record again, or deny the microphone. Expected: it still records video only or shows a clear message. Leaving the tool mid-recording stops the camera.
+- [ ] Untick Record sound and record again, or deny the microphone. Expected: it still records video only or shows a clear message. Leaving the tool mid-recording stops the camera and offers the recording to the share sheet instead of discarding it. Double tapping Start recording starts only one recording.
 
 ### Code Scanner
 _Free. Needs: camera_
 
-- [ ] Open the tool and point at a QR code containing https://example.com. Expected: a result card shows the text, the phone vibrates, and Open link and Copy are available.
-- [ ] Scan a QR code with plain text. Expected: the text is shown and no Open link button appears.
-- [ ] Tap Scan again, then Copy. Expected: scanning resumes; copied text can be pasted.
-- [ ] Tap Scan from a picture and choose a screenshot of a code. Expected: the code is decoded; a picture with no code shows No code found.
-- [ ] Check History keeps the last 20 scans and Clear history empties it. Denied camera shows a message.
+- [ ] Open the tool and point at a QR code containing https://example.com. Expected: a result card shows QR code and the text, the phone vibrates, and Open link and Copy are available.
+- [ ] Point at the EAN-13 barcode on a product, about 15 to 25 cm away with a little white space around it. Expected: within a second or two the card shows EAN-13 and the 13 digits (UPC-A and 12 digits for US products); turn the product upside down or sideways and it still reads. Copy puts the digits on the clipboard.
+- [ ] Tap Scan again, then scan a Code 128 label or a small EAN-8 code. Expected: scanning resumes and the new type and digits are shown; the history lists them with the newest first.
+- [ ] Tap Scan from a picture and choose a photo or screenshot of a product barcode and then of a QR code. Expected: each is decoded; a picture with no code shows No code found.
+- [ ] Point at a barcode with a wrong digit or at a plain textured surface. Expected: nothing is reported (no wrong or made-up numbers). Check History keeps the last 20 scans and Clear history empties it. Denied camera shows a message.
 
 ### Collage
 _Free. Needs: storage_
@@ -1217,6 +1382,15 @@ _Free. Needs: storage_
 - [ ] Move Spacing and change Background. Expected: gaps and colour update live.
 - [ ] Tap Shuffle. Expected: the picture order changes.
 - [ ] Tap Save collage. Expected: a JPEG is offered. Pressing Save before picking pictures shows a message.
+
+### Colour Blind Sim
+_Free. Needs: storage_
+
+- [ ] Open the tool and tap Choose a photo, pick a colourful photo: the normal and simulated versions appear stacked.
+- [ ] Switch the type between Deuteranopia, Protanopia, Tritanopia and Achromatopsia: the lower image changes each time and the description updates. Achromatopsia is grey-scale.
+- [ ] Use a photo with strong reds and greens (for example a traffic light): in protanopia and deuteranopia the red and green look much closer.
+- [ ] Tap Save simulated image: a PNG is saved or shared.
+- [ ] Cancel the picker without choosing a photo, or choose a non-image file: nothing breaks and an error message appears only for a bad file.
 
 ### Colour Detector
 _Free. Needs: camera_
@@ -1253,6 +1427,15 @@ _Free. Needs: camera, motion_
 - [ ] Change Grid to Cross and None. Expected: the overlay changes.
 - [ ] Tap Capture photo. Expected: a clean photo (no grid drawn in) is offered for saving.
 - [ ] On a device with no motion sensor or denied permission, a message says the level line is off and the camera still works.
+
+### Image Palette
+_Free. Needs: storage_
+
+- [ ] Tap Choose a photo and pick a photo with a clear main colour such as a blue sky: six swatches appear with HEX codes and percentages adding up to about 100.
+- [ ] Move the slider to 3: three larger colour groups are shown. Move to 10: more detailed colours appear.
+- [ ] Tap a colour row: "Copied" appears and the HEX can be pasted elsewhere.
+- [ ] Tap Copy as CSS: pasting gives a :root block with --color-1 and onwards.
+- [ ] Choose a plain single-colour image: only one colour (or a few very similar ones) is listed and nothing breaks. Cancel the picker: no error.
 
 ### Image Shrink
 _Free. Needs: storage_
@@ -1313,7 +1496,7 @@ _Free. Needs: camera_
 _Free. Needs: storage_
 
 - [ ] Pick a photo taken with the phone camera with location on. Expected: the result says Removed metadata including location.
-- [ ] Tap Save and open the saved file in an EXIF viewer. Expected: no GPS or camera data remains and the picture size is unchanged.
+- [ ] Tap Save and open the saved file in an EXIF viewer. Expected: no GPS or camera data remains and the picture size is unchanged (unless it was over 4096 px).
 - [ ] Pick a screenshot (PNG). Expected: it says Re-encoded without metadata and saves as PNG.
 - [ ] Pick several photos at once. Expected: each is listed with its own Save button.
 - [ ] Pick a file that is not a picture. Expected: Could not read this file for that item only.
@@ -1335,6 +1518,7 @@ _Free. Needs: camera, storage_
 - [ ] Place the points on the card long edge, enter 85.6 with unit mm, tap Set scale. Expected: the big number now shows about 85.60 mm.
 - [ ] Move the points to another object. Expected: the length is shown in mm.
 - [ ] Tap Clear scale. Expected: it goes back to pixels. Entering no length shows a message.
+- [ ] Known length: -5 is refused, 99999999999 is limited to 1,000,000,000. Choose a non-image file or one over 60 MB in any picture tool: a message says why it was refused.
 
 ### Stop Motion (Pro)
 _Pro. Needs: camera_
@@ -1372,6 +1556,7 @@ _Free. Needs: storage_
 - [ ] Switch to Imperial, enter 5 ft 9 in and 200 lb: category Overweight.
 - [ ] Clear the weight field: shows "--" and "Enter height and weight".
 - [ ] Reopen the tool: last values and unit are restored.
+- [ ] The colour bar bands match the categories: BMI 18.4 is in the narrow blue band, 18.6 in the green band, 26 in the amber band; the arrow and the 15/18.5/25/30/35/40 labels sit at the same positions.
 
 ### Body Fat
 _Free. Needs: storage_
@@ -1388,6 +1573,7 @@ _Free. Needs: none (vibration optional)_
 - [ ] Custom with in 3, hold 0, out 6: the hold phase is skipped.
 - [ ] Press Stop mid-session: the circle resets. Let a session finish: "Well done" and a vibration.
 - [ ] Leave the tool while running: the timer and vibration stop.
+- [ ] Start a session and lock the screen: the screen stays on while it runs (and where the app can, an end-of-session notification is scheduled). If neither is available a note says to keep the screen on.
 
 ### Calorie & BMR
 _Free. Needs: storage_
@@ -1396,6 +1582,7 @@ _Free. Needs: storage_
 - [ ] Switch to Female: BMR drops by 166.
 - [ ] Choose "Lose 0.5 kg a week": target is 500 below maintenance; for small bodies a warning about going below 1200 or 1500 appears.
 - [ ] Empty a field: results show "--" with no error.
+- [ ] Enter age 5, or height 50, or weight 500: results show "--" and a message gives the allowed ranges.
 
 ### Cycle Tracker
 _Free. Needs: storage_
@@ -1404,6 +1591,8 @@ _Free. Needs: storage_
 - [ ] Add start dates 29 and 58 days ago: cycle length shows 29 d and the text says it was learned from your cycles.
 - [ ] Delete a date with the cross: the list and prediction update.
 - [ ] Adding the same date twice does not duplicate it.
+- [ ] Across a daylight saving change the "in N days" and cycle day numbers stay whole and consistent.
+- [ ] The date picker stops at today and at 10 years back. Typing a future date and tapping Add shows a message and adds nothing.
 
 ### Due Date
 _Free. Needs: storage_
@@ -1412,6 +1601,8 @@ _Free. Needs: storage_
 - [ ] Change the cycle length to 32: the due date moves 4 days later.
 - [ ] Pick a future date: "Date is in the future".
 - [ ] Reopen: the date is remembered.
+- [ ] Pick a last-period date that is across a daylight saving change from today: the weeks and days count is still whole (no off-by-one day).
+- [ ] The date picker allows only the last 400 days up to today. Cycle length 99 is limited to 45.
 
 ### Eye Rest 20-20-20
 _Free. Needs: storage_
@@ -1419,6 +1610,7 @@ _Free. Needs: storage_
 - [ ] Set work minutes to 5, press Start: the ring counts down.
 - [ ] When it ends a beep plays and "Look 20 feet away now" shows for 20 seconds, then work time restarts and Breaks today goes up by one.
 - [ ] Press Stop: the timer resets. Leave the tool: nothing keeps beeping.
+- [ ] Start the timer: the screen stays on and, in the Android app, a notification for the next break is scheduled. Old daily break counters (over 30 days) are removed automatically.
 
 ### Fasting Timer
 _Free. Needs: storage_
@@ -1427,6 +1619,7 @@ _Free. Needs: storage_
 - [ ] Leave and reopen the tool: the fast is still running with the elapsed time.
 - [ ] End the fast after more than a minute: it appears in History.
 - [ ] Change the goal during a fast: "of N hours" updates.
+- [ ] During a fast the caption under the ring reads like "Hours 4-12 of your fast" (neutral wording, no health claims).
 
 ### Habit Streaks
 _Free. Needs: storage_
@@ -1444,6 +1637,8 @@ _Free. Needs: storage_
 - [ ] Custom: name "Temperature", unit "C", value 36.6: it shows in the list and charts on the Custom tab while the name matches.
 - [ ] Tap the cross on an entry and confirm: it is removed. Tap "Export as text" and "Copy text": the text contains all entries with dates.
 - [ ] Add with an empty value: "Enter a value" toast.
+- [ ] Try to add a weight of 0, -5 or 9999: "That value looks out of range" shows and nothing is saved.
+- [ ] Weight: enter 5 (message and out-of-range toast on Add; limit 20 to 500). Pick a date in the future or before 1900: the picker stops it, and Add refuses a typed one.
 
 ### Heart Rate
 _Free. Needs: camera_
@@ -1453,6 +1648,7 @@ _Free. Needs: camera_
 - [ ] Lift the finger mid-measurement: the timer restarts when you cover it again.
 - [ ] Deny the camera: "Camera permission denied." Leave the tool: the camera and flash switch off.
 - [ ] The "Approximate, not medical" notice is always visible.
+- [ ] Double-tap Start quickly: only one camera session starts (the camera light does not stay on after Stop). Lift your finger off for a moment mid-measurement: the measurement restarts. A resting pulse of 45 to 55 BPM is measured, not rejected.
 
 ### Ideal Weight
 _Free_
@@ -1468,6 +1664,7 @@ _Free. Needs: storage_
 - [ ] Choose Keto: fat rises to about 156 g and carbs falls to 25 g.
 - [ ] Custom with 50, 30, 30: a note says the percentages add to 110 and are scaled.
 - [ ] Empty calories: results "--".
+- [ ] In Custom, type a negative percentage: it is treated as 0. Daily calories under 500 or over 10000 show "--".
 
 ### Meditation
 _Free_
@@ -1476,6 +1673,7 @@ _Free_
 - [ ] Set Interval bell to Every minute: a bell sounds each minute.
 - [ ] Type 1 as custom minutes: the display shows 1:00; Begin and wait: the end bell rings 3 times and "Session complete" shows.
 - [ ] End session early: the ring resets.
+- [ ] Begin a session: the screen is kept awake and, in the Android app, an end-of-session notification is scheduled; leaving the tool cancels it.
 
 ### Mood Log
 _Free. Needs: storage_
@@ -1483,6 +1681,7 @@ _Free. Needs: storage_
 - [ ] Tap Save today with no face chosen: "Pick a face first".
 - [ ] Pick a face, add a note and Save: today's bar appears and the entry shows in the list.
 - [ ] Reopen the tool: today's face and note are pre-selected; saving again replaces today's entry.
+- [ ] A damaged saved entry shows as "Okay" instead of breaking the page.
 
 ### Sleep Calculator
 _Free_
@@ -1491,6 +1690,7 @@ _Free_
 - [ ] Switch to "I go to bed at" 23:00: the first suggestion is 8:15 AM (6 cycles = 9 hours, plus 15 minutes to fall asleep).
 - [ ] Tap "Use the current time": the field fills with now.
 - [ ] Clear the time field: the list empties without error.
+- [ ] Clear the time field: the list empties and nothing breaks.
 
 ### Step Counter
 _Free. Needs: motion, storage_
@@ -1500,13 +1700,16 @@ _Free. Needs: motion, storage_
 - [ ] Tap Pause, walk: no steps. Tap Start counting to resume.
 - [ ] Change the goal to 1000: the ring and "of 1000 steps" update. Reopen the tool: today's total and the history bars are kept.
 - [ ] "Reset today" asks for confirmation then zeroes the count.
+- [ ] Shake the phone hard for 10 seconds, then walk normally for 30 seconds: steps are still counted for the walk.
 
 ### Waist-Hip Ratio
 _Free_
 
-- [ ] Female, waist 70, hip 100: ratio 0.70, "Low risk" in green.
-- [ ] Male, waist 105, hip 100: ratio 1.05, "High risk" in red.
+- [ ] Female, waist 70, hip 100: ratio 0.70, "At or below the WHO cut-off" in green.
+- [ ] Male, waist 105, hip 100: ratio 1.05, "Above the WHO cut-off (increased risk)" in red.
 - [ ] Empty or zero fields: "--".
+- [ ] Men above 0.90 and women above 0.85 show "Above the WHO cut-off"; at or below shows "At or below the WHO cut-off". Absurd ratios (under 0.3 or over 2) show "--".
+- [ ] Enter 9999 in Waist: a message shows and the value is limited to 500. Hip 0 shows "--".
 
 ### Water Tracker
 _Free. Needs: storage_
@@ -1515,6 +1718,7 @@ _Free. Needs: storage_
 - [ ] Enter 330 as a custom amount and tap Add; tap Undo to remove the last addition.
 - [ ] Reach the goal: a "Daily goal reached" toast appears and the bar turns green.
 - [ ] Change the goal to 3000: level and percentage recalculate. Reopen the tool: data is kept.
+- [ ] In the light theme with the glass nearly empty the "0 ml" label is dark and readable; once the water is over half full it turns white. Enter 0 or 9999 as a custom amount and tap Add: a message asks for 1 to 5000 ml.
 
 ### Workout Timer
 _Free. Needs: storage_
@@ -1523,6 +1727,7 @@ _Free. Needs: storage_
 - [ ] Pause then Resume: the countdown continues where it stopped.
 - [ ] Reset returns to Ready and the total time shown.
 - [ ] Leave during a run: no beeps continue.
+- [ ] Start a workout and lock the screen: the screen stays on (and in the Android app an end-of-workout notification is scheduled). Pause then Resume: the timing carries on correctly.
 
 ## 9. Security
 
@@ -1531,7 +1736,7 @@ _Free. Needs: storage_
 
 - [ ] Open 2FA Codes, create a master password, tap Add account, name it and enter secret GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ: a 6 digit code appears with a countdown bar that turns red in the last 5 s and then a new code appears.
 - [ ] Compare the code with a trusted authenticator app using the same secret: they match at the same moment.
-- [ ] Enter an invalid secret such as "hello!": an error says it does not look valid. Paste an otpauth://totp/Example:me?secret=JBSWY3DPEHPK3PXP&issuer=Example link: issuer and secret are filled automatically.
+- [ ] Enter an invalid secret such as "hello!" or one shorter than 10 characters: an error says it does not look valid. Paste an otpauth://totp/Example:me?secret=JBSWY3DPEHPK3PXP&issuer=Example link: issuer and secret are filled automatically.
 - [ ] Tap the code: it copies. Tap the X on an account and confirm: it is removed (a warning explains you need the secret to add it again).
 - [ ] Lock the tool and unlock with a wrong password: refused. Export a backup, remove an account, import the backup with the master password: the account returns.
 
@@ -1541,12 +1746,12 @@ _Free. Needs: storage_
 - [ ] Choose a small text file and tap Calculate: a SHA-256 hash appears. Compare it with a known value from another tool.
 - [ ] Paste that hash into Expected hash: the verdict reads Match. Change one character: No match in red.
 - [ ] Paste a 128 character SHA-512 hash: the algorithm switches to SHA-512 automatically.
-- [ ] Cancel the file picker without choosing: the Calculate button stays disabled. Choose a file over 500 MB: a warning shows and failure is reported gracefully if memory runs out.
+- [ ] Cancel the file picker without choosing: the Calculate button stays disabled. Choose a file over 500 MB: a warning shows and failure is reported gracefully if memory runs out. A file over 1 GB is refused with a message.
 
 ### Emergency Card
 _Free. Needs: storage_
 
-- [ ] First open shows the edit form. Fill in a name, blood group O+, an allergy and a contact phone, then Save.
+- [ ] First open shows the edit form. Date of birth is a date picker (not in the future, not before 1900); phone fields take at most 20 characters of digits, spaces and + ( ) - only. Fill in a name, blood group O+, an allergy and a contact phone, then Save.
 - [ ] The card shows the name in large type, a big red blood group and a Call button for the contact; tapping it opens the dialer with the number.
 - [ ] Tap Edit card, clear the allergy, Save: it disappears from the card. Cancel on the edit screen returns to the card without changes.
 - [ ] Close and reopen the app: the card is still there.
@@ -1554,19 +1759,19 @@ _Free. Needs: storage_
 ### File Locker
 _Free (limit: 3 locked files (Pro: unlimited)). Needs: storage_
 
-- [ ] Open File Locker. Enter a password under 8 characters: an error appears. Enter two different passwords: mismatch error. Enter a valid password twice without ticking the box: asked to confirm; tick it and tap Create: the locker opens empty.
+- [ ] Open File Locker. Enter a password under 8 characters: an error appears. Enter two different passwords: mismatch error. Enter "password123" twice and tick the box: a "too easy to guess" message and a "Use this weak password anyway" button appear. Use a strong password (for example 7 random words) twice without ticking the box: asked to confirm; tick it and tap Create: the locker opens empty.
 - [ ] Tap Choose files and pick two photos and a PDF (free plan allows 3). They appear with names, sizes and image thumbnails. Pick one more file: the Pro sheet opens and the file is not added.
 - [ ] Tap View on a photo: it opens in a dialog. Tap Export on a file: the share sheet (or a download in a desktop browser) offers the decrypted file. Tap Delete and confirm: it disappears.
 - [ ] Tap Lock, then enter a wrong password 5 times: after the fifth, the Unlock button is disabled with a countdown of about 30 s. Wait, then enter the right password: it unlocks.
-- [ ] Open Security and backup, change the password (wrong current password is rejected), then lock and unlock with the new one: all files still open and the old password is rejected.
-- [ ] Unlock, send the app to the background for over 60 s and return: the locker is locked. Leave the tool and re-enter: it is locked. On a phone with biometrics: Security and backup shows "Turn on biometric unlock" (hidden if the plugin or biometrics are missing); after enabling, the Unlock screen shows a biometrics button.
+- [ ] Open Security and backup, change the password (wrong current password is rejected; a weak new password asks for "Use anyway"), then lock and unlock with the new one: all files still open and the old password is rejected. Choose a file over 200 MB: it is skipped with a message.
+- [ ] Unlock, send the app to the background for over 60 s and return: the locker is locked. Leave it untouched for 2 minutes: it locks. Leave the tool and re-enter: it is locked. On Android the screen cannot be screenshotted while it is unlocked. On a phone with biometrics: Security and backup shows "Turn on biometric unlock" (hidden if the plugin or biometrics are missing); after enabling, the Unlock screen shows a biometrics button and a fingerprint or face check is required. Add a fingerprint in Android settings: the button stops working, a message explains it, and the password still works.
 
 ### Password Check
 _Free_
 
 - [ ] Type "password": Very weak, instant crack time, problem "one of the most commonly used passwords".
 - [ ] Type "P@ssw0rd2024": still weak and the year and common word are flagged.
-- [ ] Paste a 16 character random mix of letters, digits and symbols: Strong or Excellent with a long crack time and no problems.
+- [ ] Paste a 16 character random mix of letters, digits and symbols: Strong or Excellent with a long crack time and no problems. Type "correcthorsebattery": it is rated much lower than a random string of the same length (dictionary words are charged at a word-like rate).
 - [ ] Clear the box: the meter empties and the time and problems cards disappear. Tap the eye icon to reveal the text.
 - [ ] Leave the tool and return: the field is empty (nothing is remembered).
 
@@ -1575,7 +1780,7 @@ _Free (limit: 5 entries (Pro: unlimited)). Needs: storage_
 
 - [ ] Open Password Vault, create a master password (8+ characters, confirm, tick the warning box). The empty vault opens.
 - [ ] Tap Add, type a title and username, tap Generate: a 20 character password appears and the meter fills. Save. The entry shows with dots in place of the password.
-- [ ] Tap Show, then Copy password: a toast says it clears in 30 s. Paste elsewhere to check it, wait 30 s with the app open and paste again: the clipboard is empty (may not clear if Android blocks background clipboard access).
+- [ ] Tap Show, then Copy password: the toast says it clears in 30 s only when this phone does it natively; otherwise it says it may not clear by itself. Paste elsewhere to check it, wait 30 s and paste again: on a phone with the native helper the clipboard is empty.
 - [ ] Add entries up to 5: the sixth opens the Pro sheet. Search for part of a title: the list filters.
 - [ ] Security and backup > Export backup: a .pkbackup.json file is shared/downloaded. Delete an entry, choose Import backup, pick the file and enter the master password: the deleted entry returns. Enter a wrong password: a clear error and nothing changes.
 - [ ] Lock and unlock with a wrong password: "Wrong password." After 5 wrong tries a 30 s lockout appears.
@@ -1583,8 +1788,8 @@ _Free (limit: 5 entries (Pro: unlimited)). Needs: storage_
 ### PIN & Passphrase
 _Free_
 
-- [ ] Open the tool: PIN tab shows five 6 digit PINs. Move Length to 4 and 12: the PINs change length. With "Avoid easy PINs" on, none are 0000, 1234 or 4321.
-- [ ] Passphrase tab: set 6 words and a space separator: four phrases of 6 words appear with about 57 bits shown. Toggle Capitalise and Add a number: the phrases update.
+- [ ] Open the tool: PIN tab shows five 6 digit PINs. Move Length to 4 and 12: the PINs change length. With "Avoid easy PINs" on, none are 0000, 1234, 4321, 1122, 1212, 2580 or contain a year such as 1990.
+- [ ] Passphrase tab: the default is 7 words (about 67 bits shown; fewer than 7 words adds a tip to use more). Set 6 words and a space separator: four phrases of 6 words appear with about 58 bits shown. Toggle Capitalise and Add a number: the phrases update.
 - [ ] Password tab: untick Symbols and Digits: only letters appear. Untick everything: lowercase letters are used so it never fails.
 - [ ] Tap Generate again: new values every time. Tap Copy and paste elsewhere to check the value.
 
@@ -1613,15 +1818,53 @@ _Free_
 - [ ] Enter a wrong password: "Wrong password, or the code was changed."
 - [ ] Delete one character from the middle of the code and unlock with the right password: it fails the same way. Paste random text: "not a valid locked code".
 - [ ] Tap Share: the share sheet opens (or the text is copied on a desktop browser).
+- [ ] Lock a message of about 14,000 characters: it works, and the long code pastes whole into the Unlock tab and opens. A message of 15,000 characters is cut off at the limit by the box. In Lock mode a password such as "password123" shows "too easy to guess" with a "Use anyway" button.
 
 ## 10. Create
+
+### ASCII Art
+_Free_
+
+- [ ] Tap Choose a photo and pick a high-contrast picture: a text rendering appears and the placeholder disappears.
+- [ ] Move the width slider: the art gets coarser or finer and keeps the right proportions. Change the character set: the look changes.
+- [ ] Tick Invert: dark and light characters swap, which helps on dark backgrounds.
+- [ ] Tap Copy text and paste it into the Notes tool: the lines are intact. Tap Save .txt: a file is saved or shared.
+- [ ] Tap Copy text before choosing a photo: "Pick a picture first" appears.
 
 ### Paint
 _Free. Needs: storage_
 
 - [ ] Draw with a finger in two colours. Lines follow the finger.
 - [ ] Tap Undo. The last stroke disappears. Tap Eraser and erase part of a line.
-- [ ] Tap Save. The picture is saved or shared as an image.
+- [ ] Tap Save. On the phone the share sheet opens with a PNG; in a browser a PNG downloads and Saved is shown. The word Saved is only shown when the save worked.
+- [ ] Draw a long continuous line with a thick brush. It stays smooth and does not slow down.
+
+### Paint Mixer
+_Free_
+
+- [ ] Open the tool with red and navy at 1 : 1: the result shows a dark purple HEX and five palettes below it.
+- [ ] Set colour 1 to #FF0000 and colour 2 to #0000FF with equal parts: result is #800080. Change parts to 3 : 1 and the result moves toward red.
+- [ ] Set all parts to 0: the result says "Add some parts" and the palettes disappear.
+- [ ] Type a HEX in a colour box such as #0f0 or ff8000: the colour picker updates. Typing an invalid value such as "zz" changes nothing.
+- [ ] Tap a palette swatch or Copy HEX: "Copied" appears. Settings persist after reopening the tool.
+
+### Pixel Art
+_Free. Needs: storage_
+
+- [ ] Draw with the pen by dragging a finger: continuous lines appear with no gaps even on fast strokes. Pick another palette colour and draw again.
+- [ ] Choose Fill and tap an empty area: the whole connected empty area fills. Tap Undo: the fill is reverted. Tap Undo with nothing left: "Nothing to undo" appears.
+- [ ] Choose Erase and drag over pixels: they clear back to the checkerboard. Choose Pick and tap a coloured pixel: that colour becomes the current colour and the tool returns to Pen.
+- [ ] Tap Size: with a drawing present it asks for confirmation, then switches to a 32x32 grid. Toggle Grid off: grid lines disappear.
+- [ ] Tap Export PNG: a file (or the Android share sheet) is produced; open it and check it is crisp, not blurred. Leave and reopen the tool: the drawing is still there.
+
+### Signature Pad
+_Free_
+
+- [ ] Draw a signature: strokes are smooth and follow the finger. Change the thickness and colour and draw again: the new strokes use the new settings.
+- [ ] Tap Undo: the last stroke disappears. Tap Clear: everything is erased.
+- [ ] Draw a signature and tap Save / share PNG: the saved PNG has a transparent background (open it over a coloured background) and has only a small margin around the ink.
+- [ ] With an empty pad tap Save / share PNG: the message "Sign first" appears and no file is produced.
+- [ ] Tap once without dragging: a dot is drawn and saved correctly.
 
 ## 11. Fun
 
@@ -1632,6 +1875,22 @@ _Free_
 - [ ] A swipe that changes nothing shakes the board and spawns nothing.
 - [ ] Fill the board with no merges: Game over shows. New game restarts; Best remains after reopening.
 
+### 24 Game
+_Free. Needs: storage_
+
+- [ ] Tap a number, an operator, then another number: the two are replaced by the result. Continue until one card remains.
+- [ ] If the last number is 24: "24! Solved" with the time and Solved increases. If not, a message says what it made; tap Undo to step back.
+- [ ] Edge case: divide by a card with value 0 (for example 5 - 5 then divide by it): "Cannot divide by zero". Divisions can produce fractions that are shown as n / d.
+- [ ] Tap Hint: a working solution is shown. New deals four new numbers; Reset restores the current four.
+
+### Balance Ball
+_Free. Needs: motion, storage_
+
+- [ ] Tap Start (allow motion access if asked). Hold the phone flat and tilt: the ball rolls in the tilt direction. Roll onto the star: Stars increases and time is added.
+- [ ] Touch a mine: the ball flashes red, bounces away and 3 seconds are lost.
+- [ ] Edge case: deny the motion permission or use a desktop browser: the message says no tilt was detected and dragging on the arena pulls the ball.
+- [ ] When time hits zero: "Time!" with the star count, Best updates; Play again restarts. Pause freezes everything.
+
 ### Bingo Caller
 _Free_
 
@@ -1639,11 +1898,37 @@ _Free_
 - [ ] Never repeats a number; after 75 a message says all are called.
 - [ ] Enable Read numbers aloud: the number is spoken. New game clears the board.
 
+### Blackjack
+_Free. Needs: storage_
+
+- [ ] Tap chip buttons to build a bet (chips shows the amount), then Deal: you get two cards and the dealer shows one with one hidden.
+- [ ] Hit: a card is added and the total updates (soft totals are labelled). Over 21: Bust and you lose the bet. Stand: the dealer reveals and draws to 17.
+- [ ] Double: only available with two cards and enough chips; the bet doubles, you get one card and the hand ends.
+- [ ] Edge case: Deal with no bet: "Place a bet first". A natural 21 pays 3 to 2 (a bet of 10 wins 15). All in then lose: "Out of chips" button restores 1000.
+- [ ] Leave and reopen: the chip total is kept.
+
+### Block Stack
+_Free. Needs: storage_
+
+- [ ] Tap Start: pieces fall. Drag a finger sideways on the board: the piece follows. Tap the board: it rotates. Swipe down quickly: hard drop.
+- [ ] Use the buttons: left, right, rotate, soft drop, hard drop; hold left: the piece repeats moving.
+- [ ] Complete a row: it flashes, disappears, Score and Lines increase; after 10 lines the Level goes up and pieces fall faster.
+- [ ] Tap Pause: the game stops with a Paused overlay; Resume continues. Switch to another app and back: the game is paused.
+- [ ] Edge case: stack to the top: Game over appears with the score; Best updates and survives reopening the tool. Leave the tool mid-game and reopen: the game is idle again and nothing keeps running in the background.
+
 ### Bottle Spinner
 _Free_
 
 - [ ] Choose 6 seats and tap the bottle or Spin: it turns for about 4 s.
 - [ ] The bottle points at the highlighted seat and the message says Seat N.
+
+### Breakout
+_Free. Needs: storage_
+
+- [ ] Tap Start, then tap the board to launch the ball. Drag left and right: the paddle follows the finger.
+- [ ] The ball bounces off walls, paddle and bricks; hitting a brick removes it and adds points. Where it hits the paddle changes its angle.
+- [ ] Let the ball fall: Lives drop by one and the ball returns to the paddle. At zero lives: Game over and Best updates.
+- [ ] Edge case: clear all bricks: Level increases and a fuller brick wall appears. Tap Pause: the ball freezes; Resume continues.
 
 ### Coin Flip
 _Free_
@@ -1659,12 +1944,46 @@ _Free_
 - [ ] Make four in a row: the winning discs glow and the score updates.
 - [ ] Hard level takes a moment to think; 2 Players alternates red and yellow. Fill the board: Draw.
 
+### Daily Challenge
+_Free. Needs: storage_
+
+- [ ] Open the tool: today's date, a puzzle and "Tries left 3" are shown. Type a wrong answer and tap Check answer: "Not quite, try again" appears, the box shakes and tries drop to 2.
+- [ ] Type the right answer (scramble: the 5-letter word in lowercase or capitals; sums: all three results): "Solved!" appears, the streak shows 1 and the inputs lock.
+- [ ] Leave and reopen the tool: it still shows Solved and the same puzzle (same date gives the same puzzle).
+- [ ] Edge case: leave an input empty and tap Check answer: "Fill in your answer first" and no try is used. Use up all three tries: the correct answer is revealed and the inputs lock.
+- [ ] Change the phone date to the next day and reopen: a new puzzle and 3 tries; the streak from yesterday still shows. Skip a day: the streak shows 0.
+
 ### Dice Roller
 _Free_
 
 - [ ] Choose 3 dice and d20, tap Roll: dice tumble about 1 second, then show values 1-20 and Total equals their sum.
 - [ ] Switch to d6: dice show pip faces. Tap Roll twice quickly: the second tap is ignored while rolling.
 - [ ] History lists each roll; Clear empties it. Leave and reopen the tool: dice count and sides are remembered.
+
+### Digit Span
+_Free. Needs: storage_
+
+- [ ] Tap Start: three digits flash one by one, then you can type them with the on-screen keypad (or keyboard). The OK button or filling all digits submits.
+- [ ] A correct answer shows the next length (4, 5, ...). A wrong answer shows the right sequence and strikes 1 / 2, then repeats at the same length.
+- [ ] Switch to Backwards: type the sequence in reverse order to be correct.
+- [ ] Edge case: press OK with too few digits: "Need N digits". Change mode while digits are flashing: the sequence stops and the tool resets cleanly. A second strike shows Game over and Best updates.
+
+### Dodge
+_Free. Needs: motion, storage_
+
+- [ ] Tap Start and drag a finger: the ship follows horizontally. Rocks fall; stars add 25 points; surviving adds points every second.
+- [ ] Hit a rock: Crash! with the score; Try again restarts. Best updates.
+- [ ] Tap Steering: tilt. On a phone, tilt left and right: the ship moves. On a device without a tilt sensor or when permission is denied: a message says it is using drag instead and drag still works.
+- [ ] Edge case: Pause, then lock the screen and return: the game is paused, not running behind the overlay.
+
+### Dots and Boxes
+_Free. Needs: storage_
+
+- [ ] Tap between two dots: a line appears in your colour and the phone replies after a moment.
+- [ ] Complete a box: it fills with your colour and a Y, and you go again. The phone's boxes use its colour and an M.
+- [ ] Finish the board: the message shows who won and the score; a win adds 1 to Games won.
+- [ ] Edge case: tap a line that is already drawn, or tap while the phone is thinking: nothing happens. Press New game while the phone is thinking: the phone's pending move is cancelled.
+- [ ] Change grid size: a new game of that size starts.
 
 ### Finger Chooser
 _Free_
@@ -1679,12 +1998,29 @@ _Free_
 - [ ] Tap the game to start; each tap lifts the bird. Passing a pipe adds 1.
 - [ ] Hit a pipe or the ground: Game over; tap after half a second to retry.
 
+### Gem Match
+_Free. Needs: storage_
+
+- [ ] Tap a gem then a neighbour that makes a match: they swap, the match clears, gems fall and the score rises; Moves left drops by 1.
+- [ ] Swipe a gem towards a neighbour: it swaps the same way.
+- [ ] Edge case: swap two gems that make no match: they swap back with a shake and no move is used.
+- [ ] Tap Hint: two gems pulse. A chain reaction shows "Combo x2!".
+- [ ] Use all 30 moves: "Out of moves" with the final score and Best updates. New game resets, even while gems are still moving.
+
 ### Hangman
 _Free_
 
 - [ ] Tap letters: correct ones appear in the word and the key turns green; wrong ones turn red, a body part appears and a heart is lost.
 - [ ] Guess the word: You got it and Won increases. Use all 6 lives: the word is revealed in red.
 - [ ] New word starts again.
+
+### Higher or Lower
+_Free. Needs: storage_
+
+- [ ] A card is shown face up and the next is face down. Tap Higher or Lower: the next card flips after a moment and the streak goes up when you were right.
+- [ ] A wrong guess ends the game with the final streak; the buttons are disabled until New game.
+- [ ] Edge case: when the next card has the same value, "Same value: a push" appears and the streak is unchanged. Tap the buttons twice quickly: only one guess counts.
+- [ ] Best updates and is remembered after reopening the tool.
 
 ### Lights Out
 _Free_
@@ -1706,12 +2042,29 @@ _Free. Needs: motion_
 - [ ] Shake the phone: a new answer appears (at most one per 1.5 s).
 - [ ] Where shake sensor access is missing or denied, a message tells you to tap the ball; tapping still works. On iOS an Enable shake button asks for permission.
 
+### Mastermind
+_Free. Needs: storage_
+
+- [ ] Tap four colours in the palette, then Guess: a row of black and ring dots appears and the guesses-left counter drops.
+- [ ] Tap a filled slot in the current row: it empties. Clear empties the whole row.
+- [ ] Edge case: tap Guess with an empty slot: "Fill every slot first". On Easy, use the same colour twice: "This level has no repeated colours".
+- [ ] Solve the code: "Cracked it in N guesses" and Best updates. Run out of guesses: the code is revealed.
+- [ ] Switch level: a new game starts and the level is remembered after reopening.
+
 ### Math Sprint
 _Free_
 
 - [ ] Tap Start and answer using the keypad: right answers advance instantly and increase Score.
 - [ ] A wrong answer shakes, counts as a miss and clears your input.
 - [ ] When the bar runs out Time! shows your score; Best updates per level.
+
+### Maze Runner
+_Free. Needs: storage_
+
+- [ ] Swipe in a direction: the runner slides along the corridor until a junction or wall and leaves a trail. The arrow buttons do the same.
+- [ ] Reach the flag: the message shows the time, steps taken and the shortest path; the next, larger maze loads after a moment and Best level updates.
+- [ ] Edge case: swipe into a wall: nothing moves. Restart level returns the runner to the start with the same maze; New maze creates a different one.
+- [ ] The maze fits the screen width at every level (no sideways page scroll).
 
 ### Memory Match
 _Free_
@@ -1727,6 +2080,15 @@ _Free_
 - [ ] Long-press a cell (or switch to Flag mode): a flag appears and Left decreases; again removes it.
 - [ ] Tap a mine: all mines show and Boom appears. Clear all safe cells: win message and Best time.
 
+### Nonogram
+_Free. Needs: storage_
+
+- [ ] Tap cells in Fill mode: they turn the accent colour; tap again to clear. Drag across several cells: they all take the same state as the first cell.
+- [ ] Switch to Mark empty and tap a cell: it shows a cross. Filling an already crossed cell replaces the cross.
+- [ ] Fill the cells so every row and column matches its clues: "Solved in m:ss", the cells pop and Best updates.
+- [ ] Edge case: switch to 10 x 10: the grid and clues fit the screen width without the page scrolling sideways. Clear resets the grid but keeps the puzzle.
+- [ ] Next puzzle loads another picture; Random generates a new puzzle each time.
+
 ### Number Guess
 _Free_
 
@@ -1734,12 +2096,36 @@ _Free_
 - [ ] Enter 0 or leave empty: an error shake and message, guess count unchanged.
 - [ ] Guess the number: success message with tries; New number starts over.
 
+### Peg Solitaire
+_Free. Needs: storage_
+
+- [ ] Tap a peg that can jump: it lifts and the landing hole glows. Tap the glowing hole: the peg jumps and the jumped peg disappears; Pegs left drops to 31 and Moves to 1.
+- [ ] Tap Undo: the board returns and Moves drops. Undo is disabled at the start.
+- [ ] Edge case: tap a peg that has no jump: "That peg cannot jump". Tap an empty hole with nothing selected: nothing happens.
+- [ ] Play until no moves remain: a message shows how many pegs are left and Best left updates; Restart resets the board.
+
+### Pong
+_Free. Needs: storage_
+
+- [ ] Tap Start: after a short pause the ball is served. Drag left and right: your paddle follows.
+- [ ] Miss the ball: the phone scores; let it pass the AI: you score. First to 7 ends the game with a result message.
+- [ ] Choose Hard: the AI paddle is faster and more accurate than on Easy.
+- [ ] Edge case: switch level mid-game: the game stops and the start overlay returns. Win a game: Games won goes up by 1 and is remembered.
+
 ### Reaction Timer
 _Free_
 
 - [ ] Tap to start: the pad turns red (Wait...). After 1.5-4.7 s it turns green; tap and your time in ms shows (about 200-400).
 - [ ] Tap while red: Too soon! with a shake, no result recorded.
 - [ ] Best and Average update after several tries; Reset records clears them.
+
+### Reversi
+_Free. Needs: storage_
+
+- [ ] At the start, four dots show your legal moves. Tap one: your disc is placed, the flipped discs animate, and the phone replies.
+- [ ] Edge case: tap a square that is not a dot: the board shakes and "Not a legal move" appears.
+- [ ] When one side has no move, the message says so and the other side plays again. When neither can move the game ends with the final count.
+- [ ] Win a game: Games won increases and is remembered. New game restarts, even during the phone's turn.
 
 ### RPS Showdown
 _Free_
@@ -1754,6 +2140,16 @@ _Free_
 - [ ] Tap +1 on Player 1 three times: score 3 with a crown. Tap -1: score 2.
 - [ ] Set the custom amount to 10 and tap + custom: score increases by 10. Rename a player by typing in the name field.
 - [ ] Add player adds a card; the cross removes one. Reset scores zeroes all. Reopen the tool: players and scores remain.
+- [ ] Scores stay within +-999,999,999; the custom amount is limited to 1..9999.
+
+### Silly Names
+_Free. Needs: storage_
+
+- [ ] Open the tool: eight nicknames such as "Grumpy Walrus" are listed. Tap Generate: a fresh list appears.
+- [ ] Switch to Silly names, Team names ("The ... Rockets") and Story starters: each shows the right kind of result, with story starters being a short sentence.
+- [ ] Tap the star on a result: it is added to Favourites. Close and reopen the tool: favourites persist. The cross button removes one.
+- [ ] Tap the copy button on a result: "Copied" appears.
+- [ ] Tap Generate many times quickly: results never repeat within one list and no error occurs.
 
 ### Simon Says
 _Free_
@@ -1782,6 +2178,14 @@ _Free_
 - [ ] Tap Spin: it spins ~4 s, slows down and the pointer at the top lands on the winner, shown below the wheel.
 - [ ] Enable Remove the winner after each spin: after a spin the winner vanishes from the list.
 - [ ] With fewer than 2 options, Spin shows the message Add at least two options. Options persist after reopening.
+
+### Stroop Test
+_Free. Needs: storage_
+
+- [ ] Tap Start: a colour word appears in coloured ink and the 30 second timer runs. Tap the button matching the ink colour: Correct goes up.
+- [ ] Tap a wrong button: the word shakes and no point is scored.
+- [ ] After 30 seconds the word is replaced with the score (correct / total) and the message shows accuracy and average reaction in milliseconds.
+- [ ] Edge case: tap Start and answer nothing: the result shows 0 / 0 and 0% without errors. Beat your best: "new best" shows and persists after reopening.
 
 ### Sudoku
 _Free_
@@ -1822,6 +2226,14 @@ _Free_
 - [ ] Tap Truth: a blue card shows a question. Tap Dare: a red card shows a challenge.
 - [ ] Tap the same button repeatedly: the same card never repeats twice in a row.
 
+### Typing Falls
+_Free. Needs: storage_
+
+- [ ] Tap Start: the keyboard opens and words fall. Type a word's letters: they highlight in the word; finishing it removes the word and adds points.
+- [ ] Edge case: type a letter that no falling word starts with: the box shakes and clears. Capital letters and symbols are ignored.
+- [ ] Let a word reach the bottom: Lives drops by one. At zero: Game over with score and words cleared; Best updates.
+- [ ] After every 10 words the Level goes up. Tap Pause: words freeze and typing is ignored.
+
 ### Typing Speed
 _Free. Needs: storage_
 
@@ -1836,6 +2248,15 @@ _Free_
 
 - [ ] Tap Start: moles pop up randomly. Tap one: it shows a hit and Score increases.
 - [ ] Moles that are not hit hide on their own; at 0 s the game ends with the final score.
+
+### Word Guess
+_Free. Needs: storage_
+
+- [ ] Type five letters with the on-screen keys and tap Enter: the tiles flip and show green (tick), yellow (dot with stripes) or grey; the keyboard keys take the best colour.
+- [ ] Tap Enter with only three letters: "Not enough letters" and the row shakes. Backspace removes a letter.
+- [ ] Win or lose a game: the message appears (the word is revealed on a loss), Share appears and the stats card updates. Tap Share: the share sheet opens or the grid is copied.
+- [ ] Edge case with repeated letters: guess a word with two of the same letter when the answer has one: only one of them is coloured yellow or green, the other stays grey.
+- [ ] Tap the Colours button: the palette switches between green/yellow and blue/orange and the choice is remembered. New word starts a fresh game.
 
 ### Word Scramble
 _Free_

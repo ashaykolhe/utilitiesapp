@@ -7,8 +7,14 @@ const L = {};
 const p2 = (n) => String(n).padStart(2, '0');
 L.gcd = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) { const t = a % b; a = b; b = t; } return a; };
 L.lcm = (a, b) => (a && b ? Math.abs(a / L.gcd(a, b) * b) : 0);
-L.fx = (n, d = 2) => (Number.isFinite(n) ? n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }) : '—');
-L.sig = (n, p = 10) => (Number.isFinite(n) ? n.toLocaleString(undefined, { maximumSignificantDigits: p, useGrouping: false }) : '—');
+L.fx = (n, d = 2) => {
+  if (!Number.isFinite(n)) return '—';
+  if (Object.is(n, -0) || Math.abs(n) < 0.5 * Math.pow(10, -d)) n = 0; // never show -0 or -0.00
+  return n.toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d });
+};
+// Display only (locale aware). Anything that must be parsed again uses L.num.
+L.sig = (n, p = 10) => { if (!Number.isFinite(n)) return '—'; if (Object.is(n, -0)) n = 0; return n.toLocaleString(undefined, { maximumSignificantDigits: p, useGrouping: false }); };
+L.num = (r) => String(+(+r).toPrecision(12)); // locale-proof text that L.calc can read back
 L.r2 = (x) => Math.round((x + Math.sign(x) * 1e-9) * 100) / 100;
 L.ok = (...a) => a.every(Number.isFinite);
 
@@ -31,7 +37,7 @@ L.schedule = (P, rate, n, count) => {
 
 /* ---- invoice ---- */
 L.invoice = (items, taxPct, discType, discVal) => {
-  const sub = L.r2(items.reduce((s, i) => s + (i.q || 0) * (i.p || 0), 0));
+  const sub = L.r2(items.reduce((s, i) => s + L.r2((i.q || 0) * (i.p || 0)), 0));
   let disc = discType === 'pct' ? sub * (discVal || 0) / 100 : (discVal || 0);
   disc = L.r2(Math.min(Math.max(disc, 0), sub));
   const taxable = L.r2(sub - disc), tax = L.r2(taxable * (taxPct || 0) / 100);
@@ -44,7 +50,7 @@ L.invoiceText = (inv) => {
   out.push('Date: ' + inv.date);
   if (inv.cust) out.push('Bill to: ' + inv.cust);
   out.push('------------------------');
-  inv.items.forEach((i, k) => out.push((k + 1) + '. ' + (i.d || 'Item') + '  ' + L.sig(i.q || 0) + ' x ' + m(i.p || 0) + ' = ' + m((i.q || 0) * (i.p || 0))));
+  inv.items.forEach((i, k) => out.push((k + 1) + '. ' + (i.d || 'Item') + '  ' + L.sig(i.q || 0) + ' x ' + m(i.p || 0) + ' = ' + m(L.r2((i.q || 0) * (i.p || 0)))));
   out.push('------------------------', 'Subtotal: ' + m(t.sub));
   if (t.disc) out.push('Discount' + (inv.dt === 'pct' ? ' (' + L.sig(inv.dv) + '%)' : '') + ': -' + m(t.disc));
   if (inv.tax) out.push('Tax (' + L.sig(inv.tax) + '%): ' + m(t.tax));
@@ -61,23 +67,25 @@ L.ds = (n) => { const d = new Date(n * 864e5); return d.getUTCFullYear() + '-' +
 L.today = () => { const d = new Date(); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5; };
 L.dow = (n) => new Date(n * 864e5).getUTCDay();
 L.DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const addM = (A, k) => {
+const addM = (A, k, roll) => {
   const mo = A.m + k, ty = A.y + Math.floor(mo / 12), tm = ((mo % 12) + 12) % 12;
   const dim = new Date(Date.UTC(ty, tm + 1, 0)).getUTCDate();
+  if (roll && A.d > dim) return Date.UTC(ty, tm + 1, 1) / 864e5; // 29 Feb counts as 1 March in non-leap years
   return Date.UTC(ty, tm, Math.min(A.d, dim)) / 864e5;
 };
-L.ymd = (a, b) => { // a <= b, both day numbers
+L.ymd = (a, b, roll) => { // a <= b, both day numbers
   const A = new Date(a * 864e5), B = new Date(b * 864e5);
   const S = { y: A.getUTCFullYear(), m: A.getUTCMonth(), d: A.getUTCDate() };
   let tm = (B.getUTCFullYear() - S.y) * 12 + (B.getUTCMonth() - S.m);
-  if (addM(S, tm) > b) tm--;
-  return { y: Math.floor(tm / 12), m: tm % 12, d: b - addM(S, tm) };
+  roll = !!roll && S.m === 1 && S.d === 29;
+  if (addM(S, tm, roll) > b) tm--;
+  return { y: Math.floor(tm / 12), m: tm % 12, d: b - addM(S, tm, roll) };
 };
 L.age = (dob, asof) => {
   const D = new Date(dob * 864e5), A = new Date(asof * 864e5);
   let next = Date.UTC(A.getUTCFullYear(), D.getUTCMonth(), D.getUTCDate()) / 864e5;
   if (next < asof) next = Date.UTC(A.getUTCFullYear() + 1, D.getUTCMonth(), D.getUTCDate()) / 864e5;
-  return Object.assign(L.ymd(dob, asof), { days: asof - dob, next, nextIn: next - asof, turning: new Date(next * 864e5).getUTCFullYear() - D.getUTCFullYear() });
+  return Object.assign(L.ymd(dob, asof, true), { days: asof - dob, next, nextIn: next - asof, turning: new Date(next * 864e5).getUTCFullYear() - D.getUTCFullYear() });
 };
 L.isWork = (n, wk) => !wk.includes(L.dow(n));
 L.addWork = (n, k, wk) => { // move k working days (k may be negative)
@@ -123,38 +131,42 @@ L.pay = (amount, per, hpw, wpy, dpw) => {
   const annual = { hour: amount * hpw * wpy, day: amount * dpw * wpy, week: amount * wpy, month: amount * 12, year: amount }[per];
   return { hour: annual / (hpw * wpy), day: annual / (dpw * wpy), week: annual / wpy, biweek: annual / wpy * 2, month: annual / 12, year: annual };
 };
-L.sumAmounts = (text) => {
-  let s = 0;
+L.sumLines = (text) => { // the amount is the number at the END of each line; lines without one are counted in bad
+  let sum = 0, bad = 0;
   String(text).split('\n').forEach((line) => {
-    const m = line.replace(/,/g, '').match(/-?\d*\.?\d+/g);
-    if (m) s += parseFloat(m[m.length - 1]);
+    line = line.replace(/,/g, '').replace(/[−–]/g, '-').trim();
+    if (!line) return;
+    const m = /(?<![\w.])-?\d+(?:\.\d+)?[eE][-+]?\d+$/.exec(line) || /(?<![\d.])-?\d+(?:\.\d+)?$/.exec(line);
+    if (m && Number.isFinite(parseFloat(m[0]))) sum += parseFloat(m[0]); else bad++;
   });
-  return s;
+  return { sum, bad };
 };
+L.sumAmounts = (text) => L.sumLines(text).sum;
 
 /* ---- fuel ---- */
 L.kmPerL = (x, unit) => (unit === 'l100' ? 100 / x : unit === 'mpg' ? x * 1.609344 / 3.785411784 : x);
 
 /* ---- marks / GPA ---- */
 L.marks = (text, defMax) => {
-  let got = 0, max = 0;
+  let got = 0, max = 0, bad = 0;
   String(text).split('\n').forEach((line) => {
+    if (!line.trim()) return;
     const m = /^\s*(\d*\.?\d+)\s*(?:\/\s*(\d*\.?\d+))?\s*$/.exec(line.replace(/,/g, '.'));
-    if (m) { got += parseFloat(m[1]); max += m[2] ? parseFloat(m[2]) : defMax; }
+    if (m) { got += parseFloat(m[1]); max += m[2] ? parseFloat(m[2]) : defMax; } else bad++;
   });
-  return { got, max, pct: max ? got / max * 100 : NaN };
+  return { got, max, bad, pct: max ? got / max * 100 : NaN };
 };
-L.GRADE = { 'A+': 4, A: 4, 'A-': 3.7, 'B+': 3.3, B: 3, 'B-': 2.7, 'C+': 2.3, C: 2, 'C-': 1.7, 'D+': 1.3, D: 1, F: 0 };
+L.GRADE = { 'A+': 4, A: 4, 'A-': 3.7, 'B+': 3.3, B: 3, 'B-': 2.7, 'C+': 2.3, C: 2, 'C-': 1.7, 'D+': 1.3, D: 1, 'D-': 0.7, E: 0, FX: 0, F: 0 };
 L.gpa = (text) => {
-  let pts = 0, cr = 0;
+  let pts = 0, cr = 0, bad = 0;
   String(text).split('\n').forEach((line) => {
-    const m = /^\s*([A-Za-z][+-]?|\d*\.?\d+)\s+(\d*\.?\d+)\s*$/.exec(line);
-    if (!m) return;
-    const g = /\d/.test(m[1]) ? parseFloat(m[1]) : L.GRADE[m[1].toUpperCase()];
-    if (g === undefined) return;
+    if (!line.trim()) return;
+    const m = /^\s*([A-Za-z]{1,2}[+-]?|\d*\.?\d+)\s+(\d*\.?\d+)\s*$/.exec(line);
+    const g = m ? (/\d/.test(m[1]) ? parseFloat(m[1]) : L.GRADE[m[1].toUpperCase()]) : undefined;
+    if (g === undefined) { bad++; return; }
     pts += g * parseFloat(m[2]); cr += parseFloat(m[2]);
   });
-  return { pts, cr, gpa: cr ? pts / cr : NaN };
+  return { pts, cr, bad, gpa: cr ? pts / cr : NaN };
 };
 
 /* ---- time ---- */
@@ -163,7 +175,9 @@ L.parseDur = (s) => { // seconds, or NaN. "1:30", "1:30:15", "2h 15m", "90m", "4
   if (!s) return NaN;
   let m = /^(\d+):(\d{1,2})(?::(\d{1,2}))?$/.exec(s);
   if (m) return +m[1] * 3600 + +m[2] * 60 + (+m[3] || 0);
-  m = /^(?:(\d*\.?\d+)\s*d)?\s*(?:(\d*\.?\d+)\s*h(?:rs?|ours?)?)?\s*(?:(\d*\.?\d+)\s*m(?:ins?)?)?\s*(?:(\d*\.?\d+)\s*s(?:ecs?)?)?$/.exec(s);
+  m = /^(\d*\.?\d+)\s*h(?:(?:ou)?rs?)?\s*(\d+)$/.exec(s); // 1h30 = 1 hour 30 minutes
+  if (m) return +m[1] * 3600 + +m[2] * 60;
+  m = /^(?:(\d*\.?\d+)\s*d(?:ays?)?)?\s*(?:(\d*\.?\d+)\s*h(?:(?:ou)?rs?)?)?\s*(?:(\d*\.?\d+)\s*m(?:in(?:ute)?s?)?)?\s*(?:(\d*\.?\d+)\s*s(?:ec(?:ond)?s?)?)?$/.exec(s);
   if (m && (m[1] || m[2] || m[3] || m[4])) return (+m[1] || 0) * 86400 + (+m[2] || 0) * 3600 + (+m[3] || 0) * 60 + (+m[4] || 0);
   if (/^\d*\.?\d+$/.test(s)) return parseFloat(s) * 60;
   return NaN;
@@ -214,33 +228,61 @@ L.divisors = (n) => {
 };
 L.nextPrime = (n) => { do n++; while (!L.isPrime(n)); return n; };
 L.prevPrime = (n) => { if (n <= 2) return null; do n--; while (!L.isPrime(n)); return n; };
-L.nums = (text) => String(text).split(/[\s,;]+/).map(parseFloat).filter(Number.isFinite);
+// Prime check is heavy for big numbers, so the UI only runs it when Analyse is tapped.
+L.NEIGHBOUR_MAX = 1e12; // next/previous prime are only searched up to this size
+L.analyse = (n) => {
+  if (!Number.isInteger(n) || n < 2 || n > 9e15) return null;
+  const f = L.factor(n), pr = f.length === 1 && f[0][1] === 1, out = { n, prime: pr, factors: f };
+  if (n <= 1e9) out.divisors = L.divisors(n);
+  if (n <= L.NEIGHBOUR_MAX) { out.next = L.nextPrime(n); out.prev = L.prevPrime(n); }
+  return out;
+};
+L.parseNums = (text) => { // strict: { nums, bad } where bad is the first token that is not a number (or null)
+  const nums = []; let bad = null;
+  const NUM = /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i;
+  String(text).split(/[\s;]+|,(?=\s|$)/).forEach((tok) => {
+    if (!tok || bad !== null) return;
+    if (NUM.test(tok)) { nums.push(parseFloat(tok)); return; }
+    if (/^[-+]?\d{1,3}(,\d{3})+(\.\d+)?$/.test(tok)) { nums.push(parseFloat(tok.replace(/,/g, ''))); return; }
+    const parts = tok.split(',');
+    if (parts.length > 1 && parts.every((x) => NUM.test(x))) { parts.forEach((x) => nums.push(parseFloat(x))); return; }
+    bad = tok;
+  });
+  return { nums, bad };
+};
+L.nums = (text) => L.parseNums(text).nums;
 L.stats = (a) => {
   const n = a.length, s = a.reduce((x, y) => x + y, 0), mean = s / n, so = a.slice().sort((x, y) => x - y);
   const median = n % 2 ? so[(n - 1) / 2] : (so[n / 2 - 1] + so[n / 2]) / 2;
   const cnt = new Map();
   a.forEach((v) => cnt.set(v, (cnt.get(v) || 0) + 1));
-  const top = Math.max(...cnt.values());
+  const top = [...cnt.values()].reduce((x, y) => (y > x ? y : x), 0);
   const mode = top > 1 ? [...cnt].filter((e) => e[1] === top).map((e) => e[0]).sort((x, y) => x - y) : [];
   const ss = a.reduce((x, y) => x + (y - mean) * (y - mean), 0);
   return { n, sum: s, mean, median, mode, min: so[0], max: so[n - 1], range: so[n - 1] - so[0], varP: ss / n, sdP: Math.sqrt(ss / n), varS: n > 1 ? ss / (n - 1) : NaN, sdS: n > 1 ? Math.sqrt(ss / (n - 1)) : NaN };
 };
 L.fr = (n, d) => { if (d < 0) { n = -n; d = -d; } const g = L.gcd(n, d) || 1; return { n: n / g, d: d / g }; };
+const safe = (...x) => x.every(Number.isSafeInteger);
+const frSafe = (n, d) => (safe(n, d) ? L.fr(n, d) : null);
 L.pfrac = (s) => {
-  s = String(s).trim().replace('−', '-');
+  s = String(s).trim().replace('−', '-').replace(/^(-?\d*),(\d+)$/, '$1.$2'); // decimal comma: 0,25 = 0.25
   let m = /^(-?)(\d+)\s+(\d+)\s*\/\s*(\d+)$/.exec(s);
-  if (m) return +m[4] ? L.fr((m[1] ? -1 : 1) * (+m[2] * +m[4] + +m[3]), +m[4]) : null;
+  if (m) return +m[4] ? frSafe((m[1] ? -1 : 1) * (+m[2] * +m[4] + +m[3]), +m[4]) : null;
   m = /^(-?\d+)\s*\/\s*(-?\d+)$/.exec(s);
-  if (m) return +m[2] ? L.fr(+m[1], +m[2]) : null;
+  if (m) return +m[2] ? frSafe(+m[1], +m[2]) : null;
   m = /^(-?)(\d*)\.?(\d*)$/.exec(s);
-  if (m && (m[2] || m[3]) && m[3].length <= 9) { const k = Math.pow(10, m[3].length); return L.fr((m[1] ? -1 : 1) * Math.round(+(m[2] + m[3])), k); }
+  if (m && (m[2] || m[3]) && m[3].length <= 9) { const k = Math.pow(10, m[3].length); return frSafe((m[1] ? -1 : 1) * Math.round(+(m[2] + m[3])), k); }
   return null;
 };
+// Returns a fraction, null for division by zero, or { over: true } when an intermediate product leaves the safe integer range.
 L.fop = (a, b, op) => {
-  if (op === '+') return L.fr(a.n * b.d + b.n * a.d, a.d * b.d);
-  if (op === '-') return L.fr(a.n * b.d - b.n * a.d, a.d * b.d);
-  if (op === '*') return L.fr(a.n * b.n, a.d * b.d);
-  return b.n === 0 ? null : L.fr(a.n * b.d, a.d * b.n);
+  const OVER = { over: true };
+  let x, y, z, w;
+  if (op === '+' || op === '-') { x = a.n * b.d; y = b.n * a.d; z = op === '+' ? x + y : x - y; w = a.d * b.d; if (!safe(x, y, z, w)) return OVER; return L.fr(z, w); }
+  if (op === '*') { x = a.n * b.n; w = a.d * b.d; if (!safe(x, w)) return OVER; return L.fr(x, w); }
+  if (b.n === 0) return null;
+  x = a.n * b.d; w = a.d * b.n;
+  return safe(x, w) ? L.fr(x, w) : OVER;
 };
 L.fstr = (f) => (f.d === 1 ? String(f.n) : f.n + '/' + f.d);
 L.fmixed = (f) => {
@@ -296,13 +338,20 @@ L.cook = (gPerCup, amt, unit) => {
   return { g, oz: g / 28.349523125, cup: g / gPerCup, tbsp: g / gPerCup * 16, tsp: g / gPerCup * 48, ml: g / gPerCup * 236.588 };
 };
 const half = (x) => Math.round(x * 2) / 2;
-L.shoe = (sys, size) => { // approximate (Brannock-style)
-  let cm;
-  if (sys === 'cm') cm = size;
-  else if (sys === 'eu') cm = size / 1.5 - 1.5;
-  else { const usm = sys === 'usm' ? size : sys === 'uk' ? size + 1 : size - 1.5; cm = (usm + 22) / 3 * 2.54; }
-  const usm = 3 * cm / 2.54 - 22;
-  return { cm, eu: half((cm + 1.5) * 1.5), uk: half(usm - 1), usm: half(usm), usw: half(usm + 1.5) };
+/* Shoe sizes come from one lookup table (UK 1 to 16 in half sizes, approximate Brannock-style), so converting A to B and back to A always lands on the same row. */
+L.SHOES = (() => {
+  const t = [];
+  for (let uk = 1; uk <= 16; uk += 0.5) {
+    const usm = uk + 1, cm = (usm + 22) / 3 * 2.54;
+    t.push({ uk, usm, usw: usm + 1.5, eu: half((cm + 1.5) * 1.5), cm: Math.round(cm * 10) / 10 });
+  }
+  return t;
+})();
+L.shoe = (sys, size) => {
+  const tol = { uk: 0.5, usm: 0.5, usw: 0.5, eu: 1, cm: 0.5 }[sys];
+  let best = null;
+  L.SHOES.forEach((r) => { if (best === null || Math.abs(r[sys] - size) < Math.abs(best[sys] - size)) best = r; });
+  return best && Math.abs(best[sys] - size) <= tol ? best : null;
 };
 L.dress = (sys, size) => { const uk = sys === 'uk' ? size : sys === 'us' ? size + 4 : size - 28; return { uk, us: uk - 4, eu: uk + 28 }; };
 L.chest = (unit, v) => {
@@ -340,6 +389,12 @@ L.words = (n, indian) => { // integer 0 .. 999,999,999,999,999
     if (g) out.push(w999(g) + names[i]);
   }
   return out.join(' ');
+};
+L.splitAmount = (n) => { // whole part and hundredths of |n|, rounded as one number so 1.999 is "two", not "one and 100 hundredths"
+  const a = Math.abs(n), big = a >= 9e13; // above this, hundredths no longer fit exactly in a double
+  const cents = big ? Math.round(a) * 100 : Math.round(a * 100 + 1e-6);
+  const whole = big ? Math.round(a) : Math.floor(cents / 100), frac = big ? 0 : cents % 100;
+  return { whole, frac, neg: n < 0 && (whole > 0 || frac > 0) };
 };
 L.toBase = (str, from, to) => {
   str = String(str).trim().toLowerCase();
@@ -384,6 +439,7 @@ L.shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { con
 /* ---- scientific expression parser (no eval) ---- */
 L.calc = (src, deg, ans) => {
   if (src.length > 300) throw new Error('Too long');
+  src = src.replace(/(\d),(?=\d)/g, '$1.'); // decimal comma: 0,5 means 0.5 (a comma has no other meaning here)
   const s = src.replace(/×/g, '*').replace(/÷/g, '/').replace(/[−–]/g, '-').replace(/π/g, 'pi').replace(/√/g, 'sqrt').toLowerCase();
   if (/\.\d*\./.test(s)) throw new Error('Bad number');
   const toks = [];
@@ -418,7 +474,13 @@ L.calc = (src, deg, ans) => {
   };
   function expr() {
     let v = term();
-    while (peek() === '+' || peek() === '-') { const o = toks[p++].t; const r = term(); v = o === '+' ? v + r : v - r; }
+    while (peek() === '+' || peek() === '-') {
+      const o = toks[p++].t, start = p;
+      let r = term();
+      // "50+10%" means 50 + 10% of 50 (a bare number followed by % after + or -)
+      if (p - start === 2 && toks[start].t === 'n' && toks[start + 1].t === '%') r = v * r;
+      v = o === '+' ? v + r : v - r;
+    }
     return v;
   }
   function term() {
@@ -475,8 +537,8 @@ if (typeof Tools === 'undefined') { if (typeof module !== 'undefined') module.ex
 /* ================= UI helpers ================= */
 const fx = L.fx, sig = L.sig;
 const reg = (o) => Tools.register(Object.assign({ cat: 'calculate', needs: [] }, o));
-const rows = (list) => list.map((r) => `<div class="item"><span class="grow muted">${esc(r[0])}</span><b style="text-align:right">${esc(r[1])}</b></div>`).join('');
-const big = (label, value) => `<div class="center muted">${esc(label)}</div><div class="mid">${esc(value)}</div>`;
+const rows = (list) => list.map((r) => `<div class="item"><span class="grow muted">${esc(r[0])}</span><b style="text-align:right;word-break:break-all">${esc(r[1])}</b></div>`).join('');
+const big = (label, value) => `<div class="center muted">${esc(label)}</div><div class="mid" style="word-break:break-all">${esc(value)}</div>`;
 const table = (head, body) => `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums"><tr>${head.map((x) => `<th style="text-align:right;padding:4px 6px;color:var(--muted);font-weight:600;border-bottom:1px solid var(--line)">${esc(x)}</th>`).join('')}</tr>${body.map((r) => `<tr>${r.map((x) => `<td style="text-align:right;padding:4px 6px;border-bottom:1px solid var(--line)">${esc(x)}</td>`).join('')}</tr>`).join('')}</table></div>`;
 const copyText = async (t) => {
   try { await navigator.clipboard.writeText(t); toast('Copied'); return; } catch (e) { /* fall through */ }
@@ -497,25 +559,51 @@ function fieldHtml(f, val) {
   const lab = esc(f.l);
   if (f.t === 'select') return `<label class="f">${lab}<select data-k="${f.k}">${f.o.map((o) => `<option value="${esc(o[0])}"${String(o[0]) === String(val) ? ' selected' : ''}>${esc(o[1])}</option>`).join('')}</select></label>`;
   if (f.t === 'textarea') return `<label class="f">${lab}<textarea data-k="${f.k}" rows="${f.rows || 4}" maxlength="3000" placeholder="${esc(f.p || '')}">${esc(val)}</textarea></label>`;
-  const t = f.t || 'number';
-  return `<label class="f">${lab}<input data-k="${f.k}" type="${t}" ${t === 'number' ? 'inputmode="decimal" step="any"' : 'maxlength="60"'} value="${esc(val)}" placeholder="${esc(f.p || '')}"></label>`;
+  const t = f.t || 'number', lim = (x) => (typeof x === 'function' ? x() : x);
+  let attr;
+  if (t === 'number') {
+    const by = f.by ? ` data-by="${f.by}"` : '';
+    attr = `inputmode="${f.step === 1 ? 'numeric' : 'decimal'}" step="${f.step || 'any'}" min="${lim(f.min)}" max="${lim(f.max)}"${by}`;
+  } else if (t === 'date') attr = `min="${lim(f.min) || '1900-01-01'}" max="${lim(f.max) || '2200-12-31'}"`;
+  else if (t === 'time') attr = 'maxlength="5" min="00:00" max="23:59"';
+  else attr = `maxlength="${f.len || 60}"`;
+  return `<label class="f">${lab}<input data-k="${f.k}" type="${t}" ${attr} value="${esc(val)}" placeholder="${esc(f.p || '')}"></label>`;
 }
 
 /* Builds one card per section: fields -> live result. Returns a cleanup function. */
 function multi(el, id, sections) {
   const saved = Store.get('calc.' + id, {});
-  const values = {};
-  const initial = (f, i) => (typeof saved[i + '.' + f.k] === 'string' && f.keep !== false ? saved[i + '.' + f.k] : typeof f.v === 'function' ? f.v() : f.v === undefined ? '' : f.v);
+  const dflt = (f) => (typeof f.v === 'function' ? f.v() : f.v === undefined ? '' : f.v);
+  // a saved value is reused only when it still fits the field's limits (older versions had none)
+  const fits = (f, v) => { if ((f.t || 'number') !== 'number') return true; if (v === '') return true; const n = +v; return Number.isFinite(n) && n >= (typeof f.min === 'function' ? f.min() : f.min) && n <= (typeof f.max === 'function' ? f.max() : f.max); };
+  const initial = (f, i) => (typeof saved[i + '.' + f.k] === 'string' && f.keep !== false && fits(f, saved[i + '.' + f.k]) ? saved[i + '.' + f.k] : dflt(f));
   el.innerHTML = sections.map((s, i) => `<div class="card list" data-s="${i}">${s.title ? `<b>${esc(s.title)}</b>` : ''}${s.note ? `<div class="muted" style="font-size:13px">${esc(s.note)}</div>` : ''}${s.fields.map((f) => (Array.isArray(f) ? `<div class="row">${f.map((g) => fieldHtml(g, initial(g, i))).join('')}</div>` : fieldHtml(f, initial(f, i)))).join('')}<div class="list" data-r></div></div>`).join('');
+  // limits that depend on a unit selector (years / months / days ...): data-by names the selector, the table gives min and max per unit
+  const byFields = sections.map((s) => s.fields.flat().filter((f) => f.by));
+  const applyBy = (card) => byFields[+card.dataset.s].forEach((f) => {
+    const sel = $('[data-k="' + f.by[0] + '"]', card), inp = $('[data-k="' + f.k + '"]', card), lim = f.by[1][sel.value] || f.by[1][Object.keys(f.by[1])[0]];
+    inp.min = lim[0]; inp.max = lim[1];
+  });
+  // an empty, non-numeric or out-of-range number becomes NaN, so every calculator shows its "enter the values" note instead of a wild result; -0 becomes 0
+  let outOfRange = null;
   const read = (card) => {
-    const v = {};
-    $$('[data-k]', card).forEach((x) => { v[x.dataset.k] = x.type === 'number' ? parseFloat(x.value) : x.value; });
+    const v = {}; outOfRange = null;
+    $$('[data-k]', card).forEach((x) => {
+      if (x.type !== 'number') { v[x.dataset.k] = x.value; return; }
+      let n = Valid.num(x.value);
+      if (n !== null && ((x.min !== '' && n < +x.min) || (x.max !== '' && n > +x.max))) { if (!outOfRange) outOfRange = { l: x.parentNode.firstChild.textContent, a: x.min, b: x.max }; n = null; }
+      v[x.dataset.k] = n === null ? NaN : (n === 0 ? 0 : n);
+    });
     return v;
   };
   const run = (i) => {
-    const card = $$('.card', el)[i], out = $('[data-r]', card), v = read(card);
+    const card = $$('.card', el)[i], out = $('[data-r]', card);
+    applyBy(card);
+    const v = read(card);
     let html = null;
     try { html = sections[i].calc(v); } catch (e) { html = null; }
+    if (outOfRange) html = '<div class="status">' + esc(outOfRange.l) + ': enter a value from ' + esc(outOfRange.a) + ' up to ' + esc(outOfRange.b) + '.</div>';
+    if (html && /(NaN|Infinity|undefined)/.test(html.replace(/<[^>]*>/g, ' '))) html = BIG;
     out.innerHTML = html || '<div class="muted center" style="font-size:13px">Enter the values above.</div>';
     return v;
   };
@@ -532,16 +620,20 @@ function multi(el, id, sections) {
 }
 const simple = (def) => reg({ id: def.id, name: def.name, icon: def.icon, desc: def.desc, keys: def.keys, needs: def.needs || [], render(el) { multi(el, def.id, def.sections); } });
 const sec = (title, fields, calc, note) => ({ title, fields, calc, note });
-const N = (k, l, v, p) => ({ k, l, v, p });
+/* N(key, label, default, min, max, step): every number field has real limits; step 1 means whole numbers only. by = [selector key, { unit: [min, max] }] */
+const N = (k, l, v, min = 0, max = 1e12, step, by) => ({ k, l, v, min, max, step, by });
+const BIG = '<div class="status">That value gives a result that is too large to show.</div>';
 const S = (k, l, o, v) => ({ k, l, t: 'select', o, v });
 const ok = L.ok;
+const CAPMSG = '<div class="status">Rate up to 200% a year, and a result below 1,000,000,000,000,000.</div>';
 
 /* ================= 1. EMI ================= */
 simple({ id: 'emi', name: 'EMI Calculator', icon: '🏦', desc: 'Monthly loan instalment, total interest and the first 12 months of the repayment schedule.', keys: ['loan', 'mortgage', 'interest', 'instalment', 'amortisation'], sections: [sec('', [
-  N('p', 'Loan amount', 500000), [N('r', 'Interest % per year', 8.5), N('t', 'Tenure', 5)], S('u', 'Tenure in', [['y', 'Years'], ['m', 'Months']], 'y')
+  N('p', 'Loan amount', 500000, 0, 1e12), [N('r', 'Interest % per year', 8.5, 0, 200), N('t', 'Tenure', 5, 0, 100, undefined, ['u', { y: [0, 100], m: [0, 1200] }])], S('u', 'Tenure in', [['y', 'Years'], ['m', 'Months']], 'y')
 ], (v) => {
   const n = Math.round(v.u === 'y' ? v.t * 12 : v.t);
-  if (!ok(v.p, v.r, n) || v.p <= 0 || n < 1 || n > 1200 || v.r < 0) return null;
+  if (!ok(v.p, v.r, n) || v.p <= 0 || v.r < 0) return null;
+  if (n < 1 || n > 1200) return '<div class="status">Tenure must be between 1 month and 100 years.</div>';
   const e = L.emi(v.p, v.r, n), total = e * n;
   const sch = L.schedule(v.p, v.r, n, 12);
   return big('Monthly EMI', fx(e)) + rows([['Total interest', fx(total - v.p)], ['Total payment', fx(total)], ['Months', String(n)]]) +
@@ -558,22 +650,22 @@ reg({ id: 'billing', name: 'Billing', icon: '📃', desc: 'Make an invoice with 
     <div class="row"><label class="f">Customer<input id="cust" type="text" maxlength="60"></label><label class="f">Currency symbol<input id="cur" type="text" maxlength="4" value="${esc(meta.cur)}" placeholder="optional"></label></div>
     <b>Items</b><div class="list" id="items"></div>
     <button class="btn alt" id="add">+ Add item</button>
-    <div class="row"><label class="f">Tax %<input id="tax" type="number" inputmode="decimal" step="any" value="${esc(meta.tax)}"></label>
-    <label class="f">Discount<input id="dv" type="number" inputmode="decimal" step="any" value="${esc(meta.dv)}"></label>
+    <div class="row"><label class="f">Tax %<input id="tax" type="number" inputmode="decimal" step="any" min="0" max="100" value="${esc(meta.tax)}"></label>
+    <label class="f">Discount<input id="dv" type="number" inputmode="decimal" step="any" min="0" max="1000000000000" value="${esc(meta.dv)}"></label>
     <label class="f">Type<select id="dt"><option value="pct">%</option><option value="amt">Amount</option></select></label></div>
     <div class="list" id="tot"></div>
     <div class="row"><button class="btn" id="save">Save</button><button class="btn alt" id="copy">Copy</button><button class="btn alt" id="share">Share</button></div>
     <button class="btn alt" id="new">New invoice</button></div>
     <b>Saved invoices (last 20)</b><div class="list" id="saved"></div>`;
   $('#dt', el).value = meta.dt;
-  const num = (id) => Math.max(0, parseFloat($('#' + id, el).value) || 0);
-  const cur = () => ({ biz: $('#biz', el).value.trim(), cur: $('#cur', el).value.trim(), tax: Math.min(100, num('tax')), dt: $('#dt', el).value, dv: num('dv') });
+  const num = (id, max) => Math.min(max, Math.max(0, Valid.num($('#' + id, el).value) || 0));
+  const cur = () => ({ biz: $('#biz', el).value.trim(), cur: $('#cur', el).value.trim(), tax: num('tax', 100), dt: $('#dt', el).value, dv: num('dv', 1e12) });
   const clean = () => items.filter((i) => i.d.trim() || i.p * i.q);
   const totals = () => L.invoice(items, cur().tax, cur().dt, cur().dv);
   const drawItems = () => {
     $('#items', el).innerHTML = items.map((it, i) => `<div class="item" style="flex-wrap:wrap"><input data-i="${i}" data-f="d" type="text" maxlength="60" placeholder="Item" aria-label="Item name" value="${esc(it.d)}" style="flex:1 1 100%">
-      <input data-i="${i}" data-f="q" type="number" inputmode="decimal" step="any" aria-label="Quantity" placeholder="Qty" value="${esc(it.q)}" style="flex:1 1 70px">
-      <input data-i="${i}" data-f="p" type="number" inputmode="decimal" step="any" aria-label="Price" placeholder="Price" value="${esc(it.p)}" style="flex:2 1 100px">
+      <input data-i="${i}" data-f="q" type="number" inputmode="decimal" step="any" min="0" max="1000000000" aria-label="Quantity" placeholder="Qty" value="${esc(it.q)}" style="flex:1 1 70px">
+      <input data-i="${i}" data-f="p" type="number" inputmode="decimal" step="any" min="0" max="1000000000000" aria-label="Price" placeholder="Price" value="${esc(it.p)}" style="flex:2 1 100px">
       <button class="btn alt" data-rm="${i}" aria-label="Remove item" style="flex:0 0 44px;padding:12px 0">✕</button></div>`).join('');
   };
   const drawTot = () => {
@@ -582,9 +674,10 @@ reg({ id: 'billing', name: 'Billing', icon: '📃', desc: 'Make an invoice with 
   };
   const record = () => {
     const c = cur(), list = Store.get('billing.list', []);
-    let no = editing ? (list.find((x) => x.id === editing) || {}).no : null;
+    const prev = editing ? list.find((x) => x.id === editing) : null;
+    let no = prev ? prev.no : null;
     if (!no) { no = Store.get('billing.next', 1); }
-    return { id: editing || Date.now(), no, date: todayStr(), biz: c.biz, cust: $('#cust', el).value.trim(), cur: c.cur, items: clean().map((i) => ({ d: i.d.trim(), q: i.q, p: i.p })), tax: c.tax, dt: c.dt, dv: c.dv };
+    return { id: editing || Date.now(), no, date: prev && prev.date ? prev.date : todayStr(), biz: c.biz, cust: $('#cust', el).value.trim(), cur: c.cur, items: clean().map((i) => ({ d: i.d.trim(), q: i.q, p: i.p })), tax: c.tax, dt: c.dt, dv: c.dv };
   };
   const text = () => L.invoiceText(record());
   const drawSaved = () => {
@@ -595,7 +688,7 @@ reg({ id: 'billing', name: 'Billing', icon: '📃', desc: 'Make an invoice with 
   const persistMeta = () => { const c = cur(); Store.set('billing.meta', { biz: c.biz, cur: c.cur, tax: c.tax, dt: c.dt, dv: c.dv }); };
   el.addEventListener('input', (e) => {
     const t = e.target;
-    if (t.dataset.i !== undefined) { const it = items[+t.dataset.i]; it[t.dataset.f] = t.dataset.f === 'd' ? t.value : Math.max(0, parseFloat(t.value) || 0); }
+    if (t.dataset.i !== undefined) { const it = items[+t.dataset.i]; it[t.dataset.f] = t.dataset.f === 'd' ? t.value : Math.min(t.dataset.f === 'q' ? 1e9 : 1e12, Math.max(0, Valid.num(t.value) || 0)); }
     drawTot(); persistMeta();
   });
   el.addEventListener('click', (e) => {
@@ -636,12 +729,12 @@ reg({ id: 'billing', name: 'Billing', icon: '📃', desc: 'Make an invoice with 
 reg({ id: 'days', name: 'Days Counter', icon: '📆', desc: 'Days between two dates, add or subtract days, and countdowns to your saved events.', keys: ['date', 'difference', 'countdown', 'weeks', 'event'], needs: ['storage'], render(el) {
   const t = L.today();
   el.innerHTML = `<div class="card list"><b>Between two dates</b>
-    <div class="row"><label class="f">From<input id="a" type="date" value="${L.ds(t)}"></label><label class="f">To<input id="b" type="date" value="${L.ds(t + 30)}"></label></div><div class="list" id="r1"></div></div>
+    <div class="row"><label class="f">From<input id="a" type="date" min="1900-01-01" max="2200-12-31" value="${L.ds(t)}"></label><label class="f">To<input id="b" type="date" min="1900-01-01" max="2200-12-31" value="${L.ds(t + 30)}"></label></div><div class="list" id="r1"></div></div>
     <div class="card list"><b>Add or subtract days</b>
-    <div class="row"><label class="f">Start<input id="s" type="date" value="${L.ds(t)}"></label><label class="f">Days<input id="n" type="number" inputmode="numeric" value="30"></label></div>
+    <div class="row"><label class="f">Start<input id="s" type="date" min="1900-01-01" max="2200-12-31" value="${L.ds(t)}"></label><label class="f">Days<input id="n" type="number" inputmode="numeric" step="1" min="-2900000" max="2900000" value="30"></label></div>
     <div class="row"><button class="btn" id="plus">Add</button><button class="btn alt" id="minus">Subtract</button></div><div class="list" id="r2"></div></div>
     <div class="card list"><b>Countdown to events</b>
-    <div class="row"><label class="f">Event name<input id="en" type="text" maxlength="40"></label><label class="f">Date<input id="ed" type="date" value="${L.ds(t + 7)}"></label></div>
+    <div class="row"><label class="f">Event name<input id="en" type="text" maxlength="40"></label><label class="f">Date<input id="ed" type="date" min="1900-01-01" max="2200-12-31" value="${L.ds(t + 7)}"></label></div>
     <button class="btn" id="ea">Save event</button><div class="list" id="ev"></div></div>`;
   const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
   const r1 = () => {
@@ -651,14 +744,15 @@ reg({ id: 'days', name: 'Days Counter', icon: '📆', desc: 'Days between two da
     $('#r1', el).innerHTML = big(b < a ? 'Days (To is earlier)' : 'Days', String(d)) + rows([['Weeks', Math.floor(d / 7) + ' w ' + (d % 7) + ' d'], ['Years, months, days', y.y + 'y ' + y.m + 'm ' + y.d + 'd'], ['Total weeks', sig(d / 7, 5)], ['Total hours', fx(d * 24, 0)]]);
   };
   const r2 = (sign) => {
-    const s = L.pd($('#s', el).value), n = Math.round(parseFloat($('#n', el).value));
+    const s = L.pd($('#s', el).value), n = Math.round(Valid.num($('#n', el).value));
     if (!ok(s, n)) { $('#r2', el).innerHTML = '<div class="muted center">Enter a date and number of days.</div>'; return; }
     const r = s + sign * n;
+    if (Math.abs(n) > 2.9e6 || !(r >= L.pd('1000-01-01') && r <= L.pd('9999-12-31'))) { $('#r2', el).innerHTML = '<div class="status">That date is out of range (years 1000 to 9999).</div>'; return; }
     $('#r2', el).innerHTML = big(sign > 0 ? 'Date after' : 'Date before', L.ds(r)) + `<div class="center muted">${L.DAYS[L.dow(r)]}</div>`;
   };
   const events = () => Store.get('days.events', []);
   const drawEv = () => {
-    const list = events().slice().sort((x, y) => L.pd(x.d) - L.pd(y.d)), now = L.today();
+    const list = events().filter((x) => ok(L.pd(x.d))).sort((x, y) => L.pd(x.d) - L.pd(y.d)), now = L.today();
     $('#ev', el).innerHTML = list.length ? list.map((x) => {
       const k = L.pd(x.d) - now;
       const lab = k === 0 ? 'Today' : k > 0 ? 'in ' + plural(k, 'day') : plural(-k, 'day') + ' ago';
@@ -686,24 +780,30 @@ reg({ id: 'tally', name: 'Tally Counter', icon: '🔘', desc: 'Big plus and minu
   if (!st.list.length) st.list = [{ n: 'Counter 1', v: 0 }];
   st.sel = Math.min(st.sel, st.list.length - 1);
   let armed = null, armT = null;
-  el.innerHTML = `<div class="card"><div class="center muted" id="nm"></div><div class="big" id="v" style="font-size:72px"></div>
+  el.innerHTML = `<div class="card"><div class="center muted" id="nm"></div><div class="big" id="v" style="font-size:clamp(28px,15vw,72px);word-break:break-all"></div>
     <div class="row"><button class="btn alt" id="minus" aria-label="Subtract" style="min-height:96px;font-size:44px">−</button><button class="btn" id="plus" aria-label="Add" style="min-height:96px;font-size:44px">+</button></div></div>
-    <div class="row"><label class="f">Step<input id="step" type="number" inputmode="numeric" min="1" value="${esc(st.step)}"></label><button class="btn alt" id="reset" style="align-self:flex-end">Reset</button></div>
+    <div class="row"><label class="f">Step<input id="step" type="number" inputmode="numeric" step="1" min="1" max="1000000" value="${esc(st.step)}"></label><button class="btn alt" id="reset" style="align-self:flex-end">Reset</button></div>
     <div class="card list"><b>Counters</b><div class="list" id="list"></div>
     <div class="row"><input id="newn" type="text" maxlength="30" placeholder="New counter name" aria-label="New counter name"><button class="btn" id="addc" style="flex:0 0 auto">Add</button></div></div>`;
   const save = () => Store.set('tally.state', st);
   const draw = () => {
     const c = st.list[st.sel];
-    $('#nm', el).textContent = c.n; $('#v', el).textContent = c.v;
+    const vEl = $('#v', el), len = String(c.v).length;
+    $('#nm', el).textContent = c.n; vEl.textContent = c.v;
+    vEl.style.fontSize = 'clamp(20px,' + Math.min(15, 130 / len).toFixed(1) + 'vw,72px)'; // shrink as the digit count grows
     $('#list', el).innerHTML = st.list.map((x, i) => `<div class="item" data-sel="${i}" role="button" tabindex="0" style="${i === st.sel ? 'border-color:var(--accent)' : ''}"><span class="grow">${esc(x.n)}</span><b>${esc(x.v)}</b>${st.list.length > 1 ? `<button class="btn danger" data-del="${i}" aria-label="Delete counter">✕</button>` : ''}</div>`).join('');
   };
-  const stepV = () => Math.max(1, Math.min(1e6, Math.round(parseFloat($('#step', el).value) || 1)));
+  const stepV = () => Math.max(1, Math.min(1e6, Math.round(Valid.num($('#step', el).value) || 1)));
   const disarm = () => { armed = null; clearTimeout(armT); };
   const arm = (what, msg) => { if (armed === what) { disarm(); return true; } armed = what; clearTimeout(armT); armT = setTimeout(() => { armed = null; }, 3000); toast(msg); return false; };
   el.addEventListener('input', (e) => { if (e.target.id === 'step') { st.step = stepV(); save(); } });
+  el.addEventListener('keydown', (e) => { // list rows act as buttons: Enter or Space selects
+    const row = e.target.closest && e.target.closest('[data-sel]');
+    if (row && row === e.target && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); st.sel = +row.dataset.sel; save(); draw(); const nr = $('[data-sel="' + st.sel + '"]', el); if (nr) nr.focus(); }
+  });
   el.addEventListener('click', (e) => {
     const b = e.target.closest('button'), c = st.list[st.sel];
-    if (b && (b.id === 'plus' || b.id === 'minus')) { c.v += (b.id === 'plus' ? 1 : -1) * stepV(); buzz(12); save(); draw(); return; }
+    if (b && (b.id === 'plus' || b.id === 'minus')) { c.v = Math.max(-1e15, Math.min(1e15, c.v + (b.id === 'plus' ? 1 : -1) * stepV())); buzz(12); save(); draw(); return; }
     if (b && b.id === 'reset') { if (arm('reset', 'Tap Reset again to confirm')) { c.v = 0; buzz(30); save(); draw(); } return; }
     if (b && b.id === 'addc') {
       if (st.list.length >= 20) { toast('Max 20 counters'); return; }
@@ -725,12 +825,12 @@ reg({ id: 'tally', name: 'Tally Counter', icon: '🔘', desc: 'Big plus and minu
 reg({ id: 'random', name: 'Random', icon: '🎰', desc: 'Random numbers (with a no-repeat option), pick or shuffle items from a list, and random dates.', keys: ['dice', 'draw', 'lottery', 'pick', 'shuffle', 'raffle'], render(el) {
   const drawn = new Set();
   el.innerHTML = `<div class="card list"><b>Random number</b>
-    <div class="row"><label class="f">Min<input id="mn" type="number" inputmode="numeric" value="1"></label><label class="f">Max<input id="mx" type="number" inputmode="numeric" value="100"></label><label class="f">How many<input id="cnt" type="number" inputmode="numeric" value="1" min="1"></label></div>
+    <div class="row"><label class="f">Min<input id="mn" type="number" inputmode="numeric" step="1" min="-1000000000" max="1000000000" value="1"></label><label class="f">Max<input id="mx" type="number" inputmode="numeric" step="1" min="-1000000000" max="1000000000" value="100"></label><label class="f">How many<input id="cnt" type="number" inputmode="numeric" step="1" value="1" min="1" max="500"></label></div>
     <label class="item"><input id="nr" type="checkbox" style="width:22px;height:22px;flex:0 0 auto"><span class="grow">No repeats until all are drawn</span></label>
     <button class="btn" id="gn">Draw</button><div class="mid" id="rn" style="word-break:break-word"></div><button class="btn alt" id="rst">Reset no-repeat list</button></div>
     <div class="card list"><b>Pick or shuffle a list</b><label class="f">One item per line<textarea id="li" rows="5" maxlength="3000" placeholder="Anna&#10;Ben&#10;Chloe"></textarea></label>
     <div class="row"><button class="btn" id="pk">Pick one</button><button class="btn alt" id="sh">Shuffle</button></div><div class="mid" id="rl" style="word-break:break-word"></div></div>
-    <div class="card list"><b>Random date</b><div class="row"><label class="f">From<input id="d1" type="date" value="${L.ds(L.today())}"></label><label class="f">To<input id="d2" type="date" value="${L.ds(L.today() + 365)}"></label></div>
+    <div class="card list"><b>Random date</b><div class="row"><label class="f">From<input id="d1" type="date" min="1900-01-01" max="2200-12-31" value="${L.ds(L.today())}"></label><label class="f">To<input id="d2" type="date" min="1900-01-01" max="2200-12-31" value="${L.ds(L.today() + 365)}"></label></div>
     <button class="btn" id="gd">Pick a date</button><div class="mid" id="rd"></div><div class="center muted" id="rw"></div></div>`;
   const key = () => $('#mn', el).value + ':' + $('#mx', el).value;
   let lastKey = '';
@@ -775,15 +875,15 @@ reg({ id: 'random', name: 'Random', icon: '🎰', desc: 'Random numbers (with a 
 
 /* ================= 6. Percentage ================= */
 simple({ id: 'percent', name: 'Percentage', icon: '％', desc: 'X% of Y, X is what percent of Y, percent change, and add or subtract a percentage.', keys: ['percent', 'increase', 'decrease', 'change', 'ratio'], sections: [
-  sec('What is X% of Y?', [[N('x', 'X (%)', 15), N('y', 'Y', 200)]], (v) => ok(v.x, v.y) ? big('Result', sig(v.x * v.y / 100)) : null),
-  sec('X is what % of Y?', [[N('x', 'X', 30), N('y', 'Y', 120)]], (v) => ok(v.x, v.y) && v.y !== 0 ? big('Percentage', sig(v.x / v.y * 100) + '%') : null),
-  sec('Percent change', [[N('a', 'From', 80), N('b', 'To', 100)]], (v) => { if (!ok(v.a, v.b) || v.a === 0) return null; const c = L.pctChange(v.a, v.b); return big(c >= 0 ? 'Increase' : 'Decrease', sig(Math.abs(c), 8) + '%'); }),
-  sec('Add or subtract a percentage', [[N('v', 'Value', 250), N('p', 'Percent', 12)]], (v) => ok(v.v, v.p) ? rows([['Plus ' + sig(v.p) + '%', sig(v.v * (1 + v.p / 100))], ['Minus ' + sig(v.p) + '%', sig(v.v * (1 - v.p / 100))], ['The percent itself', sig(v.v * v.p / 100)]]) : null)
+  sec('What is X% of Y?', [[N('x', 'X (%)', 15, -1e6, 1e6), N('y', 'Y', 200, -1e12, 1e12)]], (v) => ok(v.x, v.y) ? big('Result', sig(v.x * v.y / 100)) : null),
+  sec('X is what % of Y?', [[N('x', 'X', 30, -1e12, 1e12), N('y', 'Y', 120, -1e12, 1e12)]], (v) => ok(v.x, v.y) && v.y !== 0 ? big('Percentage', sig(v.x / v.y * 100) + '%') : null),
+  sec('Percent change', [[N('a', 'From', 80, -1e12, 1e12), N('b', 'To', 100, -1e12, 1e12)]], (v) => { if (!ok(v.a, v.b) || v.a === 0) return null; const c = L.pctChange(v.a, v.b); return big(c >= 0 ? 'Increase' : 'Decrease', sig(Math.abs(c), 8) + '%'); }),
+  sec('Add or subtract a percentage', [[N('v', 'Value', 250, -1e12, 1e12), N('p', 'Percent', 12, -1e6, 1e6)]], (v) => ok(v.v, v.p) ? rows([['Plus ' + sig(v.p) + '%', sig(v.v * (1 + v.p / 100))], ['Minus ' + sig(v.p) + '%', sig(v.v * (1 - v.p / 100))], ['The percent itself', sig(v.v * v.p / 100)]]) : null)
 ] });
 
 /* ================= 7. Discount & GST ================= */
 simple({ id: 'gst', name: 'Discount & GST', icon: '🔖', desc: 'Final price after discount and tax (GST or VAT), tax inclusive or exclusive, with the amount you save.', keys: ['sale', 'vat', 'tax', 'price', 'offer', 'off'], sections: [sec('', [
-  N('p', 'Price', 1000), [N('d', 'Discount %', 10), N('t', 'Tax % (GST/VAT)', 18)], S('m', 'Entered price is', [['ex', 'Without tax (add tax)'], ['in', 'Including tax (split it)']], 'ex')
+  N('p', 'Price', 1000, 0, 1e12), [N('d', 'Discount %', 10, 0, 100), N('t', 'Tax % (GST/VAT)', 18, 0, 100)], S('m', 'Entered price is', [['ex', 'Without tax (add tax)'], ['in', 'Including tax (split it)']], 'ex')
 ], (v) => {
   if (!ok(v.p, v.d, v.t) || v.p < 0 || v.d < 0 || v.d > 100 || v.t < 0) return null;
   const r = L.gst(v.p, v.d, v.t, v.m === 'in');
@@ -792,7 +892,7 @@ simple({ id: 'gst', name: 'Discount & GST', icon: '🔖', desc: 'Final price aft
 
 /* ================= 8. Tip ================= */
 simple({ id: 'tip', name: 'Tip Splitter', icon: '🍽️', desc: 'Split a bill between friends with a tip, optionally rounding each share up.', keys: ['bill', 'split', 'restaurant', 'gratuity'], sections: [sec('', [
-  N('b', 'Bill amount', 1200), [N('t', 'Tip %', 10), N('n', 'People', 4)], S('r', 'Rounding', [['no', 'Exact'], ['up', 'Round each share up']], 'no')
+  N('b', 'Bill amount', 1200, 0, 1e12), [N('t', 'Tip %', 10, 0, 100), N('n', 'People', 4, 1, 1000, 1)], S('r', 'Rounding', [['no', 'Exact'], ['up', 'Round each share up']], 'no')
 ], (v) => {
   const n = Math.round(v.n);
   if (!ok(v.b, v.t, n) || v.b < 0 || v.t < 0 || n < 1 || n > 1000) return null;
@@ -802,7 +902,7 @@ simple({ id: 'tip', name: 'Tip Splitter', icon: '🍽️', desc: 'Split a bill b
 
 /* ================= 9. Age ================= */
 simple({ id: 'age', name: 'Age Calculator', icon: '🎈', desc: 'Exact age in years, months and days, total days lived and the countdown to the next birthday.', keys: ['birthday', 'dob', 'born', 'years old'], sections: [sec('', [
-  { k: 'dob', l: 'Date of birth', t: 'date', v: '1995-06-15' }, { k: 'on', l: 'Age on', t: 'date', v: todayStr, keep: false }
+  { k: 'dob', l: 'Date of birth', t: 'date', v: '1995-06-15', min: '1900-01-01', max: '2200-12-31' }, { k: 'on', l: 'Age on', t: 'date', v: todayStr, keep: false, min: '1900-01-01', max: '2200-12-31' }
 ], (v) => {
   const a = L.pd(v.dob), b = L.pd(v.on);
   if (!ok(a, b) || b < a) return null;
@@ -813,16 +913,18 @@ simple({ id: 'age', name: 'Age Calculator', icon: '🎈', desc: 'Exact age in ye
 
 /* ================= 10. Investment ================= */
 simple({ id: 'invest', name: 'Investment', icon: '🌱', desc: 'Compound interest on a lump sum, and the future value of a monthly SIP, with a year-by-year growth table.', keys: ['sip', 'compound', 'savings', 'mutual fund', 'returns'], sections: [
-  sec('Lump sum (compound interest)', [N('p', 'Amount invested', 100000), [N('r', 'Return % per year', 8), N('y', 'Years', 10)], S('n', 'Compounded', [[1, 'Yearly'], [2, 'Half-yearly'], [4, 'Quarterly'], [12, 'Monthly']], 1)], (v) => {
+  sec('Lump sum (compound interest)', [N('p', 'Amount invested', 100000, 0, 1e12), [N('r', 'Return % per year', 8, 0, 200), N('y', 'Years', 10, 1, 100, 1)], S('n', 'Compounded', [[1, 'Yearly'], [2, 'Half-yearly'], [4, 'Quarterly'], [12, 'Monthly']], 1)], (v) => {
     const n = +v.n, y = Math.round(v.y);
     if (!ok(v.p, v.r, y) || v.p <= 0 || v.r < 0 || y < 1 || y > 100) return null;
+    if (v.r > 200 || !(L.compound(v.p, v.r, y, n) < 1e15)) return CAPMSG;
     const fv = L.compound(v.p, v.r, y, n), body = [];
     for (let i = 1; i <= y; i++) body.push([i, fx(L.compound(v.p, v.r, i, n), 0), fx(L.compound(v.p, v.r, i, n) - v.p, 0)]);
     return big('Final value', fx(fv)) + rows([['Interest earned', fx(fv - v.p)], ['Growth', sig((fv / v.p - 1) * 100, 6) + '%']]) + table(['Year', 'Value', 'Gain'], body);
   }),
-  sec('Monthly SIP', [N('m', 'Monthly investment', 5000), [N('r', 'Return % per year', 12), N('y', 'Years', 10)]], (v) => {
+  sec('Monthly SIP', [N('m', 'Monthly investment', 5000, 0, 1e12), [N('r', 'Return % per year', 12, 0, 200), N('y', 'Years', 10, 1, 60, 1)]], (v) => {
     const y = Math.round(v.y);
     if (!ok(v.m, v.r, y) || v.m <= 0 || v.r < 0 || y < 1 || y > 60) return null;
+    if (v.r > 200 || !(L.sip(v.m, v.r, y * 12) < 1e15)) return CAPMSG;
     const fv = L.sip(v.m, v.r, y * 12), inv = v.m * y * 12, body = [];
     for (let i = 1; i <= y; i++) body.push([i, fx(v.m * 12 * i, 0), fx(L.sip(v.m, v.r, i * 12), 0)]);
     return big('Future value', fx(fv)) + rows([['Total invested', fx(inv)], ['Estimated gain', fx(fv - inv)]]) + table(['Year', 'Invested', 'Value'], body) + '<div class="muted" style="font-size:12px">Each instalment is invested at the start of the month. Returns are not guaranteed.</div>';
@@ -831,10 +933,10 @@ simple({ id: 'invest', name: 'Investment', icon: '🌱', desc: 'Compound interes
 
 /* ================= 11. Scientific ================= */
 reg({ id: 'sci', name: 'Scientific', icon: '🔬', desc: 'Scientific calculator with brackets, trig in degrees or radians, logs, roots, powers, factorial and memory keys.', keys: ['sin', 'cos', 'tan', 'log', 'sqrt', 'calculator', 'factorial', 'scientific'], needs: [], render(el) {
-  let deg = true, mem = 0, ans = 0, shown = false;
+  let deg = true, mem = 0, ans = 0, shown = false, fresh = false; // fresh: the box holds a result, so a digit starts a new sum
   const layout = [['DEG', 'MC', 'MR', 'M+', 'M−'], ['sin', 'cos', 'tan', 'ln', 'log'], ['asin', 'acos', 'atan', '√', '^'], ['(', ')', '!', 'π', 'e'], ['7', '8', '9', '÷', '⌫'], ['4', '5', '6', '×', 'AC'], ['1', '2', '3', '−', 'Ans'], ['0', '.', '%', '+', '=']];
   el.innerHTML = `<div class="card"><div class="muted" id="st" style="min-height:20px;font-size:13px"></div>
-    <input id="ex" type="text" inputmode="none" autocomplete="off" aria-label="Expression" maxlength="200" style="font-size:24px;text-align:right">
+    <input id="ex" type="text" autocomplete="off" aria-label="Expression" maxlength="200" style="font-size:24px;text-align:right">
     <div class="mid" id="rs" style="text-align:right;min-height:40px;word-break:break-all"></div></div>
     <div id="kp" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">${layout.flat().map((k) => `<button data-k="${k}" style="padding:14px 0;font-size:${k.length > 2 ? 15 : 19}px;border:1px solid var(--line);border-radius:12px;background:${'=÷×−+'.includes(k) && k ? 'var(--accent)' : 'var(--surface)'};color:${'=÷×−+'.includes(k) && k ? 'var(--accent-t)' : 'var(--text)'}">${k}</button>`).join('')}</div>
     <div class="muted center" style="font-size:12px">Tip: tap the display to edit with the keyboard.</div>`;
@@ -851,57 +953,65 @@ reg({ id: 'sci', name: 'Scientific', icon: '🔬', desc: 'Scientific calculator 
     const c = a + t.length; try { ex.setSelectionRange(c, c); } catch (e) { /* ignore */ }
   };
   const FN = ['sin', 'cos', 'tan', 'ln', 'log', 'asin', 'acos', 'atan', '√'];
+  // '=' and Enter: the result goes back into the box as plain text (L.num), never as locale text such as 0,333
+  const equals = () => { shown = true; const r = preview(); if (r !== null) { ans = r; ex.value = L.num(r); fresh = true; shown = false; $('#rs', el).textContent = ''; } };
   el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-k]');
     if (!b) return;
     const k = b.dataset.k;
     buzz(8);
+    if (fresh && (/^[0-9.]$/.test(k) || ['π', 'e', '(', 'Ans', 'MR'].includes(k) || FN.includes(k))) { ex.value = ''; try { ex.setSelectionRange(0, 0); } catch (er) { /* ignore */ } }
+    if (k !== '=') fresh = false;
     if (k === 'DEG') deg = !deg;
     else if (k === 'AC') { ex.value = ''; shown = false; }
     else if (k === '⌫') { const a = ex.selectionStart == null ? ex.value.length : ex.selectionStart; if (a > 0) { ex.value = ex.value.slice(0, a - 1) + ex.value.slice(ex.selectionEnd == null ? a : ex.selectionEnd); try { ex.setSelectionRange(a - 1, a - 1); } catch (er) { /* ignore */ } } }
-    else if (k === '=') { shown = true; const r = preview(); if (r !== null) { ans = r; ex.value = sig(r, 12); shown = false; $('#rs', el).textContent = ''; } }
+    else if (k === '=') equals();
     else if (k === 'MC') mem = 0;
-    else if (k === 'MR') ins(sig(mem, 12));
+    else if (k === 'MR') ins(L.num(mem));
     else if (k === 'M+' || k === 'M−') { const r = preview(); const v = r !== null ? r : ex.value.trim() ? null : ans; if (v === null) toast('Fix the expression first'); else mem += k === 'M+' ? v : -v; }
     else if (FN.includes(k)) ins(k + '(');
     else ins(k === 'Ans' ? 'Ans' : k);
     status(); if (k !== '=') { shown = false; preview(); }
   });
-  ex.addEventListener('input', () => { shown = false; preview(); });
-  ex.addEventListener('keydown', (e) => { if (e.key === 'Enter') { shown = true; const r = preview(); if (r !== null) { ans = r; ex.value = sig(r, 12); shown = false; $('#rs', el).textContent = ''; } } });
+  ex.addEventListener('input', () => { fresh = false; shown = false; preview(); });
+  ex.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') equals();
+    else if (fresh && e.key.length === 1 && /[0-9.a-zπ(]/i.test(e.key) && !e.ctrlKey && !e.metaKey) { ex.value = ''; fresh = false; }
+  });
   status();
 } });
 
 /* ================= more calculators ================= */
 simple({ id: 'fuel', name: 'Fuel Cost', icon: '⛽', desc: 'Trip fuel and cost from distance, mileage and fuel price, plus mileage from a fill-up.', keys: ['petrol', 'diesel', 'mileage', 'mpg', 'trip', 'km/l'], sections: [
-  sec('Trip cost', [N('d', 'Distance (km)', 250), [N('e', 'Efficiency', 15), S('u', 'Unit', [['kmpl', 'km/L'], ['l100', 'L/100 km'], ['mpg', 'mpg (US)']], 'kmpl')], N('p', 'Fuel price per litre', 100)], (v) => {
+  sec('Trip cost', [N('d', 'Distance (km)', 250, 0, 1e7), [N('e', 'Efficiency', 15, 0, 1000), S('u', 'Unit', [['kmpl', 'km/L'], ['l100', 'L/100 km'], ['mpg', 'mpg (US)']], 'kmpl')], N('p', 'Fuel price per litre', 100, 0, 1e6)], (v) => {
     const k = L.kmPerL(v.e, v.u);
     if (!ok(v.d, k, v.p) || v.d < 0 || k <= 0 || v.p < 0) return null;
     const lit = v.d / k;
     return big('Trip cost', fx(lit * v.p)) + rows([['Fuel needed', fx(lit) + ' L'], ['Cost per km', fx(lit * v.p / (v.d || 1))], ['Efficiency', fx(k) + ' km/L = ' + fx(100 / k) + ' L/100km']]);
   }),
-  sec('Find my mileage', [[N('d', 'Distance driven (km)', 420), N('f', 'Fuel used (litres)', 30)]], (v) => ok(v.d, v.f) && v.d > 0 && v.f > 0 ? big('Mileage', fx(v.d / v.f) + ' km/L') + rows([['L per 100 km', fx(100 * v.f / v.d)], ['Miles per US gallon', fx(v.d / v.f * 3.785411784 / 1.609344)]]) : null)
+  sec('Find my mileage', [[N('d', 'Distance driven (km)', 420, 0, 1e7), N('f', 'Fuel used (litres)', 30, 0, 1e6)]], (v) => ok(v.d, v.f) && v.d > 0 && v.f > 0 ? big('Mileage', fx(v.d / v.f) + ' km/L') + rows([['L per 100 km', fx(100 * v.f / v.d)], ['Miles per US gallon', fx(v.d / v.f * 3.785411784 / 1.609344)]]) : null)
 ] });
 
 simple({ id: 'marks', name: 'Marks & GPA', icon: '🎓', desc: 'Total marks and percentage from subject scores, and weighted GPA from grades and credits.', keys: ['percentage', 'grade', 'gpa', 'exam', 'score', 'cgpa'], sections: [
-  sec('Percentage', [{ k: 'm', l: 'Marks, one subject per line (85 or 42/50)', t: 'textarea', rows: 5, v: '85\n72\n91\n42/50' }, N('x', 'Default maximum per subject', 100)], (v) => {
+  sec('Percentage', [{ k: 'm', l: 'Marks, one subject per line (85 or 42/50)', t: 'textarea', rows: 5, v: '85\n72\n91\n42/50' }, N('x', 'Default maximum per subject', 100, 0, 1e6)], (v) => {
     const r = L.marks(v.m, v.x);
     if (!(r.max > 0)) return null;
     const p = r.pct, g = p >= 90 ? 'A+' : p >= 80 ? 'A' : p >= 70 ? 'B' : p >= 60 ? 'C' : p >= 50 ? 'D' : p >= 40 ? 'E' : 'F';
-    return big('Percentage', sig(p, 5) + '%') + rows([['Total', sig(r.got) + ' / ' + sig(r.max)], ['Grade (typical scale)', g]]);
+    return big('Percentage', sig(p, 5) + '%') + rows([['Total', sig(r.got) + ' / ' + sig(r.max)], ['Grade (typical scale)', g]]) + (r.bad ? `<div class="status">${r.bad} line${r.bad === 1 ? '' : 's'} not understood</div>` : '');
   }),
   sec('GPA', [{ k: 'g', l: 'One per line: grade (A, B+, ...) or points, then credits', t: 'textarea', rows: 5, v: 'A 4\nB+ 3\n3.5 2' }], (v) => {
     const r = L.gpa(v.g);
-    return r.cr > 0 ? big('GPA', fx(r.gpa)) + rows([['Total credits', sig(r.cr)], ['Grade points', sig(r.pts, 6)]]) + '<div class="muted" style="font-size:12px">Letters use a 4.0 scale (A 4.0, B 3.0 ...).</div>' : null;
+    const note = r.bad ? `<div class="status">${r.bad} line${r.bad === 1 ? '' : 's'} not understood</div>` : '';
+    return r.cr > 0 ? big('GPA', fx(r.gpa)) + rows([['Total credits', sig(r.cr)], ['Grade points', sig(r.pts, 6)]]) + note + '<div class="muted" style="font-size:12px">Letters use a 4.0 scale (A 4.0, B 3.0, D- 0.7, E and F 0).</div>' : (note || null);
   })
 ] });
 
 simple({ id: 'timecalc', name: 'Time Calc', icon: '🕒', desc: 'Add and subtract durations such as 1:30 or 2h 15m, and work out hours between two clock times.', keys: ['hours', 'minutes', 'duration', 'timesheet', 'shift', 'add time'], sections: [
-  sec('Add and subtract durations', [{ k: 't', l: 'One per line. Start with - to subtract. Formats: 1:30, 2h 15m, 90m, 45s', t: 'textarea', rows: 5, v: '1:30\n2h 15m\n-0:45' }], (v) => {
+  sec('Add and subtract durations', [{ k: 't', l: 'One per line. Start with - to subtract. Formats: 1:30, 2h 15m, 1h30, 2 hours 15 minutes, 90m, 30 seconds', t: 'textarea', rows: 5, v: '1:30\n2h 15m\n-0:45' }], (v) => {
     const r = L.sumDurs(v.t);
     return big('Total', L.fmtDur(r.total)) + rows([['Decimal hours', sig(r.total / 3600, 6)], ['Minutes', sig(r.total / 60, 8)]]) + (r.bad ? `<div class="status">${r.bad} line(s) not understood</div>` : '');
   }),
-  sec('Hours between two times', [[{ k: 'a', l: 'Start', t: 'time', v: '09:00' }, { k: 'b', l: 'End', t: 'time', v: '17:30' }], N('k', 'Unpaid break (minutes)', 30)], (v) => {
+  sec('Hours between two times', [[{ k: 'a', l: 'Start', t: 'time', v: '09:00' }, { k: 'b', l: 'End', t: 'time', v: '17:30' }], N('k', 'Unpaid break (minutes)', 30, 0, 1440, 1)], (v) => {
     if (!v.a || !v.b) return null;
     const m = L.tdiff(v.a, v.b, Math.max(0, v.k || 0));
     return m < 0 ? '<div class="status">Break is longer than the shift.</div>' : big('Worked', L.fmtDur(m * 60)) + rows([['Decimal hours', sig(m / 60, 5)]]) + (v.b <= v.a ? '<div class="muted center">Shift passes midnight.</div>' : '');
@@ -909,21 +1019,23 @@ simple({ id: 'timecalc', name: 'Time Calc', icon: '🕒', desc: 'Add and subtrac
 ] });
 
 simple({ id: 'workdays', name: 'Work Days', icon: '💼', desc: 'Add working days to a date, or count working days between two dates, skipping weekends.', keys: ['business days', 'deadline', 'weekdays', 'working days'], sections: [
-  sec('Date after N working days', [[{ k: 's', l: 'Start', t: 'date', v: todayStr, keep: false }, N('n', 'Working days', 10)], S('w', 'Weekend', [['0,6', 'Sat + Sun'], ['5,6', 'Fri + Sat'], ['0', 'Sun only']], '0,6')], (v) => {
+  sec('Date after N working days', [[{ k: 's', l: 'Start', t: 'date', v: todayStr, keep: false }, N('n', 'Working days', 10, -20000, 20000, 1)], S('w', 'Weekend', [['0,6', 'Sat + Sun'], ['5,6', 'Fri + Sat'], ['0', 'Sun only']], '0,6')], (v) => {
     const s = L.pd(v.s), n = Math.round(v.n);
-    if (!ok(s, n) || Math.abs(n) > 20000) return null;
+    if (!ok(s, n)) return null;
     const wk = v.w.split(',').map(Number), r = L.addWork(s, n, wk);
     return big('Date', L.ds(r)) + `<div class="center muted">${L.DAYS[L.dow(r)]} (${r - s} calendar days)</div>`;
   }),
   sec('Working days between dates', [[{ k: 'a', l: 'From', t: 'date', v: todayStr, keep: false }, { k: 'b', l: 'To', t: 'date', v: () => L.ds(L.today() + 30), keep: false }], S('w', 'Weekend', [['0,6', 'Sat + Sun'], ['5,6', 'Fri + Sat'], ['0', 'Sun only']], '0,6')], (v) => {
     const a = L.pd(v.a), b = L.pd(v.b);
-    if (!ok(a, b) || b < a || b - a > 36500) return null;
+    if (!ok(a, b)) return null;
+    if (b < a) return '<div class="status">The end date is before the start date.</div>';
+    if (b - a > 36500) return '<div class="status">Pick dates less than 100 years apart.</div>';
     return big('Working days (both dates included)', String(L.countWork(a, b, v.w.split(',').map(Number)))) + rows([['Calendar days', String(b - a + 1)]]);
   })
 ] });
 
 simple({ id: 'pay', name: 'Salary Convert', icon: '💵', desc: 'Convert pay between hourly, daily, weekly, monthly and yearly amounts.', keys: ['hourly', 'wage', 'annual', 'income', 'salary', 'ctc'], sections: [sec('', [
-  [N('a', 'Amount', 25), S('u', 'Per', [['hour', 'Hour'], ['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year']], 'hour')], [N('h', 'Hours per week', 40), N('w', 'Weeks per year', 52)], N('d', 'Days per week', 5)
+  [N('a', 'Amount', 25, 0, 1e12), S('u', 'Per', [['hour', 'Hour'], ['day', 'Day'], ['week', 'Week'], ['month', 'Month'], ['year', 'Year']], 'hour')], [N('h', 'Hours per week', 40, 0, 168), N('w', 'Weeks per year', 52, 0, 53)], N('d', 'Days per week', 5, 0, 7)
 ], (v) => {
   if (!ok(v.a, v.h, v.w, v.d) || v.h <= 0 || v.w <= 0 || v.d <= 0) return null;
   const r = L.pay(v.a, v.u, v.h, v.w, v.d);
@@ -931,7 +1043,7 @@ simple({ id: 'pay', name: 'Salary Convert', icon: '💵', desc: 'Convert pay bet
 })] });
 
 simple({ id: 'loancmp', name: 'Loan Compare', icon: '🆚', desc: 'Compare two loan offers side by side: EMI, total interest and total cost.', keys: ['emi', 'loan', 'compare', 'mortgage', 'offer'], sections: [sec('', [
-  N('p', 'Loan amount (both)', 1000000), [N('r1', 'Offer A rate %', 9), N('n1', 'A months', 120)], [N('r2', 'Offer B rate %', 8.5), N('n2', 'B months', 144)]
+  N('p', 'Loan amount (both)', 1000000, 0, 1e12), [N('r1', 'Offer A rate %', 9, 0, 200), N('n1', 'A months', 120, 1, 1200, 1)], [N('r2', 'Offer B rate %', 8.5, 0, 200), N('n2', 'B months', 144, 1, 1200, 1)]
 ], (v) => {
   const n1 = Math.round(v.n1), n2 = Math.round(v.n2);
   if (!ok(v.p, v.r1, v.r2, n1, n2) || v.p <= 0 || n1 < 1 || n2 < 1 || n1 > 1200 || n2 > 1200 || v.r1 < 0 || v.r2 < 0) return null;
@@ -947,44 +1059,51 @@ reg({ id: 'fraction', name: 'Fractions', icon: '➗', desc: 'Add, subtract, mult
     const a = L.pfrac($('#a', el).value), b = L.pfrac($('#b', el).value);
     if (!a || !b) { $('#r', el).innerHTML = '<div class="muted center">Enter two valid fractions.</div>'; return; }
     const r = L.fop(a, b, $('#o', el).value);
-    $('#r', el).innerHTML = r ? big('Result', L.fstr(r)) + rows([['Mixed number', L.fmixed(r)], ['Decimal', sig(r.n / r.d, 10)], ['Percent', sig(r.n / r.d * 100, 8) + '%']]) : '<div class="status">Cannot divide by zero.</div>';
+    $('#r', el).innerHTML = r && r.over ? '<div class="status">These numbers are too large to calculate exactly. Use smaller fractions.</div>' : r ? big('Result', L.fstr(r)) + rows([['Mixed number', L.fmixed(r)], ['Decimal', sig(r.n / r.d, 10)], ['Percent', sig(r.n / r.d * 100, 8) + '%']]) : '<div class="status">Cannot divide by zero.</div>';
   };
   el.addEventListener('input', run); run();
 } });
 
 simple({ id: 'ratio', name: 'Ratio', icon: '⚗️', desc: 'Simplify a ratio, solve a proportion (a : b = c : x) and split an amount in a ratio.', keys: ['proportion', 'divide in ratio', 'simplify', 'scale'], sections: [
-  sec('Simplify a : b', [[N('a', 'A', 24), N('b', 'B', 36)]], (v) => { if (!ok(v.a, v.b) || !Number.isInteger(v.a) || !Number.isInteger(v.b) || !v.a || !v.b) return v.a === 0 || v.b === 0 ? null : '<div class="muted center">Use whole numbers.</div>'; const g = L.gcd(v.a, v.b); return big('Simplest form', v.a / g + ' : ' + v.b / g) + rows([['Decimal (a / b)', sig(v.a / v.b, 8)]]); }),
-  sec('Proportion  a : b = c : x', [[N('a', 'a', 3), N('b', 'b', 5)], N('c', 'c', 12)], (v) => ok(v.a, v.b, v.c) && v.a !== 0 ? big('x', sig(v.b * v.c / v.a, 10)) : null),
-  sec('Split an amount', [N('t', 'Total', 1000), [N('a', 'Share A', 2), N('b', 'Share B', 3)]], (v) => ok(v.t, v.a, v.b) && v.a + v.b > 0 && v.a >= 0 && v.b >= 0 ? rows([['A gets', fx(v.t * v.a / (v.a + v.b))], ['B gets', fx(v.t * v.b / (v.a + v.b))]]) : null)
+  sec('Simplify a : b', [[N('a', 'A', 24, -1e12, 1e12, 1), N('b', 'B', 36, -1e12, 1e12, 1)]], (v) => { if (!ok(v.a, v.b) || !Number.isInteger(v.a) || !Number.isInteger(v.b) || !v.a || !v.b) return v.a === 0 || v.b === 0 ? null : '<div class="muted center">Use whole numbers.</div>'; const g = L.gcd(v.a, v.b); return big('Simplest form', v.a / g + ' : ' + v.b / g) + rows([['Decimal (a / b)', sig(v.a / v.b, 8)]]); }),
+  sec('Proportion  a : b = c : x', [[N('a', 'a', 3, -1e12, 1e12), N('b', 'b', 5, -1e12, 1e12)], N('c', 'c', 12, -1e12, 1e12)], (v) => ok(v.a, v.b, v.c) && v.a !== 0 ? big('x', sig(v.b * v.c / v.a, 10)) : null),
+  sec('Split an amount', [N('t', 'Total', 1000, 0, 1e12), [N('a', 'Share A', 2, 0, 1e9), N('b', 'Share B', 3, 0, 1e9)]], (v) => ok(v.t, v.a, v.b) && v.a + v.b > 0 && v.a >= 0 && v.b >= 0 ? rows([['A gets', fx(v.t * v.a / (v.a + v.b))], ['B gets', fx(v.t * v.b / (v.a + v.b))]]) : null)
 ] });
 
-simple({ id: 'stats', name: 'Statistics', icon: '📉', desc: 'Mean, median, mode, range, variance and standard deviation of a list of numbers.', keys: ['average', 'mean', 'median', 'mode', 'deviation', 'variance'], sections: [sec('', [{ k: 'n', l: 'Numbers (spaces, commas or new lines)', t: 'textarea', rows: 4, v: '4, 8, 15, 16, 23, 42, 8' }], (v) => {
-  const a = L.nums(v.n);
+simple({ id: 'stats', name: 'Statistics', icon: '📉', desc: 'Mean, median, mode, range, variance and standard deviation of a list of numbers.', keys: ['average', 'mean', 'median', 'mode', 'deviation', 'variance'], sections: [sec('', [{ k: 'n', l: 'Numbers (spaces, new lines, or commas followed by a space)', t: 'textarea', rows: 4, v: '4, 8, 15, 16, 23, 42, 8' }], (v) => {
+  const pn = L.parseNums(v.n), a = pn.nums;
+  if (pn.bad !== null) return `<div class="status">"${esc(pn.bad.slice(0, 30))}" is not a number. Separate numbers with spaces or new lines.</div>`;
   if (!a.length || a.length > 5000) return null;
   const s = L.stats(a);
   return big('Mean', sig(s.mean, 10)) + rows([['Count', String(s.n)], ['Sum', sig(s.sum, 12)], ['Median', sig(s.median, 10)], ['Mode', s.mode.length ? s.mode.map((x) => sig(x)).join(', ') : 'none'], ['Min / Max', sig(s.min) + ' / ' + sig(s.max)], ['Range', sig(s.range, 10)],
     ['Std dev (population)', sig(s.sdP, 8)], ['Std dev (sample)', sig(s.sdS, 8)], ['Variance (sample)', sig(s.varS, 8)]]);
 })] });
 
-simple({ id: 'prime', name: 'Prime Check', icon: '🔍', desc: 'Check whether a number is prime, see its prime factors and divisors, and find the nearest primes.', keys: ['factor', 'factorisation', 'divisors', 'prime number'], sections: [sec('', [N('n', 'Whole number (up to 9,000,000,000,000,000)', 360)], (v) => {
-  const n = v.n;
-  if (!Number.isInteger(n) || n < 2 || n > 9e15) return null;
-  const f = L.factor(n), pr = f.length === 1 && f[0][1] === 1;
-  const out = [[pr ? 'Prime?' : 'Prime?', pr ? 'Yes, prime' : 'No, composite'], ['Prime factors', pr ? String(n) : f.map((x) => x[1] > 1 ? x[0] + '^' + x[1] : x[0]).join(' × ')]];
-  if (n <= 1e9) { const d = L.divisors(n); out.push(['Divisors (' + d.length + ')', d.length > 40 ? d.slice(0, 40).join(', ') + ' ...' : d.join(', ')]); }
-  if (n < 9e15 - 1000) out.push(['Next prime', String(L.nextPrime(n))]);
-  const pp = L.prevPrime(n); if (pp) out.push(['Previous prime', String(pp)]);
-  return rows(out);
-})] });
+reg({ id: 'prime', name: 'Prime Check', icon: '🔍', desc: 'Check whether a number is prime, see its prime factors and divisors, and find the nearest primes.', keys: ['factor', 'factorisation', 'divisors', 'prime number'], render(el) {
+  el.innerHTML = `<div class="card list"><label class="f">Whole number (up to 9,000,000,000,000,000)<input id="n" type="number" inputmode="numeric" step="1" min="2" max="9000000000000000" value="360"></label>
+    <button class="btn" id="go">Analyse</button><div class="list" id="r"></div></div>`;
+  const run = () => {
+    const n = parseFloat($('#n', el).value), out = $('#r', el);
+    if (!Number.isInteger(n) || n < 2 || n > 9e15) { out.innerHTML = '<div class="muted center" style="font-size:13px">Enter a whole number from 2 to 9,000,000,000,000,000.</div>'; return; }
+    const r = L.analyse(n), rs = [['Prime?', r.prime ? 'Yes, prime' : 'No, composite'], ['Prime factors', r.prime ? String(n) : r.factors.map((x) => x[1] > 1 ? x[0] + '^' + x[1] : x[0]).join(' × ')]];
+    if (r.divisors) rs.push(['Divisors (' + r.divisors.length + ')', r.divisors.length > 40 ? r.divisors.slice(0, 40).join(', ') + ' ...' : r.divisors.join(', ')]);
+    if (r.next !== undefined) { rs.push(['Next prime', String(r.next)]); if (r.prev) rs.push(['Previous prime', String(r.prev)]); }
+    out.innerHTML = rows(rs) + (n > L.NEIGHBOUR_MAX ? '<div class="muted" style="font-size:12px">Nearest primes are only searched up to 1,000,000,000,000.</div>' : '');
+  };
+  $('#go', el).onclick = run;
+  $('#n', el).addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+  run();
+} });
 
-simple({ id: 'gcdlcm', name: 'GCD & LCM', icon: '🧩', desc: 'Greatest common divisor and least common multiple of two or more whole numbers.', keys: ['hcf', 'gcf', 'lcm', 'multiple', 'common factor'], sections: [sec('', [{ k: 'n', l: 'Whole numbers (spaces or commas)', t: 'text', v: '12, 18, 30' }], (v) => {
-  const a = L.nums(v.n).map(Math.abs);
+simple({ id: 'gcdlcm', name: 'GCD & LCM', icon: '🧩', desc: 'Greatest common divisor and least common multiple of two or more whole numbers.', keys: ['hcf', 'gcf', 'lcm', 'multiple', 'common factor'], sections: [sec('', [{ k: 'n', l: 'Whole numbers (spaces or commas)', t: 'text', v: '12, 18, 30', len: 200 }], (v) => {
+  const pn = L.parseNums(v.n), a = pn.nums.map(Math.abs);
+  if (pn.bad !== null) return `<div class="status">"${esc(pn.bad.slice(0, 30))}" is not a whole number.</div>`;
   if (a.length < 2 || a.length > 30 || a.some((x) => !Number.isInteger(x) || x === 0 || x > 1e12)) return null;
   const g = a.reduce(L.gcd), l = a.reduce(L.lcm);
   return rows([['GCD (HCF)', fx(g, 0)], ['LCM', l > 9e15 ? 'too large' : fx(l, 0)]]);
 })] });
 
-simple({ id: 'quad', name: 'Quadratic', icon: '🎢', desc: 'Solve ax² + bx + c = 0 with real or complex roots, discriminant and the vertex of the parabola.', keys: ['equation', 'roots', 'algebra', 'parabola', 'discriminant'], sections: [sec('ax² + bx + c = 0', [[N('a', 'a', 1), N('b', 'b', -3), N('c', 'c', 2)]], (v) => {
+simple({ id: 'quad', name: 'Quadratic', icon: '🎢', desc: 'Solve ax² + bx + c = 0 with real or complex roots, discriminant and the vertex of the parabola.', keys: ['equation', 'roots', 'algebra', 'parabola', 'discriminant'], sections: [sec('ax² + bx + c = 0', [[N('a', 'a', 1, -1e9, 1e9), N('b', 'b', -3, -1e9, 1e9), N('c', 'c', 2, -1e9, 1e9)]], (v) => {
   if (!ok(v.a, v.b, v.c)) return null;
   const r = L.quad(v.a, v.b, v.c);
   if (r.type === 'none') return '<div class="status">No equation: a and b are both 0.</div>';
@@ -999,12 +1118,12 @@ reg({ id: 'shapes', name: 'Area & Volume', icon: '🔷', desc: 'Area, perimeter,
   const names = Object.keys(L.shapes);
   el.innerHTML = `<div class="card list"><label class="f">Shape<select id="s">${names.map((n) => `<option>${n}</option>`).join('')}</select></label><div class="list" id="f"></div><div class="list" id="r"></div></div>`;
   const run = () => {
-    const sh = L.shapes[$('#s', el).value], v = $$('input', el).map((i) => parseFloat(i.value));
+    const sh = L.shapes[$('#s', el).value], v = $$('input', el).map((i) => { const n = Valid.num(i.value); return n !== null && n <= +i.max ? n : NaN; });
     $('#r', el).innerHTML = v.length && v.every((x) => Number.isFinite(x) && x > 0) ? rows(sh.f(...v).map((r) => [r[0], sig(r[1], 8)])) : '<div class="muted center">Enter positive sizes.</div>';
   };
   const build = () => {
     const sh = L.shapes[$('#s', el).value];
-    $('#f', el).innerHTML = sh.d.map((d, i) => `<label class="f">${esc(d)}<input type="number" inputmode="decimal" step="any" min="0" value="${[10, 5, 4][i]}"></label>`).join('');
+    $('#f', el).innerHTML = sh.d.map((d, i) => `<label class="f">${esc(d)}<input type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="${[10, 5, 4][i]}"></label>`).join('');
     run();
   };
   $('#s', el).onchange = build; el.addEventListener('input', (e) => { if (e.target.tagName === 'INPUT') run(); });
@@ -1013,12 +1132,14 @@ reg({ id: 'shapes', name: 'Area & Volume', icon: '🔷', desc: 'Area, perimeter,
 
 reg({ id: 'triangle', name: 'Triangle', icon: '🔺', desc: 'Solve a triangle from three sides or from two sides and the angle between them: angles, area, type and radii.', keys: ['trigonometry', 'heron', 'angles', 'sides', 'geometry'], render(el) {
   el.innerHTML = `<div class="card list"><label class="f">Known<select id="m"><option value="sss">Three sides (a, b, c)</option><option value="sas">Two sides and the angle between (a, b, C°)</option></select></label>
-    <div class="row"><label class="f"><span>Side a</span><input id="a" type="number" inputmode="decimal" step="any" value="3"></label><label class="f"><span>Side b</span><input id="b" type="number" inputmode="decimal" step="any" value="4"></label><label class="f"><span id="cl">Side c</span><input id="c" type="number" inputmode="decimal" step="any" value="5"></label></div><div class="list" id="r"></div></div>`;
+    <div class="row"><label class="f"><span>Side a</span><input id="a" type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="3"></label><label class="f"><span>Side b</span><input id="b" type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="4"></label><label class="f"><span id="cl">Side c</span><input id="c" type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="5"></label></div><div class="list" id="r"></div></div>`;
   const run = () => {
     const sas = $('#m', el).value === 'sas';
     $('#cl', el).textContent = sas ? 'Angle C (°)' : 'Side c';
-    const a = parseFloat($('#a', el).value), b = parseFloat($('#b', el).value);
-    let c = parseFloat($('#c', el).value), pre = '';
+    $('#c', el).max = sas ? '180' : '1000000000';
+    const num = (id) => { const x = $('#' + id, el), n = Valid.num(x.value); return n === null || n < 0 || (x.max !== '' && n > +x.max) ? NaN : n; };
+    const a = num('a'), b = num('b');
+    let c = num('c'), pre = '';
     if (sas) { const s = ok(a, b, c) && a > 0 && b > 0 ? L.triSAS(a, b, c) : null; if (!s) { $('#r', el).innerHTML = '<div class="status">Angle must be between 0 and 180.</div>'; return; } pre = rows([['Side c', sig(s.c, 8)]]); c = s.c; }
     const t = ok(a, b, c) ? L.triSSS(a, b, c) : null;
     $('#r', el).innerHTML = t ? pre + rows([['Angle A', sig(t.A, 7) + '°'], ['Angle B', sig(t.B, 7) + '°'], ['Angle C', sig(t.C, 7) + '°'], ['Type', t.type], ['Area', sig(t.area, 8)], ['Perimeter', sig(t.perimeter, 8)], ['Inradius', sig(t.inradius, 6)], ['Circumradius', sig(t.circumradius, 6)]]) : '<div class="status">These sides cannot form a triangle.</div>';
@@ -1027,7 +1148,7 @@ reg({ id: 'triangle', name: 'Triangle', icon: '🔺', desc: 'Solve a triangle fr
 } });
 
 simple({ id: 'powercost', name: 'Power Cost', icon: '🔌', desc: 'Electricity used and cost of an appliance per day, month and year from its watts and daily hours.', keys: ['electricity', 'kwh', 'watt', 'bill', 'appliance', 'energy'], sections: [sec('', [
-  [N('w', 'Power (watts)', 1500), N('q', 'How many', 1)], [N('h', 'Hours per day', 2), N('r', 'Price per kWh', 8)]
+  [N('w', 'Power (watts)', 1500, 0, 1e6), N('q', 'How many', 1, 0, 10000, 1)], [N('h', 'Hours per day', 2, 0, 24), N('r', 'Price per kWh', 8, 0, 10000)]
 ], (v) => {
   if (!ok(v.w, v.q, v.h, v.r) || v.w < 0 || v.q < 0 || v.h < 0 || v.h > 24 || v.r < 0) return null;
   const day = v.w * v.q * v.h / 1000;
@@ -1035,7 +1156,7 @@ simple({ id: 'powercost', name: 'Power Cost', icon: '🔌', desc: 'Electricity u
 })] });
 
 simple({ id: 'cooking', name: 'Cooking Units', icon: '🥣', desc: 'Convert cups, spoons, grams and ounces for common ingredients such as flour, sugar and butter.', keys: ['recipe', 'cups to grams', 'baking', 'tablespoon', 'teaspoon', 'kitchen'], sections: [sec('', [
-  S('i', 'Ingredient', Object.keys(L.ING).map((k) => [k, k]), 'Flour (plain)'), [N('a', 'Amount', 1), S('u', 'Unit', [['cup', 'cup (US)'], ['tbsp', 'tablespoon'], ['tsp', 'teaspoon'], ['g', 'gram'], ['kg', 'kilogram'], ['oz', 'ounce'], ['ml', 'millilitre']], 'cup')]
+  S('i', 'Ingredient', Object.keys(L.ING).map((k) => [k, k]), 'Flour (plain)'), [N('a', 'Amount', 1, 0, 1e6), S('u', 'Unit', [['cup', 'cup (US)'], ['tbsp', 'tablespoon'], ['tsp', 'teaspoon'], ['g', 'gram'], ['kg', 'kilogram'], ['oz', 'ounce'], ['ml', 'millilitre']], 'cup')]
 ], (v) => {
   if (!ok(v.a) || v.a <= 0 || !L.ING[v.i]) return null;
   const r = L.cook(L.ING[v.i], v.a, v.u);
@@ -1043,17 +1164,18 @@ simple({ id: 'cooking', name: 'Cooking Units', icon: '🥣', desc: 'Convert cups
 })] });
 
 simple({ id: 'sizes', name: 'Size Converter', icon: '👕', desc: 'Approximate shoe, clothing and chest size conversions between UK, US and EU sizing.', keys: ['shoe', 'clothing', 'dress', 'shirt', 'eu', 'uk', 'us'], sections: [
-  sec('Shoes', [[S('s', 'System', [['uk', 'UK'], ['usm', 'US men'], ['usw', 'US women'], ['eu', 'EU'], ['cm', 'Foot length cm']], 'uk'), N('v', 'Size', 8)]], (v) => {
+  sec('Shoes', [[S('s', 'System', [['uk', 'UK'], ['usm', 'US men'], ['usw', 'US women'], ['eu', 'EU'], ['cm', 'Foot length cm']], 'uk'), N('v', 'Size', 8, 0, 60)]], (v) => {
     if (!ok(v.v) || v.v <= 0) return null;
     const r = L.shoe(v.s, v.v);
-    return rows([['UK', sig(r.uk)], ['US men', sig(r.usm)], ['US women', sig(r.usw)], ['EU', sig(r.eu)], ['Foot length', sig(r.cm, 3) + ' cm']]) + '<div class="muted" style="font-size:12px">Approximate. Brands differ, so check their chart.</div>';
+    if (!r) return '<div class="status">Size out of range (UK 1 to 16).</div>';
+    return rows([['UK', sig(r.uk)], ['US men', sig(r.usm)], ['US women', sig(r.usw)], ['EU', sig(r.eu)], ['Foot length', sig(r.cm, 3) + ' cm']]) + '<div class="muted" style="font-size:12px">Approximate (nearest half size). Brands differ, so check their chart.</div>';
   }),
-  sec('Women\'s clothing', [[S('s', 'System', [['uk', 'UK'], ['us', 'US'], ['eu', 'EU']], 'uk'), N('v', 'Size', 10)]], (v) => { if (!ok(v.v)) return null; const r = L.dress(v.s, v.v); return rows([['UK', sig(r.uk)], ['US', sig(r.us)], ['EU', sig(r.eu)]]); }),
-  sec('Chest / jacket', [[N('v', 'Chest', 40), S('u', 'Unit', [['in', 'inches'], ['cm', 'cm']], 'in')]], (v) => { if (!ok(v.v) || v.v <= 0) return null; const r = L.chest(v.u, v.v); return rows([['Chest', sig(r.inch, 4) + ' in / ' + sig(r.cm, 4) + ' cm'], ['EU size', sig(r.eu)], ['Letter size', r.letter]]); })
+  sec('Women\'s clothing', [[S('s', 'System', [['uk', 'UK'], ['us', 'US'], ['eu', 'EU']], 'uk'), N('v', 'Size', 10, 0, 60)]], (v) => { if (!ok(v.v)) return null; const r = L.dress(v.s, v.v); return rows([['UK', sig(r.uk)], ['US', sig(r.us)], ['EU', sig(r.eu)]]); }),
+  sec('Chest / jacket', [[N('v', 'Chest', 40, 0, 300), S('u', 'Unit', [['in', 'inches'], ['cm', 'cm']], 'in')]], (v) => { if (!ok(v.v) || v.v <= 0) return null; const r = L.chest(v.u, v.v); return rows([['Chest', sig(r.inch, 4) + ' in / ' + sig(r.cm, 4) + ' cm'], ['EU size', sig(r.eu)], ['Letter size', r.letter]]); })
 ] });
 
 simple({ id: 'breakeven', name: 'Break-even', icon: '🏁', desc: 'Units you must sell to cover costs, and to reach a profit target, from fixed and variable costs.', keys: ['business', 'profit', 'cost', 'units', 'contribution'], sections: [sec('', [
-  N('f', 'Fixed costs', 50000), [N('p', 'Price per unit', 250), N('v', 'Variable cost per unit', 150)], N('t', 'Profit target (optional)', 20000)
+  N('f', 'Fixed costs', 50000, 0, 1e12), [N('p', 'Price per unit', 250, 0, 1e9), N('v', 'Variable cost per unit', 150, 0, 1e9)], N('t', 'Profit target (optional)', 20000, 0, 1e12)
 ], (v) => {
   if (!ok(v.f, v.p, v.v) || v.f < 0) return null;
   const r = L.breakeven(v.f, v.p, v.v, Number.isFinite(v.t) ? v.t : 0);
@@ -1062,8 +1184,8 @@ simple({ id: 'breakeven', name: 'Break-even', icon: '🏁', desc: 'Units you mus
 })] });
 
 simple({ id: 'margin', name: 'Markup & Margin', icon: '💹', desc: 'Profit, margin and markup from cost and price, or the selling price for a margin or markup you want.', keys: ['profit', 'selling price', 'cost', 'retail', 'gross margin'], sections: [
-  sec('From cost and price', [[N('c', 'Cost', 80), N('p', 'Selling price', 100)]], (v) => { if (!ok(v.c, v.p) || v.c <= 0 || v.p <= 0) return null; const r = L.margin(v.c, v.p); return big('Margin', sig(r.margin, 6) + '%') + rows([['Markup', sig(r.markup, 6) + '%'], ['Profit', fx(r.profit)]]); }),
-  sec('Price I need', [[N('c', 'Cost', 80), N('x', 'Percent', 25)], S('m', 'Percent is', [['mg', 'Margin (of price)'], ['mk', 'Markup (on cost)']], 'mg')], (v) => {
+  sec('From cost and price', [[N('c', 'Cost', 80, 0, 1e12), N('p', 'Selling price', 100, 0, 1e12)]], (v) => { if (!ok(v.c, v.p) || v.c <= 0 || v.p <= 0) return null; const r = L.margin(v.c, v.p); return big('Margin', sig(r.margin, 6) + '%') + rows([['Markup', sig(r.markup, 6) + '%'], ['Profit', fx(r.profit)]]); }),
+  sec('Price I need', [[N('c', 'Cost', 80, 0, 1e12), N('x', 'Percent', 25, 0, 1000)], S('m', 'Percent is', [['mg', 'Margin (of price)'], ['mk', 'Markup (on cost)']], 'mg')], (v) => {
     if (!ok(v.c, v.x) || v.c <= 0 || v.x < 0 || (v.m === 'mg' && v.x >= 100)) return null;
     const p = v.m === 'mg' ? v.c / (1 - v.x / 100) : v.c * (1 + v.x / 100);
     return big('Selling price', fx(p)) + rows([['Profit', fx(p - v.c)]]);
@@ -1071,22 +1193,25 @@ simple({ id: 'margin', name: 'Markup & Margin', icon: '💹', desc: 'Profit, mar
 ] });
 
 simple({ id: 'interest', name: 'Simple Interest', icon: '💰', desc: 'Simple interest and total amount for a principal, rate and time in years or months.', keys: ['principal', 'rate', 'loan', 'deposit'], sections: [sec('', [
-  N('p', 'Principal', 50000), [N('r', 'Rate % per year', 7), N('t', 'Time', 3)], S('u', 'Time in', [['y', 'Years'], ['m', 'Months'], ['d', 'Days']], 'y')
+  N('p', 'Principal', 50000, 0, 1e12), [N('r', 'Rate % per year', 7, 0, 200), N('t', 'Time', 3, 0, 100, undefined, ['u', { y: [0, 100], m: [0, 1200], d: [0, 36500] }])], S('u', 'Time in', [['y', 'Years'], ['m', 'Months'], ['d', 'Days']], 'y')
 ], (v) => {
   if (!ok(v.p, v.r, v.t) || v.p < 0 || v.r < 0 || v.t < 0) return null;
   const yrs = v.u === 'y' ? v.t : v.u === 'm' ? v.t / 12 : v.t / 365, i = v.p * v.r * yrs / 100;
+  if (!(i + v.p < 1e15)) return BIG;
   return big('Interest', fx(i)) + rows([['Total amount', fx(v.p + i)], ['Per year', fx(v.p * v.r / 100)]]);
 })] });
 
 simple({ id: 'fdrd', name: 'FD / RD', icon: '🏧', desc: 'Maturity amount of a fixed deposit with compounding, and of a monthly recurring deposit.', keys: ['fixed deposit', 'recurring deposit', 'bank', 'maturity', 'savings'], sections: [
-  sec('Fixed deposit', [N('p', 'Deposit', 100000), [N('r', 'Rate % per year', 7), N('y', 'Years', 5)], S('n', 'Compounded', [[4, 'Quarterly'], [12, 'Monthly'], [2, 'Half-yearly'], [1, 'Yearly']], 4)], (v) => {
+  sec('Fixed deposit', [N('p', 'Deposit', 100000, 0, 1e12), [N('r', 'Rate % per year', 7, 0, 200), N('y', 'Years', 5, 0, 50)], S('n', 'Compounded', [[4, 'Quarterly'], [12, 'Monthly'], [2, 'Half-yearly'], [1, 'Yearly']], 4)], (v) => {
     if (!ok(v.p, v.r, v.y) || v.p <= 0 || v.r < 0 || v.y <= 0 || v.y > 50) return null;
+    if (v.r > 200 || !(L.compound(v.p, v.r, v.y, +v.n) < 1e15)) return CAPMSG;
     const m = L.compound(v.p, v.r, v.y, +v.n);
     return big('Maturity amount', fx(m)) + rows([['Interest earned', fx(m - v.p)]]);
   }),
-  sec('Recurring deposit', [N('m', 'Monthly deposit', 5000), [N('r', 'Rate % per year', 6.5), N('t', 'Months', 24)]], (v) => {
+  sec('Recurring deposit', [N('m', 'Monthly deposit', 5000, 0, 1e12), [N('r', 'Rate % per year', 6.5, 0, 200), N('t', 'Months', 24, 1, 600, 1)]], (v) => {
     const n = Math.round(v.t);
     if (!ok(v.m, v.r, n) || v.m <= 0 || v.r < 0 || n < 1 || n > 600) return null;
+    if (v.r > 200 || !(L.rd(v.m, v.r, n) < 1e15)) return CAPMSG;
     const m = L.rd(v.m, v.r, n);
     return big('Maturity amount', fx(m)) + rows([['Total deposited', fx(v.m * n)], ['Interest earned', fx(m - v.m * n)]]) + '<div class="muted" style="font-size:12px">Quarterly compounding. Banks may differ slightly.</div>';
   })
@@ -1095,22 +1220,22 @@ simple({ id: 'fdrd', name: 'FD / RD', icon: '🏧', desc: 'Maturity amount of a 
 simple({ id: 'networth', name: 'Net Worth', icon: '💎', desc: 'Add up assets and debts from simple lists to see your net worth.', keys: ['assets', 'liabilities', 'wealth', 'savings', 'debt'], sections: [sec('One item per line, amount at the end of the line', [
   { k: 'a', l: 'Assets', t: 'textarea', rows: 4, v: 'Savings 150000\nInvestments 300000', p: 'Cash 5000' }, { k: 'l', l: 'Debts', t: 'textarea', rows: 4, v: 'Car loan 120000', p: 'Loan 20000' }
 ], (v) => {
-  const a = L.sumAmounts(v.a), l = L.sumAmounts(v.l);
-  return big('Net worth', fx(a - l)) + rows([['Total assets', fx(a)], ['Total debts', fx(l)]]);
+  const A = L.sumLines(v.a), D = L.sumLines(v.l), a = A.sum, l = D.sum, bad = A.bad + D.bad;
+  return big('Net worth', fx(a - l)) + rows([['Total assets', fx(a)], ['Total debts', fx(l)]]) + (bad ? `<div class="status">${bad} line${bad === 1 ? '' : 's'} without an amount at the end were ignored</div>` : '');
 })] });
 
 simple({ id: 'cagr', name: 'Growth Rate', icon: '🚀', desc: 'Compound annual growth rate between a start and end value over a number of years.', keys: ['cagr', 'return', 'annualised', 'growth', 'investment'], sections: [sec('', [
-  [N('a', 'Start value', 10000), N('b', 'End value', 18000)], N('y', 'Years', 5)
+  [N('a', 'Start value', 10000, 0, 1e12), N('b', 'End value', 18000, 0, 1e12)], N('y', 'Years', 5, 0, 100)
 ], (v) => {
   if (!ok(v.a, v.b, v.y) || v.a <= 0 || v.b <= 0 || v.y <= 0) return null;
   return big('CAGR', sig(L.cagr(v.a, v.b, v.y), 6) + '% per year') + rows([['Total growth', sig((v.b / v.a - 1) * 100, 6) + '%'], ['Doubles in about', sig(Math.log(2) / Math.log(1 + L.cagr(v.a, v.b, v.y) / 100), 4) + ' years']].slice(0, L.cagr(v.a, v.b, v.y) > 0 ? 2 : 1));
 })] });
 
 simple({ id: 'numwords', name: 'Number Words', icon: '🔤', desc: 'Write a number in words using the Indian (lakh, crore) or international (million, billion) system.', keys: ['cheque', 'check', 'spell', 'amount in words', 'lakh', 'crore'], sections: [sec('', [
-  N('n', 'Number (up to 999 trillion)', 1234567), S('s', 'System', [['in', 'Indian (lakh, crore)'], ['int', 'International']], 'in')
+  N('n', 'Number (up to 999 trillion)', 1234567, -999999999999999, 999999999999999), S('s', 'System', [['in', 'Indian (lakh, crore)'], ['int', 'International']], 'in')
 ], (v) => {
   if (!Number.isFinite(v.n) || Math.abs(v.n) >= 1e15) return null;
-  const neg = v.n < 0 ? 'minus ' : '', a = Math.abs(v.n), whole = Math.floor(a + 1e-9), frac = Math.round((a - whole) * 100);
+  const sp = L.splitAmount(v.n), whole = sp.whole, frac = sp.frac, neg = sp.neg ? 'minus ' : '';
   let w = neg + L.words(whole, v.s === 'in');
   if (frac) w += ' and ' + L.words(frac, v.s === 'in') + ' hundredths';
   return `<div class="card" style="font-size:18px;line-height:1.5">${esc(w.charAt(0).toUpperCase() + w.slice(1))}</div>`;

@@ -10,6 +10,7 @@
   3. Set rate 0, loan 1200, tenure 12 months: EMI is 100.00 and total interest is 0.00.
   4. Switch "Tenure in" to Months and enter 6: the table shows 6 rows ending with balance 0.00.
   5. Clear the loan amount: the result is replaced by "Enter the values above." with no error.
+  6. Limits: type 250 in the interest field: a red "Maximum is 200" appears under it, the result says "enter a value from 0 up to 200", and leaving the field sets it back to 200. Tenure 101 years shows "Maximum is 100"; switching the unit to Months allows up to 1200. Letters, e and + cannot be typed.
 
 ## Billing
 - id: billing
@@ -109,6 +110,7 @@
   1. Date of birth 1995-06-15, "Age on" 2026-10-06: shows 31 years 3 months 21 days, next birthday in 252 days (turning 32).
   2. Set "Age on" to a birthday itself: it says "Today! Turning N".
   3. Birth date 2000-02-29: it works in non-leap years (birthday counts as Mar 1).
+  4. The date fields accept 1900 to 2200 only; a date outside that shows an "Earliest is..." or "Latest is..." message.
   4. Set "Age on" earlier than the birth date: shows the prompt, no error.
 
 ## Investment
@@ -135,6 +137,7 @@
   2. In DEG, sin(30) gives 0.5, cos(60) gives 0.5, tan(90) shows an "Undefined" error. Tap DEG to switch to RAD: sin(pi/2) gives 1.
   3. 2^3^2 = 512, -2^2 = -4, 5! = 120, sqrt(144) = 12, log(1000) = 3, ln(e) = 1.
   4. 1/0 and sqrt(-1) show an error in red, nothing crashes. A missing closing bracket is accepted.
+  4a. A decimal comma works: type 0,5+1 and the preview shows 1.5 (or 1,5 in a comma locale). Tap = on 1/3 then tap +, 1, =: the box shows plain digits and the sum works.
   5. M+ stores the current result (shown as "M = ..." at the top), MR inserts it, MC clears it. Tap the display to type with the keyboard.
 
 ## Fuel Cost
@@ -196,6 +199,7 @@
 - what: Converts pay between hourly, daily, weekly, monthly and yearly using your hours per week, weeks per year and days per week.
 - test:
   1. 25 per hour, 40 h/week, 52 weeks: per year 52,000.00, per month 4,333.33, per week 1,000.00, per day 200.00.
+  1a. Hours per week above 168, weeks above 53 or days above 7 are flagged with a "Maximum is..." message and the result asks for a value in range.
   2. Change "Per" to Year and enter 60,000: per hour 28.85.
   3. Hours per week 0 shows the prompt.
 

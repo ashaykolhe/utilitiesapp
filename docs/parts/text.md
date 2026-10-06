@@ -382,6 +382,7 @@
   1. The "Now" number ticks every second; Copy copies it.
   2. Enter `1700000000`: UTC `Tue, 14 Nov 2023 22:13:20 GMT`, ISO `2023-11-14T22:13:20.000Z`. Enter `1700000000000`: same date (milliseconds detected).
   3. Enter `abc`: "Enter a valid number".
+  3a. Enter `1700000000,5` (decimal comma): the dates appear. The date field only accepts years 1900 to 2200.
   4. Pick a date and time in the date field: seconds and milliseconds appear (in your local time zone). Leave the tool: the clock stops.
 
 ## UUID Maker

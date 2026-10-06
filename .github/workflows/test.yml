@@ -14,3 +14,5 @@ jobs:
       - run: npm ci
       - run: for f in www/js/*.js www/js/tools/*.js; do node --check "$f"; done
       - run: npm test
+      - run: npm run audit:inputs
+      - run: npm run fuzz

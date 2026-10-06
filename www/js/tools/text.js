@@ -36,6 +36,14 @@ TX.morseTimeline = (m, unit) => {
   return ev;
 };
 
+/* Android truncates long vibration patterns (about 99 entries), so a pattern is cut into chunks that each start with an "on" entry and are re-issued one after another. */
+TX.vibChunks = (ev, size = 98) => {
+  const abs = ev.map(Math.abs), out = [];
+  size -= size % 2; // an even length keeps every chunk starting with "on"
+  for (let i = 0; i < abs.length; i += size) out.push(abs.slice(i, i + size));
+  return out;
+};
+
 /* ---------- Barcodes ---------- */
 const C128 = '212222,222122,222221,121223,121322,131222,122213,122312,132212,221213,221312,231212,112232,122132,122231,113222,123122,123221,223211,221132,221231,213212,223112,312131,311222,321122,321221,312212,322112,322211,212123,212321,232121,111323,131123,131321,112313,132113,132311,211313,231113,231311,112133,112331,132131,113123,113321,133121,313121,211331,231131,213113,213311,213131,311123,311321,331121,312113,312311,332111,314111,221411,431111,111224,111422,121124,121421,141122,141221,112214,112412,122114,122411,142112,142211,241211,221114,413111,241112,134111,111242,121142,121241,114212,124112,124211,411212,421112,421211,212141,214121,412121,111143,111341,131141,114113,114311,411113,411311,113141,114131,311141,411131,211412,211214,211232,2331112'.split(',');
 TX.C128 = C128;
@@ -83,10 +91,11 @@ TX.dedupeLines = (s) => { const seen = new Set(); return s.split('\n').filter(l 
 TX.sortLines = (s, desc) => { const a = s.split('\n').sort((x, y) => x.localeCompare(y, undefined, { numeric: true, sensitivity: 'base' })); return (desc ? a.reverse() : a).join('\n'); };
 TX.dropEmpty = (s) => s.split('\n').filter(l => l.trim()).join('\n');
 TX.reverseText = (s) => [...s].reverse().join('');
-TX.words = (s) => s.normalize('NFC').replace(/['’]/g, '').replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, '$1 $2').replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, '$1 $2').match(/[\p{L}\p{N}]+/gu) || [];
+TX.words = (s) => s.normalize('NFC').replace(/['’]/g, '').replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, '$1 $2').replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, '$1 $2').match(/[\p{L}\p{N}\p{M}]+/gu) || [];
 const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
 const perLine = (f) => (s) => s.split('\n').map(l => f(TX.words(l), l)).join('\n');
-TX.slug = perLine((w, l) => TX.words(l.normalize('NFD').replace(/\p{M}/gu, '')).map(x => x.toLowerCase()).join('-'));
+// Only Latin-style combining accents are stripped (U+0300-036F); Indic and other scripts keep their vowel signs.
+TX.slug = perLine((w, l) => TX.words(l.normalize('NFD').replace(/[\u0300-\u036f]/g, '')).map(x => x.toLowerCase()).join('-'));
 TX.camel = perLine(w => w.map((x, i) => i ? cap(x) : x.toLowerCase()).join(''));
 TX.pascal = perLine(w => w.map(cap).join(''));
 TX.snake = perLine(w => w.map(x => x.toLowerCase()).join('_'));
@@ -96,7 +105,7 @@ TX.dotcase = perLine(w => w.map(x => x.toLowerCase()).join('.'));
 TX.wordFreq = (s, opt = {}) => {
   const stop = new Set(opt.stop ? 'a an and are as at be but by for from has have he her his i in is it its of on or she that the their they this to was we were will with you your not so if do my me our us them then than there what when which who'.split(' ') : []);
   const m = new Map();
-  (s.toLowerCase().match(/[\p{L}\p{N}']+/gu) || []).forEach(w => { w = w.replace(/^'+|'+$/g, ''); if (w.length >= (opt.min || 1) && !stop.has(w)) m.set(w, (m.get(w) || 0) + 1); });
+  (s.toLowerCase().normalize('NFC').match(/[\p{L}\p{N}\p{M}']+/gu) || []).forEach(w => { w = w.replace(/^'+|'+$/g, ''); if (w.length >= (opt.min || 1) && !stop.has(w)) m.set(w, (m.get(w) || 0) + 1); });
   return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 };
 TX.readTime = (words, wpm) => { const sec = Math.round(words / wpm * 60); return { sec, text: sec < 60 ? sec + ' sec' : Math.floor(sec / 60) + ' min ' + (sec % 60) + ' sec' }; };
@@ -223,6 +232,31 @@ TX.jsonCheck = (s) => {
   }
 };
 
+/* Rebuilds already-valid JSON text (check it with jsonCheck first) changing only whitespace: numbers and strings are copied exactly as written,
+   so 12345678901234567890, 1.0, 1E2 and the order of keys such as "2" and "1" survive. ind is '' (minify), '  ', '    ' or '\t'. */
+TX.jsonFormat = (s, ind) => {
+  let i = 0; const n = s.length, nl = (d) => (ind ? '\n' + ind.repeat(d) : '');
+  const ws = () => { while (i < n && (s[i] === ' ' || s[i] === '\t' || s[i] === '\n' || s[i] === '\r')) i++; };
+  const str = () => { const a = i; i++; while (i < n && s[i] !== '"') i += s[i] === '\\' ? 2 : 1; i++; return s.slice(a, i); };
+  const val = (d) => {
+    ws(); const c = s[i];
+    if (c === '{' || c === '[') {
+      const close = c === '{' ? '}' : ']'; i++; ws();
+      if (s[i] === close) { i++; return c + close; }
+      const parts = [];
+      for (;;) {
+        ws();
+        if (c === '{') { const k = str(); ws(); i++; parts.push(k + ':' + (ind ? ' ' : '') + val(d + 1)); } else parts.push(val(d + 1));
+        ws(); if (s[i] === ',') { i++; continue; } i++; break;
+      }
+      return c + parts.map(p => nl(d + 1) + p).join(',') + nl(d) + close;
+    }
+    if (c === '"') return str();
+    const m = /-?[0-9][0-9.eE+-]*|true|false|null/y; m.lastIndex = i; const t = m.exec(s)[0]; i += t.length; return t;
+  };
+  return val(0);
+};
+
 /* ---------- Colour ---------- */
 TX.hexToRgb = (s) => { s = s.trim().replace(/^#/, ''); if (/^[0-9a-f]{3}$/i.test(s)) s = s.replace(/./g, '$&$&'); return /^[0-9a-f]{6}$/i.test(s) ? [0, 2, 4].map(i => parseInt(s.substr(i, 2), 16)) : null; };
 TX.rgbToHex = (c) => '#' + c.map(v => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join('').toUpperCase();
@@ -284,6 +318,9 @@ TX.regexRun = (pat, flags, text, cap = 500) => {
   }
   return { matches };
 };
+/* Source text for the regex Worker: the same two functions, so the Worker and the tests share one implementation. */
+TX.regexWorkerSource = () => 'const regexRun = ' + TX.regexRun.toString() + ';\nconst regexReplace = ' + TX.regexReplace.toString() +
+  ';\nonmessage = (e) => { const d = e.data, r = regexRun(d.p, d.f, d.t, 500); postMessage({ r, rep: r.error ? null : regexReplace(d.p, d.f, d.t, d.r) }); };';
 TX.regexReplace = (pat, flags, text, repl) => {
   try { return { out: text.replace(new RegExp(pat, (flags || '').replace(/[^dgimsuvy]/g, '')), repl) }; } catch (e) { return { error: e.message }; }
 };
@@ -305,19 +342,30 @@ TX.parseCSV = (s, d) => {
 TX.detectDelim = (s) => { const l = s.split('\n')[0] || ''; return [',', ';', '\t', '|'].map(d => [d, l.split(d).length]).sort((a, b) => b[1] - a[1])[0][0]; };
 TX.csvToJson = (rows, header) => {
   if (!header) return rows;
-  const h = rows[0].map((x, i) => x.trim() || 'col' + (i + 1));
-  return rows.slice(1).map(r => { const o = {}; h.forEach((k, i) => { o[k] = r[i] === undefined ? '' : r[i]; }); return o; });
+  const seen = new Set(), h = rows[0].map((x, i) => {
+    const base = x.trim() || 'col' + (i + 1); let k = base;
+    for (let n = 2; seen.has(k); n++) k = base + '_' + n; // duplicate headers become name_2, name_3 ...
+    seen.add(k); return k;
+  });
+  return rows.slice(1).map(r => { const o = {}; h.forEach((k, i) => { Object.defineProperty(o, k, { value: r[i] === undefined ? '' : r[i], enumerable: true, writable: true, configurable: true }); }); return o; });
 };
 
 /* ---------- Markdown (small subset, HTML-escaped) ---------- */
 const escH = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 TX.mdInline = (t) => {
   const codes = [];
-  t = escH(t).replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return '\u0000' + (codes.length - 1) + '\u0000'; });
-  t = t.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, a, u) => /^(https?:\/\/|mailto:|#)/i.test(u) ? '<a href="' + u + '">' + a + '</a>' : a + ' (' + u + ')')
+  const lit = [];
+  t = escH(String(t).replace(/[\u0000-\u0002]/g, '')).replace(/`([^`]+)`/g, (m, c) => { codes.push(c); return '\u0000' + (codes.length - 1) + '\u0000'; });
+  // URLs (and link tags) are swapped for placeholders so the bold / italic passes cannot touch underscores or asterisks inside them
+  t = t.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, a, u) => {
+    const good = /^(https?:\/\/|mailto:|#)/i.test(u);
+    lit.push(good ? '<a href="' + u + '">' : ' (' + u + ')');
+    return good ? '\u0001' + (lit.length - 1) + '\u0001' + a + '\u0002' : a + '\u0001' + (lit.length - 1) + '\u0001';
+  })
     .replace(/\*\*(.+?)\*\*|__(.+?)__/g, (m, a, b) => '<b>' + (a || b) + '</b>')
     .replace(/\*(.+?)\*|\b_(.+?)_\b/g, (m, a, b) => '<i>' + (a || b) + '</i>')
     .replace(/~~(.+?)~~/g, '<s>$1</s>');
+  t = t.replace(/\u0001(\d+)\u0001/g, (m, i) => lit[+i]).replace(/\u0002/g, '</a>');
   return t.replace(/\u0000(\d+)\u0000/g, (m, i) => '<code>' + codes[+i] + '</code>');
 };
 TX.md = (src) => {
@@ -430,8 +478,9 @@ TX.toBraille = (s) => {
   }
   return out;
 };
+TX.brailleLost = (s) => [...s].filter(c => !/[A-Za-z0-9 \n]/.test(c) && !BRP[c]).length;
 TX.fromBraille = (s) => {
-  let out = '', num = false, cap = 0, capWord = false;
+  let out = '', num = false, cap = 0, capWord = false, paren = 0;
   for (const c of s) {
     if (c === ' ' || c === '\n') { out += c; num = false; capWord = false; cap = 0; continue; }
     if (c === BR_NUM) { num = true; continue; }
@@ -441,6 +490,7 @@ TX.fromBraille = (s) => {
     num = false;
     if (BR_REV[c]) { const ch = BR_REV[c]; out += (cap || capWord) ? ch.toUpperCase() : ch; cap = 0; continue; }
     cap = 0;
+    if (c === '⠶') { out += paren ? ')' : '('; paren ^= 1; continue; } // one cell stands for both brackets: alternate open / close
     const p = Object.keys(BRP).find(k => BRP[k] === c);
     out += p || '?';
   }
@@ -464,11 +514,13 @@ const NATO = 'Alfa Bravo Charlie Delta Echo Foxtrot Golf Hotel India Juliett Kil
 const NDIG = 'Zero One Two Three Four Five Six Seven Eight Nine'.split(' ');
 const NATO_REV = {}; NATO.forEach((w, i) => { NATO_REV[w.toLowerCase()] = String.fromCharCode(65 + i); }); NATO_REV.alpha = 'A'; NATO_REV.juliet = 'J'; NATO_REV.x = 'X'; NATO_REV['x-ray'] = 'X';
 NDIG.forEach((w, i) => { NATO_REV[w.toLowerCase()] = String(i); }); NATO_REV.niner = '9';
-TX.natoEnc = (s) => s.split(/\s+/).filter(Boolean).map(w => [...w].map(c => /[a-z]/i.test(c) ? NATO[c.toUpperCase().charCodeAt(0) - 65] : /\d/.test(c) ? NDIG[+c] : c).join(' ')).join(' / ');
+TX.natoEnc = (s) => s.split(/\s+/).filter(Boolean).map(w => [...w].map(c => /[a-z]/i.test(c) ? NATO[c.toUpperCase().charCodeAt(0) - 65] : /[0-9]/.test(c) ? NDIG[+c] : '').filter(Boolean).join(' ')).filter(Boolean).join(' / ');
+/* How many characters natoEnc / toBraille cannot express (they are skipped). */
+TX.natoLost = (s) => [...s].filter(c => !/[\sA-Za-z0-9]/.test(c)).length;
 TX.natoDec = (s) => s.trim().split(/\s+/).filter(Boolean).map(t => t === '/' ? ' ' : (NATO_REV[t.toLowerCase().replace(/[,.]/g, '')] || '?')).join('').replace(/ +/g, ' ');
 
 /* ---------- Pig Latin / Caesar ---------- */
-TX.pig = (s) => s.replace(/[A-Za-z]+/g, (w) => {
+TX.pig = (s) => s.replace(/[A-Za-z]+(?:['’][A-Za-z]+)*/g, (w) => {
   const lw = w.toLowerCase(); let r;
   if (/^[aeiou]/.test(lw)) r = lw + 'way';
   else {
@@ -482,7 +534,21 @@ TX.pig = (s) => s.replace(/[A-Za-z]+/g, (w) => {
 TX.caesar = (s, k) => { k = ((k % 26) + 26) % 26; return s.replace(/[a-z]/gi, c => { const b = c <= 'Z' ? 65 : 97; return String.fromCharCode((c.charCodeAt(0) - b + k) % 26 + b); }); };
 
 /* ---------- Numbers ---------- */
-TX.parseNums = (s) => (s.match(/[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?/g) || []).map(Number).filter(Number.isFinite);
+/* Strict number list: split on whitespace / semicolons / new lines, and on a comma only when a space or line end follows it. Returns { nums, bad } (bad = first token that is not a number). */
+TX.parseNumsStrict = (s) => {
+  const nums = []; let bad = null;
+  const NUM = /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i;
+  String(s).split(/[\s;]+|,(?=\s|$)/).forEach(tok => {
+    if (!tok || bad !== null) return;
+    if (NUM.test(tok)) { const v = Number(tok); if (Number.isFinite(v)) { nums.push(v); return; } bad = tok; return; }
+    if (/^[-+]?\d{1,3}(,\d{3})+(\.\d+)?$/.test(tok)) { nums.push(Number(tok.replace(/,/g, ''))); return; }
+    const parts = tok.split(',');
+    if (parts.length > 1 && parts.every(x => NUM.test(x) && Number.isFinite(Number(x)))) { parts.forEach(x => nums.push(Number(x))); return; }
+    bad = tok;
+  });
+  return { nums, bad };
+};
+TX.parseNums = (s) => TX.parseNumsStrict(s).nums;
 TX.numStats = (a) => {
   if (!a.length) return null;
   const s = a.slice().sort((x, y) => x - y), sum = a.reduce((x, y) => x + y, 0), mid = s.length >> 1;
@@ -534,12 +600,12 @@ function xform(meta, modes, o = {}) {
       ${o.opt ? lbl(esc(o.opt.label), `<input id="p" type="number" min="${o.opt.min}" max="${o.opt.max}" value="${o.opt.value}" inputmode="numeric">`) : ''}
       ${lbl(esc(o.inLabel || 'Input'), `<textarea id="i" rows="5" maxlength="200000" placeholder="${esc(o.ph || '')}"></textarea>`)}
       <div class="status" id="e" hidden></div>
-      ${lbl('Output', '<textarea id="u" rows="5" readonly></textarea>')}
+      ${lbl('Output', '<textarea id="u" rows="5" maxlength="2000000" readonly></textarea>')}<div class="muted" id="nt" style="font-size:13px"></div>
       <div class="row"><button class="btn" id="cp">Copy</button><button class="btn alt" id="sw">Swap</button><button class="btn alt" id="cl">Clear</button></div></div>`;
     const sel = $('#m', el);
     const run = () => {
       const m = modes[sel ? +sel.value : 0], e = $('#e', el);
-      try { $('#u', el).value = m.f($('#i', el).value, o.opt ? clamp(+$('#p', el).value || 0, o.opt.min, o.opt.max) : 0); e.hidden = true; }
+      try { $('#u', el).value = m.f($('#i', el).value, o.opt ? clamp(+$('#p', el).value || 0, o.opt.min, o.opt.max) : 0); e.hidden = true; $('#nt', el).textContent = m.note ? m.note($('#i', el).value) : ''; }
       catch (x) { $('#u', el).value = ''; e.textContent = x.message; e.hidden = false; }
     };
     el.addEventListener('input', run); if (sel) sel.onchange = run;
@@ -560,16 +626,16 @@ reg({ id: 'morse', name: 'Morse Code', icon: '📟', desc: 'Translate text to Mo
   el.innerHTML = `<div class="list">
     <select id="m" aria-label="Direction"><option value="0">Text to Morse</option><option value="1">Morse to text</option></select>
     ${lbl('Input', '<textarea id="i" rows="4" maxlength="2000" placeholder="Type here. In Morse use . and -, spaces between letters, / between words"></textarea>')}
-    ${lbl('Output', '<textarea id="o" rows="4" readonly></textarea>')}
+    ${lbl('Output', '<textarea id="o" rows="4" maxlength="20000" readonly></textarea>')}
     <div class="card list">
       ${lbl('Speed: <b id="wv">15</b> words per minute', '<input id="w" type="range" min="5" max="30" value="15">')}
       <div class="row"><label style="display:flex;gap:8px;align-items:center;min-height:44px"><input type="checkbox" id="snd" checked style="flex:none"> Sound</label><label style="display:flex;gap:8px;align-items:center;min-height:44px"><input type="checkbox" id="vib" checked style="flex:none"> Vibrate</label></div>
       <div class="row"><button class="btn" id="play">▶ Play</button><button class="btn alt" id="cp">Copy output</button></div></div></div>`;
-  let ctx = null, tm = 0, playing = false;
+  let ctx = null, tm = 0, vt = 0, playing = false;
   const mode = () => +$('#m', el).value, morse = () => mode() ? $('#i', el).value : $('#o', el).value;
   const conv = () => { const v = $('#i', el).value; $('#o', el).value = mode() ? TX.morseDec(v) : TX.morseEnc(v); };
   const stop = () => {
-    playing = false; clearTimeout(tm);
+    playing = false; clearTimeout(tm); clearTimeout(vt);
     if (ctx) { try { ctx.close(); } catch (e) { /* ignore */ } ctx = null; }
     if (navigator.vibrate) navigator.vibrate(0);
     const b = $('#play', el); if (b) b.textContent = '▶ Play';
@@ -587,7 +653,11 @@ reg({ id: 'morse', name: 'Morse Code', icon: '📟', desc: 'Translate text to Mo
         ev.forEach(d => { const s = Math.abs(d) / 1000; if (d > 0) { g.gain.setTargetAtTime(0.4, t, 0.004); g.gain.setTargetAtTime(0, t + s, 0.004); } t += s; });
       } catch (e) { toast('Sound is not available'); }
     }
-    if ($('#vib', el).checked && navigator.vibrate) navigator.vibrate(ev.map(Math.abs));
+    if ($('#vib', el).checked && navigator.vibrate) {
+      // Android cuts patterns after ~99 entries, so send them in chunks and issue the next one when the last ends
+      const chunks = TX.vibChunks(ev), go = (k) => { if (!playing || k >= chunks.length) return; navigator.vibrate(chunks[k]); vt = setTimeout(() => go(k + 1), chunks[k].reduce((a, d) => a + d, 0)); };
+      go(0);
+    }
     tm = setTimeout(stop, ev.reduce((a, d) => a + Math.abs(d), 0) + 150);
   };
   $('#w', el).oninput = () => { $('#wv', el).textContent = $('#w', el).value; };
@@ -669,45 +739,60 @@ reg({ id: 'qr', name: 'QR & Barcode', icon: '🔳', desc: 'Make QR codes for tex
 
 /* ====================== 3. Notes ====================== */
 reg({ id: 'notes', name: 'Notes', icon: '📝', desc: 'Quick notes with a title and body, search and pinning, stored only on this device.', keys: ['memo', 'jot', 'write', 'notepad'], needs: ['storage'], render(el) {
-  let items = Store.get('notes.items', []), cur = null, q = '', delArm = 0;
-  const save = () => Store.set('notes.items', items);
+  const MAX_BODY = 50000, blank = (n) => !n.t.trim() && !n.b.trim();
+  let items = Store.get('notes.items', []).filter(n => !blank(n)), cur = null, q = '', delArm = 0, timer = 0, warned = false;
+  /* Saves are debounced (about 400 ms) and flushed on Done, on delete and when the tool is closed. localStorage is used directly
+     (same "pk." prefix as Store) so a full disk can be reported once instead of on every keystroke. */
+  const persist = () => {
+    clearTimeout(timer); timer = 0;
+    try { localStorage.setItem('pk.notes.items', JSON.stringify(items)); warned = false; }
+    catch (e) { if (!warned) { warned = true; toast('Storage is full. Copy your note somewhere safe.'); } }
+  };
+  const later = () => { clearTimeout(timer); timer = setTimeout(persist, 400); };
   const rows = () => {
     const f = items.filter(n => !q || (n.t + ' ' + n.b).toLowerCase().includes(q)).sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0) || b.ts - a.ts);
     $('#lst', el).innerHTML = f.map(n => `<div class="item" data-id="${n.id}" role="button" tabindex="0"><div class="grow"><b>${n.pin ? '📌 ' : ''}${esc(n.t || 'Untitled')}</b><div class="muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(n.b.slice(0, 90) || 'Empty note')}</div></div></div>`).join('') || `<div class="muted center">${items.length ? 'No matches' : 'No notes yet. Tap New to start.'}</div>`;
   };
   const showList = () => {
     cur = null;
-    el.innerHTML = `<div class="list"><div class="row"><input type="search" id="q" placeholder="Search notes" aria-label="Search notes" value="${esc(q)}"><button class="btn" id="new" style="flex:none">+ New</button></div>
+    el.innerHTML = `<div class="list"><div class="row"><input type="search" id="q" maxlength="100" placeholder="Search notes" aria-label="Search notes" value="${esc(q)}"><button class="btn" id="new" style="flex:none">+ New</button></div>
       <div class="muted">${items.length} note${items.length === 1 ? '' : 's'}${isPro() ? '' : ' (free plan: up to ' + proLimit('notes') + ')'}</div><div class="list" id="lst"></div></div>`;
     rows();
     $('#q', el).oninput = (e) => { q = e.target.value.toLowerCase(); rows(); };
     $('#new', el).onclick = () => {
       if (items.length >= proLimit('notes') && needPro('notes')) return;
-      const n = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), t: '', b: '', pin: false, ts: Date.now() };
-      items.push(n); save(); edit(n.id);
+      // the note only joins the list once something is typed, so tapping New and leaving leaves nothing behind
+      edit({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), t: '', b: '', pin: false, ts: Date.now() }, true);
     };
-    $('#lst', el).onclick = (e) => { const it = e.target.closest('.item'); if (it) edit(it.dataset.id); };
+    const open = (e) => { const it = e.target.closest('.item'); if (it) edit(items.find(x => x.id === it.dataset.id)); };
+    $('#lst', el).onclick = open;
+    $('#lst', el).onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('item')) { e.preventDefault(); open(e); } };
   };
-  const edit = (id) => {
-    const n = items.find(x => x.id === id); if (!n) { showList(); return; }
+  const edit = (n, isNew) => {
+    if (!n) { showList(); return; }
     cur = n; delArm = 0;
     el.innerHTML = `<div class="list"><div class="row"><button class="btn alt" id="bk">‹ Done</button><button class="btn alt" id="pin"></button></div>
       <input id="t" type="text" maxlength="120" placeholder="Title" aria-label="Title" value="${esc(n.t)}">
-      <textarea id="b" rows="12" maxlength="50000" placeholder="Write something..." aria-label="Note text">${esc(n.b)}</textarea>
+      <textarea id="b" rows="12" maxlength="${MAX_BODY}" placeholder="Write something..." aria-label="Note text">${esc(n.b.slice(0, MAX_BODY))}</textarea>
       <div class="row"><button class="btn alt" id="cp">Copy</button><button class="btn danger" id="del">Delete</button></div></div>`;
     const pinTxt = () => { $('#pin', el).textContent = n.pin ? '📌 Pinned' : 'Pin'; };
     pinTxt();
-    const touch = () => { n.t = $('#t', el).value; n.b = $('#b', el).value; n.ts = Date.now(); save(); };
+    const touch = () => {
+      n.t = $('#t', el).value.slice(0, 120); n.b = $('#b', el).value.slice(0, MAX_BODY); n.ts = Date.now();
+      if (!items.includes(n) && !blank(n)) items.push(n);
+      if (items.includes(n)) later();
+    };
     $('#t', el).oninput = touch; $('#b', el).oninput = touch;
-    $('#pin', el).onclick = () => { n.pin = !n.pin; save(); pinTxt(); };
+    $('#pin', el).onclick = () => { n.pin = !n.pin; if (items.includes(n)) persist(); pinTxt(); };
     $('#cp', el).onclick = () => copy((n.t ? n.t + '\n\n' : '') + n.b);
-    $('#bk', el).onclick = () => { if (!n.t.trim() && !n.b.trim()) { items = items.filter(x => x !== n); save(); } showList(); };
+    $('#bk', el).onclick = () => { items = items.filter(x => !blank(x)); persist(); showList(); };
     $('#del', el).onclick = () => {
       if (!delArm) { delArm = 1; $('#del', el).textContent = 'Tap again to delete'; setTimeout(() => { const b = $('#del', el); if (b) { delArm = 0; b.textContent = 'Delete'; } }, 2500); return; }
-      items = items.filter(x => x !== n); save(); showList();
+      items = items.filter(x => x !== n); persist(); showList();
     };
   };
   showList();
+  return () => { items = items.filter(x => !blank(x)); persist(); };
 } });
 
 /* ====================== 4. Base64 and URL ====================== */
@@ -766,7 +851,7 @@ reg({ id: 'password', name: 'Password Maker', icon: '🔑', desc: 'Create strong
 
 /* ====================== 7. Roman numerals ====================== */
 reg({ id: 'roman', name: 'Roman Numerals', icon: '🏛️', desc: 'Convert numbers 1 to 3999 to Roman numerals and Roman numerals back to numbers.', keys: ['roman', 'numeral', 'xiv', 'mcm'], needs: [], render(el) {
-  el.innerHTML = `<div class="list">${lbl('Number (1-3999) or Roman numeral', '<input id="i" type="text" maxlength="20" autocapitalize="characters" placeholder="e.g. 2024 or MMXXIV">')}
+  el.innerHTML = `<div class="list">${lbl('Number (1-3999) or Roman numeral', '<input id="i" type="text" maxlength="20" pattern="[0-9IVXLCDMivxlcdm ]*" title="Digits 0-9, or the letters I V X L C D M" autocapitalize="characters" placeholder="e.g. 2024 or MMXXIV">')}
     <div class="card"><div class="big" id="o" style="font-size:40px;word-break:break-all">—</div><div class="center muted" id="n"></div></div>
     <button class="btn" id="cp">Copy result</button>
     <div class="card muted" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center">${[['I', 1], ['V', 5], ['X', 10], ['L', 50], ['C', 100], ['D', 500], ['M', 1000]].map(x => `<div><b style="color:var(--text)">${x[0]}</b> ${x[1]}</div>`).join('')}</div></div>`;
@@ -820,9 +905,9 @@ reg({ id: 'json', name: 'JSON Tool', icon: '🧪', desc: 'Pretty-print, minify a
     try { ta.focus(); ta.setSelectionRange(r.pos, Math.min(s.length, r.pos + 1)); } catch (e) { /* ignore */ }
     return false;
   };
-  const apply = (f) => { if (check()) { ta.value = f(JSON.parse(ta.value)); } };
-  $('#pp', el).onclick = () => apply(v => JSON.stringify(v, null, $('#ind', el).value === 'tab' ? '\t' : +$('#ind', el).value));
-  $('#mn', el).onclick = () => apply(v => JSON.stringify(v));
+  const apply = (ind) => { if (check()) ta.value = TX.jsonFormat(ta.value, ind); };
+  $('#pp', el).onclick = () => apply($('#ind', el).value === 'tab' ? '\t' : ' '.repeat(+$('#ind', el).value));
+  $('#mn', el).onclick = () => apply('');
   $('#va', el).onclick = check;
   $('#cp', el).onclick = () => { if (ta.value) copy(ta.value); };
   $('#cl', el).onclick = () => { ta.value = ''; say(''); };
@@ -836,6 +921,7 @@ reg({ id: 'hash', name: 'Hash Maker', icon: '#️⃣', desc: 'Get the SHA-1, SHA
     <div class="list" id="out"></div>
     ${lbl('Compare with a hash you have', '<input id="cmp" type="text" maxlength="200" autocomplete="off" autocapitalize="none" placeholder="Paste a hash to compare">')}
     <div id="cr" class="center"></div></div>`;
+  const MAX_FILE = 50e6; // bigger files are read into memory whole, so keep a sensible ceiling
   let res = {}, tok = 0, file = null, timer = 0;
   const hex = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
   const show = () => {
@@ -849,15 +935,17 @@ reg({ id: 'hash', name: 'Hash Maker', icon: '#️⃣', desc: 'Get the SHA-1, SHA
   const compute = async () => {
     const my = ++tok;
     if (!(window.crypto && crypto.subtle)) { $('#out', el).innerHTML = '<div class="status">Hashing is not available in this browser.</div>'; return; }
+    if (file && file.size > MAX_FILE) { $('#out', el).innerHTML = '<div class="status">File too large (50 MB maximum). Choose a smaller file.</div>'; return; }
     let data;
     try { data = file ? await file.arrayBuffer() : enc.encode($('#i', el).value); } catch (e) { toast('Could not read the file'); return; }
     const r = {};
-    for (const a of algs) r[a] = hex(await crypto.subtle.digest(a, data));
+    try { for (const a of algs) r[a] = hex(await crypto.subtle.digest(a, data)); }
+    catch (e) { if (my === tok) $('#out', el).innerHTML = '<div class="status">Could not calculate the hash for this input.</div>'; return; }
     if (my === tok) { res = r; show(); }
   };
   const later = () => { clearTimeout(timer); timer = setTimeout(compute, 120); };
   $('#i', el).oninput = () => { file = null; $('#fl', el).value = ''; later(); };
-  $('#fl', el).onchange = (e) => { file = e.target.files[0] || null; if (file && file.size > 200e6) { toast('File is too big (200 MB max)'); file = null; return; } later(); };
+  $('#fl', el).onchange = (e) => { file = e.target.files[0] || null; if (file && file.size > MAX_FILE) { toast('File too large (50 MB maximum)'); $('#out', el).innerHTML = '<div class="status">File too large (50 MB maximum). Choose a smaller file.</div>'; file = null; $('#fl', el).value = ''; res = {}; return; } later(); };
   $('#cmp', el).oninput = show;
   compute();
   return () => { clearTimeout(timer); tok++; };
@@ -867,7 +955,7 @@ reg({ id: 'hash', name: 'Hash Maker', icon: '#️⃣', desc: 'Get the SHA-1, SHA
 reg({ id: 'colour', name: 'Colour Convert', icon: '🪁', desc: 'Convert colours between HEX, RGB and HSL with a colour picker and a live swatch.', keys: ['color', 'hex', 'rgb', 'hsl', 'picker', 'css'], needs: [], render(el) {
   const num = (id, t, max) => lbl(t, `<input id="${id}" type="number" min="0" max="${max}" inputmode="numeric">`);
   el.innerHTML = `<div class="list"><div id="sw" style="height:110px;border-radius:16px;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:22px"></div>
-    <div class="row">${lbl('Pick', '<input id="pk" type="color" style="width:100%;height:48px;padding:2px;border:1px solid var(--line);border-radius:12px;background:var(--surface)">')}${lbl('HEX', '<input id="hx" type="text" maxlength="7" autocapitalize="characters" placeholder="#RRGGBB">')}</div>
+    <div class="row">${lbl('Pick', '<input id="pk" type="color" style="width:100%;height:48px;padding:2px;border:1px solid var(--line);border-radius:12px;background:var(--surface)">')}${lbl('HEX', '<input id="hx" type="text" maxlength="7" pattern="#?([0-9a-fA-F]{3}|[0-9a-fA-F]{6})" title="A colour such as #7C5CFF or 7C5CFF" autocapitalize="characters" placeholder="#RRGGBB">')}</div>
     <div class="row">${num('r', 'R', 255)}${num('g', 'G', 255)}${num('b', 'B', 255)}</div>
     <div class="row">${num('h', 'H (0-360)', 360)}${num('s', 'S %', 100)}${num('l', 'L %', 100)}</div>
     <div class="list" id="css"></div></div>`;
@@ -936,7 +1024,7 @@ reg({ id: 'symbols', name: 'Emoji & Symbols', icon: '😀', desc: 'Pick emoji an
   Object.keys(SYM).forEach(g => SYM[g].split(' ').forEach(c => items.push({ g, c, k: g.toLowerCase() })));
   const groups = Object.keys(EMO).concat(Object.keys(SYM));
   el.innerHTML = `<div class="list"><div class="row"><input id="buf" type="text" maxlength="500" aria-label="Your text" placeholder="Tap characters to add them here"><button class="btn" id="cp" style="flex:none">Copy</button><button class="btn alt" id="cl" style="flex:none">Clear</button></div>
-    <input type="search" id="q" placeholder="Search (e.g. heart, arrow, euro)" aria-label="Search">
+    <input type="search" id="q" maxlength="50" placeholder="Search (e.g. heart, arrow, euro)" aria-label="Search">
     <select id="g" aria-label="Group">${groups.map(g => `<option>${g}</option>`).join('')}</select><div id="grid" style="${WRAP}"></div></div>`;
   const draw = () => {
     const q = $('#q', el).value.trim().toLowerCase(), g = $('#g', el).value;
@@ -990,22 +1078,45 @@ reg({ id: 'regex', name: 'Regex & Replace', icon: '📌', desc: 'Test regular ex
     <div class="muted" id="cnt"></div><div class="card" id="hl" style="white-space:pre-wrap;word-break:break-word;min-height:40px"></div><div class="list" id="ml"></div>
     ${lbl('Replace with (use $1, $2 for groups)', '<input id="r" type="text" maxlength="500" autocapitalize="none" autocomplete="off">')}
     ${taArea('ro', 'Result', 4, '', 'readonly')}<button class="btn" id="cp">Copy result</button></div>`;
+  /* The match and the replace run together, once, in a Worker built from a Blob (works offline). A pattern that backtracks forever
+     is stopped after about a second instead of freezing the app. Without Worker support it falls back to running in the page. */
+  let worker = null, wurl = '', timer = 0, killer = 0, seq = 0;
+  const kill = () => { clearTimeout(killer); if (worker) { worker.terminate(); worker = null; } if (wurl) { URL.revokeObjectURL(wurl); wurl = ''; } };
+  const exec = (job, done, slow) => {
+    kill(); const my = ++seq;
+    const inline = () => { const r = TX.regexRun(job.p, job.f, job.t); done({ r, rep: r.error ? null : TX.regexReplace(job.p, job.f, job.t, job.r) }); };
+    if (typeof Worker === 'undefined' || typeof Blob === 'undefined' || !URL.createObjectURL) { inline(); return; }
+    try {
+      wurl = URL.createObjectURL(new Blob([TX.regexWorkerSource()], { type: 'text/javascript' }));
+      worker = new Worker(wurl);
+      worker.onmessage = (ev) => { if (my !== seq) return; kill(); done(ev.data); };
+      worker.onerror = () => { if (my !== seq) return; kill(); inline(); };
+      worker.postMessage(job);
+      killer = setTimeout(() => { if (my === seq) { kill(); slow(); } }, 1000);
+    } catch (x) { kill(); inline(); }
+  };
+  const later = () => { clearTimeout(timer); timer = setTimeout(run, 250); };
   const run = () => {
     const p = $('#p', el).value, f = $('#f', el).value, t = $('#t', el).value, e = $('#e', el), cnt = $('#cnt', el);
     e.hidden = true; $('#ml', el).innerHTML = ''; $('#hl', el).textContent = t; $('#ro', el).value = t; cnt.textContent = '';
-    if (!p) return;
-    const r = TX.regexRun(p, f, t);
-    if (r.error) { e.textContent = r.error; e.hidden = false; return; }
+    if (!p) { seq++; kill(); return; }
+    cnt.textContent = 'Working...';
+    exec({ p, f, t, r: $('#r', el).value }, (res) => show(res, t), () => { cnt.textContent = ''; e.textContent = 'Pattern too slow (stopped after 1 second). Try a simpler pattern.'; e.hidden = false; });
+  };
+  const show = (res, t) => {
+    const e = $('#e', el), cnt = $('#cnt', el), r = res.r;
+    if (r.error) { cnt.textContent = ''; e.textContent = r.error; e.hidden = false; return; }
     cnt.textContent = r.matches.length + ' match' + (r.matches.length === 1 ? '' : 'es') + (r.matches.length >= 500 ? ' (showing first 500)' : '');
     let pos = 0, html = '';
     r.matches.forEach(m => { if (!m.s) return; html += esc(t.slice(pos, m.i)) + '<mark style="background:var(--accent);color:var(--accent-t);border-radius:3px">' + esc(m.s) + '</mark>'; pos = m.i + m.s.length; });
     $('#hl', el).innerHTML = html + esc(t.slice(pos));
     $('#ml', el).innerHTML = r.matches.slice(0, 50).map((m, i) => `<div class="item"><div class="grow"><b>#${i + 1}</b> at ${m.i}: <span style="${MONO}">${esc(m.s) || '(empty)'}</span>${m.g.map((g, k) => `<div class="muted" style="font-size:12px">group ${k + 1}: ${g === undefined ? 'undefined' : esc(g)}</div>`).join('')}</div></div>`).join('');
-    const rep = TX.regexReplace(p, f, t, $('#r', el).value);
-    $('#ro', el).value = rep.error ? '' : rep.out;
+    const rep = res.rep;
+    $('#ro', el).value = !rep || rep.error ? '' : rep.out;
   };
-  el.addEventListener('input', run);
+  el.addEventListener('input', later);
   $('#cp', el).onclick = () => copy($('#ro', el).value);
+  return () => { clearTimeout(timer); seq++; kill(); };
 } });
 
 /* ---------- Case styles ---------- */
@@ -1017,11 +1128,13 @@ xform({ id: 'cases', name: 'Case & Slug', icon: '🐍', desc: 'Convert text to s
 /* ---------- Number sorter ---------- */
 const fnum = (v) => String(+v.toPrecision(12));
 reg({ id: 'numsort', name: 'Number Sorter', icon: '🔀', desc: 'Sort a list of numbers, remove duplicates and see the count, sum, average, median, smallest and largest.', keys: ['sort', 'dedupe', 'average', 'median', 'sum', 'statistics'], needs: [], render(el) {
-  el.innerHTML = `<div class="list">${taArea('i', 'Numbers (separated by spaces, commas or lines)', 5, '5, 3, 9, 3, 1')}
+  el.innerHTML = `<div class="list">${taArea('i', 'Numbers (separated by spaces, new lines, or commas followed by a space)', 5, '5, 3, 9, 3, 1')}
     <div class="row"><select id="o" aria-label="Order"><option value="a">Smallest first</option><option value="d">Largest first</option></select>${chkRow('dd', 'Remove duplicates')}</div>
     ${taArea('r', 'Sorted', 4, '', 'readonly')}<div class="card" id="st" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center"></div><button class="btn" id="cp">Copy sorted</button></div>`;
   const run = () => {
-    let a = TX.parseNums($('#i', el).value);
+    const pn = TX.parseNumsStrict($('#i', el).value);
+    if (pn.bad !== null) { $('#r', el).value = ''; $('#st', el).innerHTML = '<div class="status" style="grid-column:1/-1">"' + esc(pn.bad.slice(0, 30)) + '" is not a number. Separate numbers with spaces or new lines.</div>'; return; }
+    let a = pn.nums;
     if ($('#dd', el).checked) a = [...new Set(a)];
     a.sort((x, y) => x - y); if ($('#o', el).value === 'd') a.reverse();
     $('#r', el).value = a.map(fnum).join(', ');
@@ -1044,7 +1157,7 @@ reg({ id: 'csv', name: 'CSV Viewer', icon: '🪄', desc: 'Paste CSV to see it as
     if (!s.trim()) { o.innerHTML = ''; $('#sm', el).textContent = ''; return; }
     const d = $('#d', el).value || TX.detectDelim(s), rows = TX.parseCSV(s, d), hd = $('#hd', el).checked;
     if (!rows.length) { o.innerHTML = ''; return; }
-    $('#sm', el).textContent = rows.length + ' rows, ' + Math.max(...rows.map(r => r.length)) + ' columns';
+    $('#sm', el).textContent = rows.length + ' rows, ' + rows.reduce((m, r) => Math.max(m, r.length), 0) + ' columns';
     json = JSON.stringify(TX.csvToJson(rows, hd), null, 2);
     if ($('#v', el).value === 'j') { o.innerHTML = `<textarea readonly rows="12" style="${MONO};font-size:13px">${esc(json)}</textarea>`; return; }
     const cell = (c, tag) => `<${tag} style="border:1px solid var(--line);padding:6px 8px;text-align:left;white-space:nowrap">${esc(c)}</${tag}>`;
@@ -1075,7 +1188,7 @@ reg({ id: 'checklist', name: 'Checklist', icon: '🔭', desc: 'A simple to-do li
     const done = items.filter(x => x.d).length;
     $('#bar', el).style.width = (items.length ? done / items.length * 100 : 0) + '%';
     $('#sm', el).textContent = items.length ? done + ' of ' + items.length + ' done' : 'Nothing here yet';
-    $('#l', el).innerHTML = items.map((x, i) => `<div class="item"><input type="checkbox" data-t="${i}" ${x.d ? 'checked' : ''} aria-label="Done: ${esc(x.t)}" style="flex:none;width:26px;height:26px"><div class="grow" style="word-break:break-word;${x.d ? 'text-decoration:line-through;opacity:.6' : ''}">${esc(x.t)}</div><button class="btn alt" data-x="${i}" aria-label="Delete ${esc(x.t)}" style="flex:none;min-width:44px">✕</button></div>`).join('');
+    $('#l', el).innerHTML = items.map((x, i) => `<div class="item"><label style="flex:none;display:flex;align-items:center;justify-content:center;width:44px;min-height:44px;margin:-8px 0 -8px -8px"><input type="checkbox" data-t="${i}" ${x.d ? 'checked' : ''} aria-label="Done: ${esc(x.t)}" style="width:26px;height:26px;margin:0"></label><div class="grow" style="word-break:break-word;${x.d ? 'text-decoration:line-through;opacity:.6' : ''}">${esc(x.t)}</div><button class="btn alt" data-x="${i}" aria-label="Delete ${esc(x.t)}" style="flex:none;min-width:44px">✕</button></div>`).join('');
   };
   const add = () => { const v = $('#i', el).value.trim(); if (!v) return; if (items.length >= 300) { toast('List is full (300 items)'); return; } items.push({ t: v, d: false }); $('#i', el).value = ''; save(); draw(); };
   $('#add', el).onclick = add; $('#i', el).onkeydown = (e) => { if (e.key === 'Enter') add(); };
@@ -1145,10 +1258,10 @@ reg({ id: 'caesar', name: 'Caesar Cipher', icon: '🛰️', desc: 'Encode and de
 /* ---------- Pig Latin, NATO, Braille, T9 ---------- */
 xform({ id: 'piglatin', name: 'Pig Latin', icon: '🐷', desc: 'Turn English text into Pig Latin.', keys: ['language game', 'ay', 'fun'] }, [{ n: 'English to Pig Latin', f: TX.pig }], { ph: 'e.g. Hello world' });
 xform({ id: 'nato', name: 'NATO Alphabet', icon: '🛩️', desc: 'Spell words with the NATO phonetic alphabet (Alfa, Bravo, Charlie) and decode it back.', keys: ['phonetic', 'alpha bravo', 'spelling', 'radio', 'icao'] }, [
-  { n: 'Text to NATO words', f: TX.natoEnc, inv: 1 }, { n: 'NATO words to text', f: TX.natoDec, inv: 0 }
+  { n: 'Text to NATO words', f: TX.natoEnc, inv: 1, note: s => { const k = TX.natoLost(s); return k ? 'Unsupported characters ignored (' + k + '). Only letters and digits are spelled out.' : ''; } }, { n: 'NATO words to text', f: TX.natoDec, inv: 0 }
 ], { ph: 'e.g. Hello 42' });
 xform({ id: 'braille', name: 'Braille', icon: '👆', desc: 'Convert English text to Unicode Braille (grade 1) and back.', keys: ['blind', 'dots', 'tactile', 'unicode'] }, [
-  { n: 'Text to Braille', f: TX.toBraille, inv: 1 }, { n: 'Braille to text', f: TX.fromBraille, inv: 0 }
+  { n: 'Text to Braille', f: TX.toBraille, inv: 1, note: s => { const k = TX.brailleLost(s); return k ? 'Unsupported characters ignored (' + k + ').' : ''; } }, { n: 'Braille to text', f: TX.fromBraille, inv: 0 }
 ], { ph: 'e.g. Hello World 2024' });
 xform({ id: 't9', name: 'Phone Keypad', icon: '☎️', desc: 'Convert text to old phone keypad taps (multi-tap or T9 digits) and decode keypad taps to text.', keys: ['t9', 'multitap', 'sms', 'nokia', 'keypad', 'texting'] }, [
   { n: 'Text to multi-tap', f: TX.multitapEnc, inv: 1 }, { n: 'Multi-tap to text', f: TX.multitapDec, inv: 0 }, { n: 'Text to T9 digits', f: TX.t9Digits }
@@ -1163,12 +1276,12 @@ const rel = (ms) => {
 };
 reg({ id: 'epoch', name: 'Timestamp', icon: '📻', desc: 'Convert Unix timestamps (seconds or milliseconds) to dates and dates to timestamps, with a live clock.', keys: ['epoch', 'unix', 'time', 'date', 'iso', 'utc'], needs: [], render(el) {
   el.innerHTML = `<div class="list"><div class="card center"><div class="muted">Now (Unix seconds)</div><div class="big" id="now" style="font-size:36px"></div><button class="btn alt" id="cn">Copy</button></div>
-    ${lbl('Timestamp to date', '<input id="ts" type="text" inputmode="numeric" maxlength="20" placeholder="e.g. 1700000000 or 1700000000000">')}<div class="list" id="res"></div>
-    ${lbl('Date to timestamp (your local time)', '<input id="dt" type="datetime-local">')}<div class="list" id="res2"></div></div>`;
+    ${lbl('Timestamp to date', '<input id="ts" type="text" inputmode="decimal" maxlength="20" pattern="-?[0-9]+([.,][0-9]+)?" title="Digits only, for example 1700000000" placeholder="e.g. 1700000000 or 1700000000000">')}<div class="list" id="res"></div>
+    ${lbl('Date to timestamp (your local time)', '<input id="dt" type="datetime-local" min="1900-01-01T00:00" max="2200-12-31T23:59">')}<div class="list" id="res2"></div></div>`;
   const row = (k, v) => `<div class="item"><div class="grow"><div class="muted" style="font-size:12px">${k}</div><div style="${MONO}">${esc(v)}</div></div><button class="btn alt" data-v="${esc(v)}" style="flex:none">Copy</button></div>`;
   const tick = () => { $('#now', el).textContent = Math.floor(Date.now() / 1000); };
   const conv = () => {
-    const v = $('#ts', el).value.trim(), o = $('#res', el);
+    const v = $('#ts', el).value.trim().replace(/^(-?\d+),(\d+)$/, '$1.$2'), o = $('#res', el);
     if (!v) { o.innerHTML = ''; return; }
     const n = Number(v), ms = TX.epochMs(n), d = new Date(ms);
     if (!/^-?\d+(\.\d+)?$/.test(v) || isNaN(d.getTime())) { o.innerHTML = '<div class="status">Enter a valid number</div>'; return; }
