@@ -31,7 +31,7 @@ vc.on('jsdomError', e => { if (!/Not implemented/.test(e.message)) errors.push('
       w.TextEncoder = w.TextEncoder || TextEncoder; w.TextDecoder = w.TextDecoder || TextDecoder;
       w.scrollTo = () => {}; w.confirm = () => true; w.alert = () => {}; w.prompt = () => '5';
       /* jsdom has no Web Audio or element.animate: harmless stand-ins so tools that use them can be exercised */
-      const node = () => new Proxy(function () {}, { get: (t, k) => k === 'connect' ? (x) => x : (k === 'value' ? 0 : node()), set: () => true, apply: () => node(), construct: () => node() });
+      const node = () => new Proxy(function () {}, { get: (t, k) => typeof k === 'symbol' ? (k === Symbol.toPrimitive ? () => 0 : undefined) : (k === 'connect' ? (x) => x : (k === 'value' ? 0 : node())), set: () => true, apply: () => node(), construct: () => node() });
       w.AudioContext = w.webkitAudioContext = class { constructor() { return Object.assign(new Proxy({}, { get: (t, k) => k === 'state' ? 'running' : (k === 'currentTime' ? 0 : (k === 'sampleRate' ? 44100 : (k === 'close' || k === 'resume' ? () => Promise.resolve() : node()))), set: () => true }), {}); } };
       w.Element.prototype.animate = function () { return { finished: Promise.resolve(), cancel() {}, onfinish: null, addEventListener() {} }; };
       w.addEventListener('unhandledrejection', () => {});
