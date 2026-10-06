@@ -25,6 +25,7 @@ const PRO_FEATURES = [
   { k: 'notes', i: '📝', t: 'Unlimited notes', s: 'Free: 10 notes' },
   { k: 'recordings', i: '🎙️', t: 'Unlimited voice recordings', s: 'Free: 3 recordings' },
   { k: 'pins', i: '📌', t: 'Unlimited pinned tools and collections', s: 'Free: 4 pinned tools, no collections' },
+  { k: 'drive', i: '☁️', t: 'Automatic Google Drive backup', s: 'Free: back up and restore by hand' },
   { k: 'accents', i: '🎨', t: 'All colour themes' }
 ];
 

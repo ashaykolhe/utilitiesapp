@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(PocketNativePlugin.class);
         registerPlugin(PocketSensorsPlugin.class);
+        registerPlugin(PocketDrivePlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

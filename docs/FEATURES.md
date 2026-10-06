@@ -21,6 +21,7 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Share** | A button in every tool shares the text on screen (results, inputs) through the Android share sheet. |
 | **App lock** | A 4 to 6 digit PIN (and optionally fingerprint or face) asked when the app opens or returns after 0 seconds, 30 seconds or 5 minutes. The PIN is stored only as a salted hash. 5 wrong tries cause a growing wait. |
 | **Backup and restore** | Saves settings and tool data to a file and restores it. Pro state, the PIN, recordings, locked files and the vault are not included. |
+| **Google Drive backup** | Connect your Google account to back up settings and tool data to a hidden folder in your own Drive and restore it on any phone. Manual backup and restore are free; automatic daily backup (only when something changed) is Pro. Recordings, locked files and the Password Vault are not included. |
 | **Tour and What's new** | A three-step tour on first launch (replay in Settings) and a short note after updates. |
 | **Languages** | English only for now. The app is built so a translation pack can be added later; none is planned. |
 | **Haptics** | Optional vibration feedback, switchable in Settings. |

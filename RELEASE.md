@@ -17,6 +17,7 @@ and `android/keystore.properties` exists (an unsigned bundle is rejected by Play
 3. Use Play App Signing in Play Console.
 
 ## Before each upload
+- Google Drive backup: follow `docs/GOOGLE-DRIVE-SETUP.md` (OAuth client per signing key, including the Play app signing key) before releasing, or Connect will say it is not set up.
 - Bump `versionCode` and `versionName` in `android/app/build.gradle`.
 - Run `npm run release:phone-test` and click through `docs/MANUAL-TEST.md` on a phone.
 - Play Console: the in-app product `pocketkit_pro` (one-time purchase), the privacy policy URL (host `docs/privacy-policy.html`, e.g. with GitHub Pages from the `/docs` folder), and the data-safety form (no data collected).

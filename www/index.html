@@ -40,6 +40,7 @@
           <button class="btn alt" id="changePin" data-i="Change PIN">Change PIN</button>
         </div></div>
       <div class="card list"><b data-i="Backup">Backup</b><p class="muted" style="margin:0;font-size:13px" data-i="Saves your settings, notes, lists and other tool data to a file. Recordings, locked files and the Password Vault are not included.">Saves your settings, notes, lists and other tool data to a file. Recordings, locked files and the Password Vault are not included.</p><div class="row"><button class="btn alt" id="backupBtn" data-i="Back up">Back up</button><button class="btn alt" id="restoreBtn" data-i="Restore">Restore</button></div><input id="restoreFile" type="file" accept="application/json,.json" hidden></div>
+      <div class="card list" id="driveCard"></div>
       <button class="btn alt" id="tourBtn" data-i="Show the tour again">Show the tour again</button>
       <button class="btn alt" id="clearRecent" data-i="Clear recent tools">Clear recent tools</button>
       <button class="btn alt" id="clearPins" data-i="Clear pinned tools">Clear pinned tools</button>
@@ -66,6 +67,11 @@
 <dialog id="histDlg"><div class="dlg">
   <h2 data-i="History">History</h2><div id="histList" class="list"></div>
   <div class="row"><button class="btn alt" id="histClear" data-i="Clear history">Clear history</button><button class="btn" id="histClose" data-i="Done">Done</button></div></div></dialog>
+
+<dialog id="driveDlg"><div class="dlg">
+  <h2 data-i="Restore from Google Drive">Restore from Google Drive</h2><p class="muted" style="margin:0" data-i="Pick a backup. Newest first.">Pick a backup. Newest first.</p>
+  <div id="driveList" class="list"></div>
+  <button class="btn alt" id="driveCancel" data-i="Cancel">Cancel</button></div></dialog>
 
 <dialog id="tourDlg"><div class="dlg">
   <div class="tour-art" id="tourArt" aria-hidden="true"></div>
@@ -127,5 +133,6 @@
 <script src="js/tools/games2.js"></script>
 <script src="js/tools/sensorbox.js"></script>
 <script src="js/app.js"></script>
+<script src="js/drive.js"></script>
 </body>
 </html>

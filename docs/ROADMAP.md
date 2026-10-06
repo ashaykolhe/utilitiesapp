@@ -22,5 +22,4 @@ File Transfer, Walkie Talkie, Wi-Fi Calls, CCTV, Music Group, Peer link. Plan: W
 ## App-level
 - Languages: not planned for now (the app has a translation hook in `www/js/i18n.js` if this changes).
 - Backup and restore of tool data to a file.
-- Optional Google Drive backup for Pro.
 - Release build set up for Google Play (see RELEASE.md).

@@ -15,7 +15,8 @@
     "test": "node tests/smoke.js",
     "fuzz": "node tests/fuzz.js",
     "test:coupons": "node tests/coupon-flow.js",
-    "audit:inputs": "node tests/validation-audit.js"
+    "audit:inputs": "node tests/validation-audit.js",
+    "test:drive": "node tests/drive-flow.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",

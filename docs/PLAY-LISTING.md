@@ -35,9 +35,10 @@ PocketKit puts everything you reach for a phone to do into one app that works of
 - Is all data encrypted in transit? Not applicable (no data is transmitted by the app).
 - Can users request deletion? Data is on-device only; uninstalling or clearing app data deletes it.
 - Google Play Billing is used for the Pro purchase (handled by Google; the app receives only purchase confirmation).
+- Optional Google Drive backup: the user's settings and tool data are sent from their phone to a hidden folder in the user's own Google Drive, only at their request. The developer does not receive or store it, so answer "not collected". Scopes: Drive app data and email (to show the connected account).
 
 ## Permissions to declare / explain
-Camera, microphone, precise location, notifications, vibration, biometrics, Google Play billing, network state, internet (required by the WebView and Billing). Each is requested only when a tool needs it; see the privacy policy table.
+Camera, microphone, precise location, notifications, vibration, biometrics, Google Play billing, network and Wi-Fi state, internet (required by the WebView and Billing). Each is requested only when a tool needs it; see the privacy policy table.
 
 ## Content rating
 Everyone. Contains no user-generated content, no ads, simple games without violence. Answer the questionnaire as "Utility / Tools".

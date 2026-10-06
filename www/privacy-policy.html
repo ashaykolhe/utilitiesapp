@@ -55,7 +55,7 @@ a{color:var(--accent)}
 <tr><td>Vibration</td><td>Haptic feedback and alerts.</td></tr>
 <tr><td>Biometrics</td><td>Optional fingerprint or face unlock for the app lock and the File Locker, if you turn it on. The biometric data stays inside Android and is never available to the app.</td></tr>
 <tr><td>Network and Wi-Fi state</td><td>Showing whether you are online in Device Info and Battery &amp; Network Status, and the signal strength, band and link speed of your current connection in Signal Strength. The name of your Wi-Fi network is not read or stored.</td></tr>
-<tr><td>Internet</td><td>Required by Android for the in-app browser engine and for Google Play purchases. The tools themselves work without an internet connection.</td></tr>
+<tr><td>Internet</td><td>Required by Android for the in-app browser engine, for Google Play purchases and for the optional Google Drive backup. The tools themselves work without an internet connection.</td></tr>
 </table>
 </div>
 
@@ -63,6 +63,7 @@ a{color:var(--accent)}
 <h2>App lock and sharing</h2>
 <ul>
 <li><b>App lock.</b> If you turn on the app lock, a salted, one-way hash of your PIN is stored on your phone. The PIN itself is never stored or sent anywhere. We cannot recover a forgotten PIN.</li>
+<li><b>Google Drive backup (optional).</b> If you connect your Google account, PocketKit can save a backup of your settings and tool data to a hidden app folder in <i>your own</i> Google Drive, and restore it later. This happens only after you connect and tap Back up (or, with Pro, switch on automatic backup). The backup goes straight from your phone to your Google Drive. We never receive it and cannot read it. PocketKit asks for Google's Drive app-data permission and your email address, only to show which account is connected. You can disconnect in the app or revoke access any time at myaccount.google.com. Backups stay in your Drive until you delete them there.</li>
 <li><b>Backup file.</b> The Backup button saves your settings and tool data to a file that you choose where to send. It does not contain your PIN, Pro status, recordings, locked files or Password Vault.</li>
 <li><b>Share.</b> The Share button sends the text on the screen to the app you pick in Android's share sheet. Nothing is sent unless you tap it and choose an app.</li>
 </ul>

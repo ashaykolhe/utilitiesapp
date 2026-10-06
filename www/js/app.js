@@ -307,7 +307,7 @@ function renderPro() {
 function openPro(focus) { proFocus = focus || null; setProStatus(null); renderPro(); loadPrice(); const d = $('#proDlg'); if (!d.open) d.showModal(); if (focus === 'coupon' && !$('#proCoupon').hidden) setTimeout(() => $('#proCode').focus(), 50); }
 /* Called by pro.js whenever Pro starts, ends or the price arrives. */
 function proChanged() {
-  applyAccent(); if ($('#proDlg').open) renderPro(); renderProState(); renderAccents();
+  applyAccent(); if ($('#proDlg').open) renderPro(); renderProState(); renderAccents(); if (typeof renderDriveCard === 'function') renderDriveCard();
   if (view === 'home') renderHome();
   const x = view === 'tool' && Tools.get($('#pinBtn').dataset.id);
   if (x && x.pro && !isPro()) { history.back(); openPro(x.proKey || 'connect'); } // a Pro tool is open and Pro just ended
@@ -338,20 +338,25 @@ function makeBackup() {
 }
 $('#backupBtn').onclick = async () => { if (await saveTextFile('pocketkit-backup-' + new Date().toISOString().slice(0, 10) + '.json', makeBackup(), 'application/json')) toast(tr('Backup ready')); };
 $('#restoreBtn').onclick = () => $('#restoreFile').click();
+/* Put a backup's contents back. Used by the file restore and by Google Drive restore. Throws when the text is not a PocketKit backup.
+   Only keys in the app's own 'pk.' namespace with valid JSON values are written, so a backup can never carry Pro, the PIN or the Drive connection. */
+function applyBackup(text) {
+  const o = JSON.parse(text);
+  if (!o || o.app !== 'PocketKit' || typeof o.data !== 'object' || o.data === null) throw new Error('not a PocketKit backup');
+  let n = 0;
+  for (const [k, v] of Object.entries(o.data)) {
+    if (!/^pk\.[A-Za-z0-9_.-]{1,80}$/.test(k) || BACKUP_SKIP.test(k) || typeof v !== 'string' || v.length > 2e6) continue;
+    try { JSON.parse(v); } catch (x) { continue; }
+    localStorage.setItem(k, v); n++;
+  }
+  applyTheme(); applyAccent(); renderAccents(); $('#themeSel').value = Store.get('theme', 'auto'); $('#hapticsChk').checked = Store.get('haptics', true); renderHome();
+  return n;
+}
 $('#restoreFile').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   if (f.size > 5 * 1024 * 1024) { toast(tr('That file is too large')); return; }
-  try {
-    const o = JSON.parse(await f.text());
-    if (!o || o.app !== 'PocketKit' || typeof o.data !== 'object' || o.data === null) throw 0;
-    let n = 0;
-    for (const [k, v] of Object.entries(o.data)) {
-      if (!/^pk\.[A-Za-z0-9_.-]{1,80}$/.test(k) || BACKUP_SKIP.test(k) || typeof v !== 'string' || v.length > 2e6) continue;
-      try { JSON.parse(v); } catch (x) { continue; }
-      localStorage.setItem(k, v); n++;
-    }
-    toast(tr('Restored {n} items').replace('{n}', n)); applyTheme(); applyAccent(); renderAccents(); $('#themeSel').value = Store.get('theme', 'auto'); renderHome();
-  } catch (x) { toast(tr('That is not a PocketKit backup')); }
+  try { toast(tr('Restored {n} items').replace('{n}', applyBackup(await f.text()))); }
+  catch (x) { toast(tr('That is not a PocketKit backup')); }
 };
 
 /* App lock: a PIN (4 to 6 digits) asked when PocketKit opens or comes back after the chosen time away. The PIN is stored only as a
@@ -399,10 +404,16 @@ async function submitLock() {
 $('#lockGo').onclick = submitLock;
 $('#lockPin').addEventListener('keydown', e => { if (e.key === 'Enter') submitLock(); });
 $('#lockBio').onclick = bioUnlock;
+/* Leaving the app on purpose (Google's consent screen, a file picker the app opened) must not count as "away": wrap such a call in outside(). */
+let outsideUntil = 0;
+async function outside(fn) {
+  outsideUntil = Date.now() + 5 * 60000;
+  try { return await fn(); } finally { outsideUntil = Date.now() + 2000; hiddenAt = 0; }
+}
 document.addEventListener('visibilitychange', () => {
   const c = lockCfg(); if (!c) return;
   if (document.hidden) hiddenAt = Date.now();
-  else if (!locked && hiddenAt && Date.now() - hiddenAt >= (c.delay || 0) * 1000) lockNow();
+  else if (!locked && hiddenAt && Date.now() >= outsideUntil && Date.now() - hiddenAt >= (c.delay || 0) * 1000) lockNow();
 });
 
 /* PIN dialog: 'set' asks twice, 'verify' asks once (used to turn the lock off or change the PIN). */

@@ -48,6 +48,8 @@ let F = `# PocketKit: features\n\nPocketKit has ${tools.length} tools in ${CATS.
   `| **Share** | A button in every tool shares the text on screen (results, inputs) through the Android share sheet. |\n` +
   `| **App lock** | A 4 to 6 digit PIN (and optionally fingerprint or face) asked when the app opens or returns after 0 seconds, 30 seconds or 5 minutes. The PIN is stored only as a salted hash. 5 wrong tries cause a growing wait. |\n` +
   `| **Backup and restore** | Saves settings and tool data to a file and restores it. Pro state, the PIN, recordings, locked files and the vault are not included. |\n` +
+  `| **Google Drive backup** | Connect your Google account to back up settings and tool data to a hidden folder in your own Drive and restore it on any phone. Manual backup and restore are free; automatic daily backup (only when something changed) is Pro. Recordings, locked files and the Password Vault are not included. |
+` +
   `| **Tour and What's new** | A three-step tour on first launch (replay in Settings) and a short note after updates. |\n` +
   `| **Languages** | English only for now. The app is built so a translation pack can be added later; none is planned. |
 ` +
@@ -74,7 +76,9 @@ let T = `# PocketKit: manual test\n\nTick each box on a real phone. Test on a de
   `- [ ] In a tool, tap the share button: the Android share sheet opens with the tool's text; the folder button opens Collections (free: asks for Pro; Pro: make "Travel", tick the tool, Done, see it on Home, delete it).\n` +
   `- [ ] Settings > App lock: turn on, set a PIN twice. Leave the app for longer than the chosen time: the lock screen appears; wrong PIN shows an error; 5 wrong tries cause a wait; the right PIN unlocks. Fingerprint option appears only if the phone has one. Turn the lock off (asks for the PIN).\n` +
   `- [ ] Settings > Back up saves a .json file through the share sheet; change something; Restore that file: the change is undone. A random .json file is refused.\n` +
-  `- [ ] Settings > Language appears only when a translation pack exists; switching it translates the home screen.\n` +
+  `- [ ] Settings > Google Drive backup > Connect Google Drive: Google's account chooser and consent screen appear (needs the Google Cloud setup in docs/GOOGLE-DRIVE-SETUP.md); afterwards it shows "Connected as <email>". Back up now shows "Backup saved to Google Drive" and a last-backup time. Change a note, Restore from Google Drive, pick the backup: the note is back. The app lock does not trigger while Google's screen is open.
+- [ ] Free user: turning on Automatic backup opens the Pro sheet. Pro or trial: turning it on makes at most one automatic backup a day, and only when something changed. Disconnect forgets the account.
+- [ ] Settings > Language appears only when a translation pack exists; switching it translates the home screen.\n` +
   `- [ ] Rotate the phone and send the app to the background and back: nothing breaks.\n- [ ] Turn on airplane mode: every tool except those marked "network" still works.\n\n`;
 let n = 1;
 for (const [id, label] of CATS) {
