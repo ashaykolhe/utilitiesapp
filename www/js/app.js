@@ -113,7 +113,7 @@ function applyAccent() {
 function renderAccents() {
   const cur = Store.get('accent', ACCENTS[0][0]);
   $('#accents').innerHTML = ACCENTS.map(([c, n, p]) => `<button class="sw${c === cur ? ' on' : ''}" data-c="${c}" data-p="${p}" style="background:${c}" aria-label="${n}">${p && !isPro() ? '<span class="lk">🔒</span>' : ''}</button>`).join('');
-  $('.sw', $('#accents')).forEach(b => b.onclick = () => {
+  $$('.sw', $('#accents')).forEach(b => b.onclick = () => {
     if (+b.dataset.p && needPro('accents')) return;
     Store.set('accent', b.dataset.c); applyAccent(); renderAccents();
   });
