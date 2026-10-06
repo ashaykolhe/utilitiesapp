@@ -95,3 +95,5 @@ button.btn,.chip,.tile{min-height:44px}
 .lockbox h2{margin:4px 0 8px}.lockbox input{text-align:center;font-size:24px;letter-spacing:8px}
 .mark.big{width:72px;height:72px;margin:0 auto;border-radius:22px;padding:14px;gap:5px}
 #collList .item{padding:4px 8px}
+
+h1[tabindex="-1"]:focus{outline:none}

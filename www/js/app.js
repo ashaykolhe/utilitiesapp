@@ -60,13 +60,22 @@ function totdHTML() {
 function renderChips() {
   $('#filters').innerHTML = FILTERS.map(([id, label]) => `<button class="chip${id === filter ? ' on' : ''}" data-f="${id}" aria-pressed="${id === filter}">${id === 'surprise' ? '🎲 ' : ''}${esc(tr(label))}</button>`).join('');
 }
-function searchMatch(x, q) { return Tools.matches(x, q) || toolName(x).toLowerCase().includes(q); }
+/* Lower is better: name starts with it, a word in the name starts with it, name contains it, a keyword or category matches. -1 = no match. */
+function searchScore(x, q) {
+  const names = [x.name.toLowerCase(), toolName(x).toLowerCase()];
+  if (names.some(n => n.startsWith(q))) return 0;
+  if (names.some(n => n.split(/[s&-/]+/).some(w => w.startsWith(q)))) return 1;
+  if (names.some(n => n.includes(q))) return 2;
+  if ((x.keys || []).some(k => String(k).toLowerCase().includes(q))) return 3;
+  return Tools.matches(x, q) ? 4 : -1;
+}
 function renderHome() {
   const q = $('#search').value.trim().toLowerCase(), el = $('#sections');
   $('#count').textContent = tr('{n} tools, all on your phone').replace('{n}', Tools.list.length);
   const fdef = (FILTERS.find(f => f[0] === filter) || FILTERS[0])[2] || (() => true);
   if (q || filter !== 'all') {
-    const found = Tools.list.filter(x => fdef(x) && (!q || searchMatch(x, q)));
+    let found = Tools.list.filter(x => fdef(x) && (!q || searchScore(x, q) >= 0));
+    if (q) found = found.map(x => [searchScore(x, q), x]).sort((a, b) => a[0] - b[0]).map(p => p[1]);
     el.innerHTML = found.length ? `<div class="grid flat-grid">${gridHTML(found)}</div>` : `<p class="muted center pad">${esc(tr('No tool matches that.'))}</p>`;
     return;
   }
