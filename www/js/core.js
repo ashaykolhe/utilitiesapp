@@ -48,7 +48,8 @@ const Tools = {
     this.list.push(t);
   },
   _map: null,
-  get(id) { if (!this._map || this._map.size !== this.list.length) this._map = new Map(this.list.map(t => [t.id, t])); return this._map.get(id); },
+  /* Safe to pass around as a bare callback (list.map(Tools.get)): it does not use `this`. */
+  get(id) { if (!Tools._map || Tools._map.size !== Tools.list.length) Tools._map = new Map(Tools.list.map(t => [t.id, t])); return Tools._map.get(id); },
   matches(t, q) { return (t.name + ' ' + (t.keys || []).join(' ') + ' ' + catOf(t.cat).name).toLowerCase().includes(q); }
 };
 

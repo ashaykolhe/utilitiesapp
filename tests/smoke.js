@@ -26,6 +26,9 @@ vc.on('jsdomError', e => { if (!/Not implemented/.test(e.message)) fail('page er
       w.HTMLDialogElement.prototype.close = function () { this.open = false; };
       w.crypto.subtle = w.crypto.subtle || require('crypto').webcrypto.subtle;
       w.TextEncoder = w.TextEncoder || TextEncoder; w.TextDecoder = w.TextDecoder || TextDecoder;
+      /* jsdom blocks localStorage on file:// pages: an in-memory stand-in so saved state (pins, recents, settings) really works */
+      const mem = new Map();
+      Object.defineProperty(w, 'localStorage', { value: { getItem: k => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => { mem.set(k, String(v)); }, removeItem: k => { mem.delete(k); }, clear: () => mem.clear(), key: i => [...mem.keys()][i] || null, get length() { return mem.size; } } });
       w.scrollTo = () => {};
       w.AudioContext = w.webkitAudioContext = undefined;
     }
@@ -51,6 +54,17 @@ vc.on('jsdomError', e => { if (!/Not implemented/.test(e.message)) fail('page er
     [...fs.readFileSync(path.join(__dirname, '..', 'docs', 'parts', f), 'utf8').matchAll(/^- id: (\S+)/gm)].map(m => m[1]));
   for (const t of L) if (!docs.includes(t.id)) fail(`${t.id}: not documented in docs/parts (run npm run features after adding it)`);
   for (const d of docs) if (!L.some(t => t.id === d)) fail(`docs/parts mentions ${d} but no tool has that id`);
+
+  /* the Home screen with pinned tools, recent tools and a collection, and opening and leaving a tool (a bare Tools.get callback once broke this) */
+  try {
+    w.eval(`Store.set('pins', ['calculator', 'timer']); Store.set('recent', ['emi', 'compass']); Store.set('colls', [{ id: 'a1', name: 'Trip', tools: ['timer', 'compass'] }]); renderHome();`);
+    const html = w.document.querySelector('#sections').innerHTML;
+    for (const need of ['Pinned', 'Recent', 'Trip']) if (!html.includes(need)) fail('Home screen is missing the "' + need + '" section');
+    w.eval(`openTool('calculator'); goHome(); openTool('timer'); goHome(); Store.set('pins', []); Store.set('recent', []); Store.set('colls', []); renderHome();`);
+    w.eval(`document.querySelector('#search').value = 'emi'; renderHome();`);
+    if (!w.document.querySelector('#sections .tile')) fail('searching for "emi" found nothing');
+    w.eval(`document.querySelector('#search').value = ''; renderHome();`);
+  } catch (e) { fail('home flows threw: ' + e.message); }
 
   /* render and clean up every tool (sensor tools included: they must fail gracefully, not throw) */
   let rendered = 0;
