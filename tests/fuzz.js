@@ -30,7 +30,10 @@ vc.on('jsdomError', e => { if (!/Not implemented/.test(e.message)) errors.push('
       w.HTMLDialogElement.prototype.close = function () { this.open = false; };
       w.TextEncoder = w.TextEncoder || TextEncoder; w.TextDecoder = w.TextDecoder || TextDecoder;
       w.scrollTo = () => {}; w.confirm = () => true; w.alert = () => {}; w.prompt = () => '5';
-      w.AudioContext = w.webkitAudioContext = undefined;
+      /* jsdom has no Web Audio or element.animate: harmless stand-ins so tools that use them can be exercised */
+      const node = () => new Proxy(function () {}, { get: (t, k) => k === 'connect' ? (x) => x : (k === 'value' ? 0 : node()), set: () => true, apply: () => node(), construct: () => node() });
+      w.AudioContext = w.webkitAudioContext = class { constructor() { return Object.assign(new Proxy({}, { get: (t, k) => k === 'state' ? 'running' : (k === 'currentTime' ? 0 : (k === 'sampleRate' ? 44100 : (k === 'close' || k === 'resume' ? () => Promise.resolve() : node()))), set: () => true }), {}); } };
+      w.Element.prototype.animate = function () { return { finished: Promise.resolve(), cancel() {}, onfinish: null, addEventListener() {} }; };
       w.addEventListener('unhandledrejection', () => {});
     }
   });
@@ -72,7 +75,7 @@ vc.on('jsdomError', e => { if (!/Not implemented/.test(e.message)) errors.push('
           setVal(f, v);
         }
         const buttons = [...host.querySelectorAll('button:not([disabled])')];
-        for (const b of buttons.slice(0, 40)) { try { b.click(); } catch (e) { add(t.id, 'click threw: ' + e.message); } }
+        for (const b of buttons.slice(0, 40)) { if (!host.contains(b)) continue; try { b.click(); } catch (e) { add(t.id, 'click threw: ' + e.message); } }
         await wait(2);
         const text = host.innerText || host.textContent || '';
         const m = text.match(BAD);
