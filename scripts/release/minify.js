@@ -50,7 +50,8 @@ async function buildStage(srcDir, outDir) {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     const ext = path.extname(file).toLowerCase();
     const text = ['.js', '.css', '.html'].includes(ext) ? fs.readFileSync(file, 'utf8') : null;
-    if (text === null || /\.min\.js$/.test(file)) { fs.copyFileSync(file, dest); if (text !== null) report.skipped.push(rel); continue; }
+    // already-minified files and vendored libraries (which must keep their licence headers) are copied as they are
+    if (text === null || /\.min\.js$/.test(file) || /^js[\\/]vendor[\\/]/.test(rel)) { fs.copyFileSync(file, dest); if (text !== null) report.skipped.push(rel); continue; }
     let out;
     if (ext === '.js') {
       const r = await terser.minify(text, TERSER);

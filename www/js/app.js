@@ -175,7 +175,7 @@ function openTool(id) {
   const x = Tools.get(id); if (!x) return;
   if (x.pro && needPro(x.proKey || 'connect')) return;
   if (view === 'home') homeScroll = window.scrollY;
-  Prefs.touch(id); curTool = x;
+  Prefs.touch(id); curTool = x; histChanged();
   $('#toolTitle').textContent = toolName(x); $('#toolDesc').textContent = toolDesc(x);
   $('#pinBtn').dataset.id = id; refreshPin(id);
   const body = freshBody(); attachValidation(body);
@@ -184,7 +184,7 @@ function openTool(id) {
 }
 function leaveTool() {
   if (activeCleanup) { try { activeCleanup(); } catch (e) {} activeCleanup = null; }
-  freshBody(); curTool = null;
+  freshBody(); curTool = null; histChanged();
 }
 function goHome() { if (view === 'tool') leaveTool(); renderHome(); show('home'); }
 $('#pinBtn').onclick = () => {
@@ -221,6 +221,17 @@ $('#shareBtn').onclick = () => {
   if (!text) { toast(tr('Nothing to share yet')); return; }
   shareText(curTool ? toolName(curTool) : 'PocketKit', (curTool ? toolName(curTool) + '\n\n' : '') + text + '\n\n' + tr('Made with PocketKit'));
 };
+
+/* History of results for the open tool (tools opt in with Hist.add). */
+function histChanged() { const b = $('#histBtn'); if (b) b.hidden = !(curTool && Hist.list(curTool.id).length); }
+function renderHist() {
+  const list = curTool ? Hist.list(curTool.id) : [];
+  $('#histList').innerHTML = list.length ? list.map((x, i) => `<div class="item"><div class="grow"><div class="muted" style="font-size:12px">${esc(new Date(x.at).toLocaleString())}</div><div>${esc(x.l)}</div><b>${esc(x.v)}</b></div><button class="btn alt" data-i="${i}" aria-label="${esc(tr('Copy'))}">⧉</button></div>`).join('') : `<p class="muted">${esc(tr('Nothing here yet.'))}</p>`;
+}
+$('#histBtn').onclick = () => { renderHist(); $('#histDlg').showModal(); };
+$('#histClose').onclick = () => $('#histDlg').close();
+$('#histClear').onclick = () => { if (curTool) Hist.clear(curTool.id); renderHist(); $('#histDlg').close(); toast(tr('Cleared')); };
+$('#histList').addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (!b || !curTool) return; const x = Hist.list(curTool.id)[+b.dataset.i]; if (x) navigator.clipboard.writeText(x.l + ' = ' + x.v).then(() => toast(tr('Copied to the clipboard')), () => toast(tr('Could not share'))); });
 
 /* Collections (Pro): named groups of tools shown on Home. */
 function renderColl() {

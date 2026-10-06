@@ -20,7 +20,7 @@
     <div id="sections"></div>
   </section>
   <section id="tool" class="screen" hidden>
-    <header class="bar"><button id="backBtn" class="round flat" aria-label="Back" data-i-label="Back">←</button><h1 id="toolTitle" tabindex="-1"></h1><button id="shareBtn" class="round flat" aria-label="Share what is on screen" data-i-label="Share what is on screen">⤴</button><button id="collBtn" class="round flat" aria-label="Collections" data-i-label="Collections">📁</button><button id="pinBtn" class="round flat" aria-label="Pin tool">☆</button></header>
+    <header class="bar"><button id="backBtn" class="round flat" aria-label="Back" data-i-label="Back">←</button><h1 id="toolTitle" tabindex="-1"></h1><button id="histBtn" class="round flat" aria-label="History" data-i-label="History" hidden>🕘</button><button id="shareBtn" class="round flat" aria-label="Share what is on screen" data-i-label="Share what is on screen">⤴</button><button id="collBtn" class="round flat" aria-label="Collections" data-i-label="Collections">📁</button><button id="pinBtn" class="round flat" aria-label="Pin tool">☆</button></header>
     <p id="toolDesc" class="tool-desc muted"></p>
     <div id="toolBody" class="tool-body"></div>
   </section>
@@ -62,6 +62,10 @@
   <div id="collList" class="list"></div>
   <div class="row"><input id="collName" type="text" maxlength="30" placeholder="New collection" data-i-ph="New collection" aria-label="New collection" data-i-label="New collection"><button class="btn" id="collAdd" style="flex:none" data-i="Add">Add</button></div>
   <button class="btn alt" id="collClose" data-i="Done">Done</button></div></dialog>
+
+<dialog id="histDlg"><div class="dlg">
+  <h2 data-i="History">History</h2><div id="histList" class="list"></div>
+  <div class="row"><button class="btn alt" id="histClear" data-i="Clear history">Clear history</button><button class="btn" id="histClose" data-i="Done">Done</button></div></div></dialog>
 
 <dialog id="tourDlg"><div class="dlg">
   <div class="tour-art" id="tourArt" aria-hidden="true"></div>

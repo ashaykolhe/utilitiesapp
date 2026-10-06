@@ -69,6 +69,19 @@ const Prefs = {
   saveColls(list) { Store.set('colls', list); }
 };
 
+/* Result history: tools call Hist.add(toolId, 'what was calculated', 'the result') after a deliberate calculation. The last 200 results
+   are kept on the device; the clock button in the tool's header shows the ones for the open tool. */
+const Hist = {
+  list(id) { return Store.arr('hist').filter(x => x && x.t === id); },
+  add(id, label, value) {
+    label = String(label == null ? '' : label).slice(0, 160); value = String(value == null ? '' : value).slice(0, 240); if (!label && !value) return;
+    const all = Store.arr('hist'); if (all[0] && all[0].t === id && all[0].l === label && all[0].v === value) return;
+    all.unshift({ t: id, l: label, v: value, at: Date.now() }); Store.set('hist', all.slice(0, 200));
+    if (typeof histChanged === 'function') histChanged();
+  },
+  clear(id) { Store.set('hist', Store.arr('hist').filter(x => !x || x.t !== id)); if (typeof histChanged === 'function') histChanged(); }
+};
+
 /* Save or share a text file (CSV, JSON, GPX...). On Android it goes through the share sheet; in a browser it downloads. Returns true when it worked. */
 async function saveTextFile(name, text, type) {
   const C = window.Capacitor && Capacitor.Plugins || {}, FS = C.Filesystem, SH = C.Share;
