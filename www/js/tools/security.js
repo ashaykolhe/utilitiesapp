@@ -7,7 +7,7 @@
 
 /*PURE-START*/
 const SC = globalThis.crypto;
-const KDF_ITER = 600000, MIN_ITER = 310000, MAX_ITER = 5000000;
+const KDF_ITER = 600000, MIN_ITER = 310000, MAX_ITER = 1200000; // the cap stops a crafted file from freezing the phone
 const te = new TextEncoder(), td = new TextDecoder();
 const rnd = n => SC.getRandomValues(new Uint8Array(n));
 const hex = u8 => [...u8].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -80,8 +80,10 @@ async function sealedCreate(name, pw, obj, iter = KDF_ITER) {
 }
 async function sealedOpen(name, rec, pw) {
   if (!rec || rec.v !== 1 || !iterOk(rec.iter) || typeof rec.salt !== 'string' || typeof rec.iv !== 'string' || typeof rec.ct !== 'string') throw new Error('bad record');
-  const key = await deriveKey(pw, b64d(rec.salt), rec.iter);
-  const pt = await openBytes(key, b64d(rec.iv), b64d(rec.ct), 'pk1/' + name); // throws when the password is wrong or data was changed
+  let salt, iv, ct;
+  try { salt = b64d(rec.salt); iv = b64d(rec.iv); ct = b64d(rec.ct); } catch (e) { throw new Error('bad record'); }
+  const key = await deriveKey(pw, salt, rec.iter);
+  const pt = await openBytes(key, iv, ct, 'pk1/' + name); // throws when the password is wrong or data was changed
   return { key, obj: JSON.parse(td.decode(pt)) };
 }
 async function sealedSave(name, rec, key, obj) {
@@ -167,6 +169,10 @@ function assess(pw) {
   let entropy = 0;
   for (let k = 0; k < n; k++) entropy += cov[k] === null ? bpc : cov[k];
   entropy = Math.round(entropy * 10) / 10;
+  // Stretches of ordinary-looking letters are far weaker than random letters: charge them at a language-like rate.
+  const isCommon = cov.every(c => c !== null) && issues.includes('This is one of the most commonly used passwords');
+  entropy = capWordy(pw, cov, bpc, entropy);
+  entropy = Math.round(entropy * 10) / 10;
   const level = entropy < 28 ? 0 : entropy < 40 ? 1 : entropy < 60 ? 2 : entropy < 80 ? 3 : 4;
   const label = ['Very weak', 'Weak', 'Fair', 'Strong', 'Excellent'][level];
   const rate = [['Online guessing (100 per second)', 1e2], ['Stolen hash, slow hashing (10,000 per second)', 1e4], ['Stolen hash, fast hashing (10 billion per second)', 1e10]];
@@ -177,8 +183,32 @@ function assess(pw) {
   if (!/[0-9]/.test(pw)) tips.push('Add a few digits in unexpected places.');
   if (!/[^A-Za-z0-9]/.test(pw)) tips.push('Add a symbol or two.');
   if (issues.length) tips.push('Avoid words, years, keyboard runs and repeats. Random beats clever.');
-  if (level < 3) tips.push('Try a passphrase of 5 or more random words. It is long, strong and easy to remember.');
-  return { len: n, entropy, level, label, issues, tips, times };
+  if (level < 3) tips.push('Try a passphrase of 7 or more random words (the generator in PIN & Passphrase makes one of about 67 bits). It is long and easier to remember.');
+  return { len: n, entropy, level, label, issues, tips, times, common: isCommon };
+}
+/* Runs of word-like letters (leetspeak undone, normal vowel ratio, at most one capital at the start) are charged at most
+   2.5 bits per letter plus 1.5 bits per substituted or capital character. Random letters have a low vowel ratio and keep the full rate. */
+function capWordy(pw, cov, bpc, entropy) {
+  const v = leetA(pw), re = /[a-z]{6,}/g;
+  let m, saved = 0;
+  while ((m = re.exec(v))) {
+    const w = m[0], i = m.index, o = pw.slice(i, i + w.length);
+    if (/[^aeiouy]{5,}/.test(w)) continue;
+    const vow = (w.match(/[aeiouy]/g) || []).length / w.length;
+    if (vow < 0.28 || vow > 0.6) continue;
+    let subs = 0;
+    for (let k = 0; k < w.length; k++) if (o[k] !== w[k]) subs++;
+    const caps = (o.match(/[A-Z]/g) || []).length;
+    if (caps > 1 && caps < o.length) continue; // random-looking case: no discount
+    if (subs > w.length * 0.4) continue;
+    let cur = 0;
+    for (let k = i; k < i + w.length; k++) cur += cov[k] === null ? bpc : cov[k];
+    const cap = 2.5 * w.length + 1.5 * subs;
+    if (cur > cap) saved += cur - cap;
+  }
+  const sep = /[a-z]{4,}([^a-z0-9])(?=[a-z]{4,})/g; // one separator between two words is worth about 3 bits
+  while ((m = sep.exec(v))) { const k = m.index + m[0].length - 1; if (cov[k] === null && bpc > 3) saved += bpc - 3; }
+  return entropy - saved;
 }
 function humanTime(sec) {
   if (sec < 1) return 'instantly';
@@ -196,26 +226,57 @@ function humanTime(sec) {
 }
 
 /* ---- Generators ---- */
+/* Phone keypad position of a digit, to spot straight-line patterns such as 147, 2580 or 159. */
+const KP = d => d === 0 ? [3, 1] : [Math.floor((d - 1) / 3), (d - 1) % 3];
+function isEasyPin(s) {
+  const d = [...s].map(Number), n = d.length;
+  if (/^(\d)\1+$/.test(s)) return true;
+  const step = (a, k) => a.every((x, i) => i === 0 || x - a[i - 1] === k);
+  if (step(d, 1) || step(d, -1)) return true;
+  if (n % 2 === 0 && d.every((x, i) => i % 2 === 0 || x === d[i - 1])) return true; // doubled pairs: 1122
+  for (let p = 2; p <= n / 2; p++) if (n % p === 0 && s === s.slice(0, p).repeat(n / p)) return true; // ABAB, 123123
+  for (let i = 0; i + 4 <= n; i++) {
+    const w = d.slice(i, i + 4), q = s.slice(i, i + 4);
+    if (/^(19|20)\d\d$/.test(q)) return true;
+    if (/^(\d)\1{3}$/.test(q) || step(w, 1) || step(w, -1)) return true;
+    const p = w.map(KP), dr = p[1][0] - p[0][0], dc = p[1][1] - p[0][1];
+    if ((dr || dc) && p.every((x, j) => j === 0 || (x[0] - p[j - 1][0] === dr && x[1] - p[j - 1][1] === dc))) return true;
+  }
+  return false;
+}
+const clampInt = (v, lo, hi, d) => { const n = Math.trunc(Number(v)); return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
 function genPin(len, avoidEasy) {
+  len = clampInt(len, 4, 12, 6);
   for (;;) {
     let s = '';
     for (let i = 0; i < len; i++) s += randInt(10);
-    if (!avoidEasy) return s;
-    const d = [...s].map(Number);
-    const same = d.every(x => x === d[0]);
-    const up = d.every((x, i) => i === 0 || x === d[i - 1] + 1), dn = d.every((x, i) => i === 0 || x === d[i - 1] - 1);
-    if (!same && !up && !dn) return s;
+    if (!avoidEasy || !isEasyPin(s)) return s;
   }
+}
+/* Honest bits for a PIN: log2 of how many PINs the generator can return (rejection rate measured by sampling). */
+const pinRate = {};
+function pinBits(len, avoidEasy) {
+  len = clampInt(len, 4, 12, 6);
+  const bits = len * Math.log2(10);
+  if (!avoidEasy) return bits;
+  if (pinRate[len] === undefined) { // estimate only, so Math.random is fine here
+    let ok = 0; const N = 20000;
+    for (let i = 0; i < N; i++) { let s = ''; for (let k = 0; k < len; k++) s += Math.floor(Math.random() * 10); if (!isEasyPin(s)) ok++; }
+    pinRate[len] = Math.max(ok, 1) / N;
+  }
+  return bits + Math.log2(pinRate[len]);
 }
 const SETS = { lower: 'abcdefghijklmnopqrstuvwxyz', upper: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', digit: '0123456789', symbol: '!@#$%^&*()-_=+[]{};:,.?/' };
 function genPassword(len, opt = { lower: true, upper: true, digit: true, symbol: true }) {
   const sets = Object.keys(SETS).filter(k => opt[k]).map(k => SETS[k]);
   if (!sets.length) sets.push(SETS.lower);
-  len = Math.max(len, sets.length);
-  const all = sets.join(''), out = sets.map(s => s[randInt(s.length)]);
-  while (out.length < len) out.push(all[randInt(all.length)]);
-  for (let i = out.length - 1; i > 0; i--) { const j = randInt(i + 1); [out[i], out[j]] = [out[j], out[i]]; }
-  return out.join('');
+  len = Math.max(clampInt(len, 8, 64, 16), sets.length);
+  const all = sets.join('');
+  for (;;) { // uniform draw, retried until every chosen set appears (no positional bias)
+    let out = '';
+    for (let i = 0; i < len; i++) out += all[randInt(all.length)];
+    if (sets.every(set => [...out].some(c => set.includes(c)))) return out;
+  }
 }
 const WORDS = ('able acid acorn actor adapt adult agent agree ahead alarm album alert alien alley allow alone alpha amber ample angle ankle apple april arena argue armor army arrow ' +
   'aspen atlas atom attic audio autumn avoid awake award aware bacon badge bagel baker balance ballot bamboo banjo barn basil basin batch beach beam beard beast bench berry bike ' +
@@ -246,6 +307,7 @@ const WORDS = ('able acid acorn actor adapt adult agent agree ahead alarm album 
   'vine violet violin visor voice volcano voyage wagon walnut walrus water wave wheat wheel whale willow wind window wing winter wizard wolf wonder wool yacht yard yarn yellow ' +
   'yogurt zebra zenith zero zigzag zinc zone zoom').split(' ');
 function genPassphrase(count, sep = '-', cap = false, addNum = false) {
+  count = clampInt(count, 3, 10, 7); sep = String(sep == null ? '-' : sep).slice(0, 3);
   const w = [];
   for (let i = 0; i < count; i++) { let x = WORDS[randInt(WORDS.length)]; if (cap) x = x[0].toUpperCase() + x.slice(1); w.push(x); }
   let s = w.join(sep);
@@ -289,6 +351,23 @@ function parseOtpauth(uri) {
   const digits = [6, 7, 8].includes(Number(q.get('digits'))) ? Number(q.get('digits')) : 6;
   const period = Math.min(120, Math.max(10, Number(q.get('period')) || 30));
   return { issuer: issuer.trim(), account: account.trim(), secret: (q.get('secret') || '').replace(/\s+/g, '').toUpperCase(), algo, digits, period };
+}
+/* Safe export file name: no control or bidi characters, no leading dots, the stem (not the extension) is shortened. */
+function safeName(name, max = 100) {
+  let n = String(name || '').normalize('NFC').replace(/[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff]/g, '').replace(/[\\\/:*?"<>|]+/g, '_').replace(/^[.\s_]+/, '').replace(/[.\s]+$/, '');
+  const m = /^(.*?)(\.[A-Za-z0-9]{1,10})?$/.exec(n);
+  let stem = m[1];
+  const ext = m[2] || '';
+  stem = [...stem].slice(0, Math.max(1, max - ext.length)).join('').replace(/[.\s]+$/, '');
+  n = (stem + ext).replace(/^\.+/, '');
+  return n || 'file';
+}
+const ALG_LEN = { 'SHA-1': 40, 'SHA-256': 64, 'SHA-384': 96, 'SHA-512': 128 };
+/* First hash-looking token in pasted text ('sha256sum' lines, 'sha256:' prefixes). Falls back to stripping separators (aa:bb:cc). */
+function extractHash(text) {
+  const t = String(text || ''), m = /\b[0-9a-fA-F]{40,128}\b/.exec(t);
+  if (m) return m[0].toLowerCase();
+  return t.replace(/[^0-9a-fA-F]/g, '').toLowerCase();
 }
 /*PURE-END*/
 
@@ -340,6 +419,30 @@ const CSS = `
 const mount = el => { el.innerHTML = '<style>' + CSS + '</style><div class="sx"></div>'; return $('.sx', el); };
 const hero = (icon, title, text) => `<div class="sx-hero"><div class="sx-badge">${icon}</div><h2>${esc(title)}</h2><p>${esc(text)}</p></div>`;
 const NB = () => (window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.NativeBiometric) || null;
+/* PN (the PocketNative plugin) is a global const from pro.js; it is null in a browser and its calls may reject. */
+const PNX = () => { try { return (typeof PN !== 'undefined' && PN) || null; } catch (e) { return null; } };
+/* FLAG_SECURE (no screenshots, blank Recents thumbnail) while ANY sealed tool is unlocked: a counter, so two tools cannot switch it off for each other. */
+let secureCount = 0;
+function secureHold(on) {
+  secureCount = Math.max(0, secureCount + (on ? 1 : -1));
+  try {
+    const p = PNX();
+    if (p && p.setSecure) { const r = p.setSecure({ enabled: secureCount > 0 }); if (r && r.catch) r.catch(() => {}); }
+  } catch (e) { /* browser: nothing to do */ }
+}
+/* Clock for the lockout that a changed phone date cannot skip: it starts at the latest time ever seen (saved on the device),
+   then follows performance.now() for the rest of the session. */
+const clock = (() => {
+  let seen = 0, saved = 0, base = Date.now();
+  const p0 = performance.now();
+  try { seen = Number(Store.get('sec.clockmax', 0)) || 0; } catch (e) { /* ignore */ }
+  base = Math.max(base, seen);
+  return () => {
+    const n = base + (performance.now() - p0);
+    if (n > seen) { seen = n; if (n - saved > 5000) { saved = n; try { Store.set('sec.clockmax', Math.round(n)); } catch (e) { /* ignore */ } } }
+    return n;
+  };
+})();
 const fmtSize = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) + ' KB' : n < 1073741824 ? (n / 1048576).toFixed(1) + ' MB' : (n / 1073741824).toFixed(2) + ' GB';
 const METER = ['var(--danger)', '#f97316', '#eab308', '#84cc16', 'var(--ok)'];
 function paintMeter(meter, a) {
@@ -348,7 +451,7 @@ function paintMeter(meter, a) {
   bar.style.background = METER[a.level];
 }
 function pwField(id, label, ph, auto) {
-  return `<label class="f">${esc(label)}<div class="sx-pw"><input type="password" id="${id}" placeholder="${esc(ph || '')}" autocomplete="${auto || 'off'}" autocapitalize="off" spellcheck="false" maxlength="256"><button type="button" class="sx-eye" data-eye="${id}" aria-label="Show or hide password">👁</button></div></label>`;
+  return `<label class="f">${esc(label)}<div class="sx-pw"><input type="password" id="${id}" placeholder="${esc(ph || '')}" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="256"><button type="button" class="sx-eye" data-eye="${id}" aria-label="Show or hide password">👁</button></div></label>`;
 }
 function wireEyes(root) {
   $$('[data-eye]', root).forEach(b => b.addEventListener('click', () => {
@@ -381,9 +484,13 @@ function askPassword(root, title, text) {
   });
 }
 
-/* Clipboard with optional auto-clear (best effort: Android may refuse while the app is in the background). */
+/* Clipboard with optional auto-clear. The native helper marks the clip sensitive and clears it itself; without it the clear is best effort only. */
 let clipVal = null, clipExp = 0, clipT = 0;
-async function clipWrite(t) {
+async function clipWrite(t, clearMs) {
+  const p = PNX();
+  if (clearMs && p && p.copySensitive) {
+    try { const r = await p.copySensitive({ text: t, clearMs }); if (r && r.native) return 'native'; } catch (e) { /* fall back to the web clipboard */ }
+  }
   try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(t); return true; } } catch (e) { /* fall through */ }
   try {
     const ta = document.createElement('textarea');
@@ -396,34 +503,51 @@ async function clipClear() {
   const v = clipVal; clipVal = null;
   if (v === null) return;
   try {
-    let cur = null;
-    try { cur = await navigator.clipboard.readText(); } catch (e) { /* reading may be blocked: clear anyway */ }
-    if (cur === null || cur === v) await navigator.clipboard.writeText('');
-  } catch (e) { /* not allowed right now */ }
+    const cur = await navigator.clipboard.readText(); // only clear if it still holds our value
+    if (cur === v) await navigator.clipboard.writeText('');
+  } catch (e) { /* reading or writing is blocked: leave the clipboard alone, we cannot tell whether it holds something else now */ }
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && clipVal !== null && Date.now() >= clipExp) clipClear(); });
 async function copyText(t, clearMs) {
-  const ok = await clipWrite(t);
+  const ok = await clipWrite(t, clearMs);
   if (!ok) { toast('Could not copy'); return false; }
-  if (clearMs) { clearTimeout(clipT); clipVal = t; clipExp = Date.now() + clearMs; clipT = setTimeout(clipClear, clearMs); toast('Copied. Clears in ' + Math.round(clearMs / 1000) + ' s'); }
-  else toast('Copied');
+  if (!clearMs) { toast('Copied'); return true; }
+  clearTimeout(clipT); clipVal = null;
+  if (ok === 'native') toast('Copied. Clears in ' + Math.round(clearMs / 1000) + ' s');
+  else { clipVal = t; clipExp = Date.now() + clearMs; clipT = setTimeout(clipClear, clearMs); toast('Copied. It may not clear by itself on this phone; clear the clipboard yourself if others use it.'); }
   return true;
 }
 
+/* Decrypted exports are written to the cache before sharing. Remove that folder whenever we can. */
+const EXPORT_DIR = 'pk-export';
+async function cleanExports() {
+  try {
+    const P = (window.Capacitor && Capacitor.Plugins) || {};
+    if (P.Filesystem && P.Filesystem.rmdir) await P.Filesystem.rmdir({ path: EXPORT_DIR, directory: 'CACHE', recursive: true });
+  } catch (e) { /* nothing there */ }
+}
 /* Save or share a Blob: native share sheet on Android, a normal download elsewhere. */
 async function saveFile(blob, name) {
   const P = (window.Capacitor && Capacitor.Plugins) || {};
-  const safe = String(name || 'file').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 100) || 'file';
+  const safe = safeName(name);
   if (P.Filesystem && P.Share) {
+    const path = EXPORT_DIR + '/' + safe;
+    let wrote = false;
     try {
-      const path = 'pk-export/' + safe;
       await P.Filesystem.writeFile({ path, data: b64e(new Uint8Array(await blob.arrayBuffer())), directory: 'CACHE', recursive: true });
+      wrote = true;
       const r = await P.Filesystem.getUri({ path, directory: 'CACHE' });
       await P.Share.share({ title: safe, files: [r.uri] });
-      setTimeout(() => { try { P.Filesystem.deleteFile({ path, directory: 'CACHE' }).catch(() => {}); } catch (e) { /* ignore */ } }, 120000);
       return true;
     } catch (e) {
       if (/cancel/i.test(String(e && (e.message || e)))) return false;
+    } finally {
+      // The share target may still be reading the file for a moment after the promise settles, so allow a short grace period.
+      // The whole folder is also removed when the tool starts, unlocks or locks; 120 s is only a last backup.
+      if (wrote) {
+        setTimeout(() => { try { P.Filesystem.deleteFile({ path, directory: 'CACHE' }).catch(() => {}); } catch (e) { /* ignore */ } }, 20000);
+        setTimeout(cleanExports, 120000);
+      }
     }
   }
   const url = URL.createObjectURL(blob), a = document.createElement('a');
@@ -438,14 +562,18 @@ async function shareText(text) {
   return copyText(text);
 }
 
-/* Tiny IndexedDB wrapper (out-of-line keys). */
-function idb(name, stores) {
+/* Tiny IndexedDB wrapper (out-of-line keys). `upgrade(db, tx, oldVersion)` runs inside the version-change transaction after missing stores are created. */
+function idb(name, stores, version = 1, upgrade = null) {
   let p = null;
   const open = () => p || (p = new Promise((res, rej) => {
-    const r = indexedDB.open(name, 1);
-    r.onupgradeneeded = () => { for (const s of stores) if (!r.result.objectStoreNames.contains(s)) r.result.createObjectStore(s); };
+    const r = indexedDB.open(name, version);
+    r.onupgradeneeded = ev => {
+      for (const s of stores) if (!r.result.objectStoreNames.contains(s)) r.result.createObjectStore(s);
+      if (upgrade) upgrade(r.result, r.transaction, ev.oldVersion);
+    };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
+    r.onblocked = () => rej(new Error('Close other copies of the app and try again.'));
   }));
   const run = async (store, mode, fn) => {
     const db = await open();
@@ -460,6 +588,8 @@ function idb(name, stores) {
     put: (s, k, v) => run(s, 'readwrite', o => o.put(v, k)),
     del: (s, k) => run(s, 'readwrite', o => o.delete(k)),
     all: s => run(s, 'readonly', o => o.getAll()),
+    keys: s => run(s, 'readonly', o => o.getAllKeys()),
+    clear: s => run(s, 'readwrite', o => o.clear()),
     count: s => run(s, 'readonly', o => o.count()),
     async batch(ops) {
       const db = await open();
@@ -469,67 +599,110 @@ function idb(name, stores) {
         t.oncomplete = () => res(); t.onerror = t.onabort = () => rej(t.error || new Error('db'));
       });
     },
+    /* One transaction driven by `fn(tx)`; resolves when it commits, rejects (and rolls back) on any error. */
+    async tx(storeNames, mode, fn) {
+      const db = await open();
+      return new Promise((res, rej) => {
+        const t = db.transaction(storeNames, mode);
+        t.oncomplete = () => res(); t.onerror = t.onabort = () => rej(t.error || new Error('db'));
+        try { fn(t); } catch (e) { try { t.abort(); } catch (x) { /* ignore */ } rej(e); }
+      });
+    },
     close() { if (p) { p.then(d => d.close()).catch(() => {}); p = null; } }
   };
 }
 
-/* Failed-attempt lockout: 30 s after every 5 failures, doubling each round (max 15 min). Stored on the device. */
+/* Failed-attempt lockout: 30 s after every 5 failures, doubling each round (max 15 min). Stored on the device.
+   Uses clock() so moving the phone's date backwards does not shorten the wait. */
 function lockout(name) {
   const k = 'sec.lock.' + name, get = () => Store.get(k, { n: 0, until: 0 });
   return {
-    left() { return Math.max(0, get().until - Date.now()); },
-    fail() { const s = get(); s.n++; if (s.n % 5 === 0) s.until = Date.now() + Math.min(900000, 30000 * Math.pow(2, s.n / 5 - 1)); Store.set(k, s); return s.n; },
+    left() { return Math.min(900000, Math.max(0, (Number(get().until) || 0) - clock())); },
+    fail() { const s = get(); s.n++; if (s.n % 5 === 0) s.until = Math.round(clock() + Math.min(900000, 30000 * Math.pow(2, s.n / 5 - 1))); Store.set(k, s); return s.n; },
     ok() { Store.set(k, { n: 0, until: 0 }); }
   };
 }
 
+/* Minimum strength for a master password (bits from assess()); the user can still override with "Use anyway". */
+const MIN_BITS = 50;
+const isWeak = a => !!a.common || a.entropy < MIN_BITS;
+const weakMsg = a => 'This password is too easy to guess (about ' + Math.round(a.entropy) + ' bits; at least ' + MIN_BITS + ' are needed' + (a.common ? ', and it is a very common password' : '') + '). Make it longer, for example 7 random words from the PIN & Passphrase tool, or use it anyway.';
+const IDLE_MS = 120000, AWAY_MS = 60000;
+const MAX_ITEMS = 1000, MAX_IMPORT = 5000; // stored entries per tool, and entries read from one backup file
+
 /* ================= Sealed shell: setup / unlock / lock / settings for every password-protected tool ================= */
-/* cfg: { name, db, stores, icon, title, blurb, init(), build(body, S), rekey?, backup?, bio? } */
+/* cfg: { name, db, stores, dbVersion?, upgrade?, icon, title, blurb, init(), build(body, S), rekey?, backup?, bio? } */
 function sealedShell(el, cfg) {
   const box = mount(el);
-  const db = idb('pk-' + cfg.db, ['kv'].concat(cfg.stores || []));
-  const lk = lockout(cfg.name), BIO_KEY = 'sec.bio.' + cfg.name, BIO_SRV = 'pocketkit.' + cfg.name;
-  let rec = null, key = null, data = null, alive = true, hiddenAt = 0, holdUntil = 0, hideT = 0, cdT = 0, bodyClean = null, busy = false;
+  const db = idb('pk-' + cfg.db, ['kv'].concat(cfg.stores || []), cfg.dbVersion || 1, cfg.upgrade || null);
+  const lk = lockout(cfg.name), BIO_KEY = 'sec.bio.' + cfg.name, BIO_V2 = 'sec.bio2.' + cfg.name, BIO_SRV = 'pocketkit.' + cfg.name;
+  const nowP = () => performance.now();
+  let rec = null, key = null, data = null, alive = true, hiddenAt = 0, hiddenPerf = 0, holdUntil = 0, hideT = 0, cdT = 0, idleT = 0, bodyClean = null, busy = false, secured = false, lastIn = nowP();
+  const appHandles = [];
+  const setSec = on => { if (on !== secured) { secured = on; secureHold(on); } };
   const S = {
     db, root: el,
-    get data() { return data; }, get key() { return key; },
-    hold(ms) { holdUntil = Math.max(holdUntil, Date.now() + ms); },
+    get data() { return data; }, get key() { return key; }, get busy() { return busy; },
+    hold(ms) { holdUntil = Math.max(holdUntil, nowP() + ms); },
+    release() { holdUntil = 0; },
+    /* Open a file picker: the background lock waits while it is open, and the wait ends when it is cancelled or used. */
+    pick(input, ms) {
+      S.hold(ms);
+      const done = () => { input.removeEventListener('cancel', done); input.removeEventListener('change', done); S.release(); };
+      input.addEventListener('cancel', done); input.addEventListener('change', done);
+      input.click();
+    },
     async save() { rec = await sealedSave(cfg.name, rec, key, data); await db.put('kv', 'rec', rec); },
     lock, refresh: buildBody,
     progress(msg) { const e = $('#sx-cpmsg', box); if (e) e.textContent = msg; }
   };
 
   function clearTimers() { clearInterval(cdT); clearTimeout(hideT); }
+  function closeDialogs() { $$('dialog', el).forEach(d => { try { d.close(); } catch (e) { d.remove(); } }); }
   function lock() {
     if (bodyClean) { try { bodyClean(); } catch (e) { /* ignore */ } bodyClean = null; }
-    key = null; data = null; clearTimers();
-    $$('dialog', el).forEach(d => { try { d.close(); } catch (e) { d.remove(); } });
+    key = null; data = null; clearTimers(); setSec(false); cleanExports();
+    closeDialogs();
     if (alive) showUnlock();
   }
 
+  async function orphanCount() {
+    let n = 0;
+    for (const s of (cfg.stores || []).filter(x => x !== 'stage')) { try { n = Math.max(n, await db.count(s)); } catch (e) { /* ignore */ } } // the stores of one locker hold the same items, so take the largest count
+    return n;
+  }
   async function start() {
-    try { rec = await db.get('kv', 'rec'); } catch (e) { box.innerHTML = '<div class="sx-warn"><span>⚠️</span><span>Secure storage is not available in this browser, so this tool cannot work here.</span></div>'; return; }
+    cleanExports();
+    try { rec = await db.get('kv', 'rec'); } catch (e) { box.innerHTML = '<div class="sx-warn"><span>⚠️</span><span>Secure storage could not be opened here' + (e && e.message ? ' (' + esc(e.message) + ')' : '') + '. Nothing was changed.</span></div>'; return; }
     if (!alive) return;
-    rec ? showUnlock() : showSetup();
+    if (rec) { showUnlock(); return; }
+    const orphans = await orphanCount();
+    if (alive) showSetup(orphans);
   }
 
-  function showSetup() {
+  function showSetup(orphans) {
+    let forced = false;
     box.innerHTML = hero(cfg.icon, 'Create your ' + cfg.title, cfg.blurb) +
+      (orphans ? `<div class="sx-warn"><span>⚠️</span><span><b>Old locked data was found but its password record is missing.</b> ${orphans} encrypted item${orphans === 1 ? ' is' : 's are'} still on this phone. They cannot be opened with a new password, and the original password alone is not enough without the missing record. If you have an exported backup, restore that instead.</span></div>` : '') +
       `<div class="card sx-card">
-        ${pwField('s1', 'Choose a strong password', 'At least 8 characters', 'new-password')}
+        ${pwField('s1', 'Choose a strong password', 'At least 8 characters', 'off')}
         <div class="sx-meter" id="s-meter"><i></i></div><div class="muted" id="s-hint" style="font-size:13px">Use a long phrase you can remember.</div>
-        ${pwField('s2', 'Confirm password', '', 'new-password')}
-        <div class="sx-warn"><span>⚠️</span><span><b>There is no way to recover a forgotten password.</b> Nobody, including the app maker, can open your data without it. Write it down and keep it somewhere safe.</span></div>
+        ${pwField('s2', 'Confirm password', '', 'off')}
+        <div class="sx-warn"><span>⚠️</span><span><b>There is no way to recover a forgotten password.</b> Nobody, including the app maker, can open your data without it. Write it down and keep it somewhere safe. Uninstalling the app or clearing its data also deletes everything stored here.</span></div>
         <label class="sx-t"><input type="checkbox" id="s-ok"><span>I understand I cannot recover my data if I forget this password.</span></label>
+        ${orphans ? '<label class="sx-t"><input type="checkbox" id="s-ok2"><span>I understand the old items cannot be opened after I create a new ' + esc(cfg.title) + '.</span></label>' : ''}
         <div class="status" id="s-err" role="alert"></div>
+        <button class="btn alt" id="s-any" style="min-height:44px" hidden>Use this weak password anyway</button>
         <button class="btn" id="s-go" style="min-height:48px">Create ${esc(cfg.title)}</button>
       </div>`;
     wireEyes(box);
     const m = $('#s-meter', box), hint = $('#s-hint', box);
     $('#s1', box).addEventListener('input', e => {
       const a = assess(e.target.value);
+      forced = false; $('#s-any', box).hidden = true;
       paintMeter(m, a); hint.textContent = a.len ? a.label + ' (about ' + Math.round(a.entropy) + ' bits)' + (a.issues[0] ? '. ' + a.issues[0] : '') : 'Use a long phrase you can remember.';
     });
+    $('#s-any', box).addEventListener('click', () => { forced = true; $('#s-go', box).click(); });
     $('#s-go', box).addEventListener('click', async () => {
       if (busy) return;
       const p1 = $('#s1', box).value, p2 = $('#s2', box).value, err = $('#s-err', box);
@@ -537,10 +710,14 @@ function sealedShell(el, cfg) {
       if (p1.length < 8) { err.textContent = 'Use at least 8 characters.'; return; }
       if (p1 !== p2) { err.textContent = 'The two passwords do not match.'; return; }
       if (!$('#s-ok', box).checked) { err.textContent = 'Please tick the box to confirm you understand.'; return; }
+      if (orphans && !$('#s-ok2', box).checked) { err.textContent = 'Please tick the second box to confirm you understand about the old items.'; return; }
+      const a = assess(p1);
+      if (isWeak(a) && !forced) { err.textContent = weakMsg(a); $('#s-any', box).hidden = false; return; }
       busy = true; const b = $('#s-go', box); b.disabled = true; b.textContent = 'Securing…';
       try {
         const init = cfg.init(), r = await sealedCreate(cfg.name, p1, init);
         await db.put('kv', 'rec', r.rec);
+        try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) { /* not supported */ }
         rec = r.rec; key = r.key; data = init;
         $('#s1', box).value = ''; $('#s2', box).value = '';
         busy = false; showUnlocked();
@@ -549,16 +726,24 @@ function sealedShell(el, cfg) {
   }
 
   function showUnlock() {
+    /* Biometric unlock saved by an older version was not bound to authentication: remove it and ask the user to enable it again. */
+    let note = '';
+    if (cfg.bio && Store.get(BIO_KEY, false) && !Store.get(BIO_V2, false)) {
+      Store.set(BIO_KEY, false);
+      try { const x = NB() && NB().deleteCredentials({ server: BIO_SRV }); if (x && x.catch) x.catch(() => {}); } catch (e) { /* ignore */ }
+      note = 'Biometric unlock was switched off because it now uses stronger protection. Unlock with your password, then turn it on again in Security and backup.';
+    }
     const bioOn = cfg.bio && NB() && Store.get(BIO_KEY, false);
     box.innerHTML = hero('🔒', cfg.title + ' is locked', 'Enter your password to open it. It stays encrypted on this device.') +
       `<div class="card sx-card">
-        ${pwField('u1', 'Password', '', 'current-password')}
+        ${pwField('u1', 'Password', '', 'off')}
         <div class="status" id="u-err" role="alert"></div>
         <button class="btn" id="u-go" style="min-height:48px">Unlock</button>
         ${bioOn ? '<button class="btn alt" id="u-bio" style="min-height:48px">👆 Unlock with biometrics</button>' : ''}
       </div>`;
     wireEyes(box);
     const err = $('#u-err', box), go = $('#u-go', box), inp = $('#u1', box);
+    if (note) err.textContent = note;
     function cd() {
       clearInterval(cdT);
       const upd = () => {
@@ -578,8 +763,12 @@ function sealedShell(el, cfg) {
         showUnlocked();
       } catch (e) {
         busy = false; if (!alive) return;
-        go.textContent = 'Unlock'; go.disabled = false;
-        lk.fail(); inp.value = ''; inp.focus();
+        go.textContent = 'Unlock'; go.disabled = false; inp.value = '';
+        if (/^bad (record|iterations|base64)/.test(String(e && e.message))) { // a damaged record is not a wrong password: do not count it
+          err.textContent = 'The stored data looks damaged or unreadable. This is not a wrong password. If you have an exported backup, restore it.';
+          return;
+        }
+        lk.fail(); inp.focus();
         err.textContent = 'Wrong password.';
         cd();
       }
@@ -588,17 +777,32 @@ function sealedShell(el, cfg) {
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') attempt(inp.value); });
     const bio = $('#u-bio', box);
     if (bio) bio.addEventListener('click', async () => {
+      if (busy || lk.left() > 0) return;
+      err.textContent = '';
+      let c;
       try {
-        await NB().verifyIdentity({ reason: 'Unlock ' + cfg.title, title: 'Unlock ' + cfg.title });
-        const c = await NB().getCredentials({ server: BIO_SRV });
-        await attempt(c.password);
-      } catch (e) { err.textContent = 'Biometric unlock was cancelled or is unavailable. Use your password.'; }
+        // The password is released by the secure hardware only after a live fingerprint or face check (the plugin shows the prompt itself).
+        c = await NB().getSecureCredentials({ server: BIO_SRV, reason: 'Unlock ' + cfg.title, title: 'Unlock ' + cfg.title });
+      } catch (e) {
+        const m = String(e && (e.message || e)), code = Number(e && e.code);
+        if (/cancel/i.test(m) || [11, 15, 16, 17].includes(code)) err.textContent = 'Biometric unlock was cancelled. Use your password.';
+        else if (code === 21 || /invalidat|no protected|permanently|not found/i.test(m)) {
+          // The key no longer works (fingerprints or face data changed, or it was removed): turn the feature off and use the password.
+          Store.set(BIO_KEY, false);
+          try { await NB().deleteCredentials({ server: BIO_SRV }); } catch (x) { /* ignore */ }
+          bio.hidden = true;
+          err.textContent = 'Biometric unlock stopped working (usually because fingerprints or face data on this phone changed). Enter your password, then turn it on again in Security and backup.';
+        } else err.textContent = 'Biometric unlock did not work. Use your password.';
+        return;
+      }
+      await attempt(c && c.password);
     });
     cd();
   }
 
   function showUnlocked() {
-    box.innerHTML = `<div class="sx-head"><div class="grow"><b>${cfg.icon} ${esc(cfg.title)}</b><small>Unlocked. Locks when you leave or after 60 s away.</small></div><button class="btn alt" id="sx-lock" style="min-height:44px">🔒 Lock</button></div>
+    cleanExports(); setSec(true); lastIn = nowP();
+    box.innerHTML = `<div class="sx-head"><div class="grow"><b>${cfg.icon} ${esc(cfg.title)}</b><small>Unlocked. Locks when you leave, after 2 minutes without use, or after 60 s away.</small></div><button class="btn alt" id="sx-lock" style="min-height:44px">🔒 Lock</button></div>
       <div class="sx" id="sx-body"></div>
       <div class="card sx-sec"><details><summary>⚙️ Security and backup</summary><div class="sx-card" style="margin-top:8px" id="sx-set"></div></details></div>`;
     $('#sx-lock', box).addEventListener('click', lock);
@@ -618,49 +822,56 @@ function sealedShell(el, cfg) {
     if (!avail) return;
     let ok = false;
     try { const r = await NB().isAvailable(); ok = !!(r && r.isAvailable); } catch (e) { ok = false; }
-    if (!ok || !alive) return;
+    if (!ok || !alive || !$('#sx-set', box)) return;
     const on = Store.get(BIO_KEY, false), c = h(`<div class="sx-card" id="sx-bio"><h3>Biometric quick unlock</h3>
-      <p class="muted" style="margin:0;font-size:13.5px">If you turn this on, your password is saved in the Android secure credential store and released only after your fingerprint or face check. Anyone who can pass a biometric check on this phone could then open the vault. Leave it off if you share biometrics or want maximum protection.</p>
+      <p class="muted" style="margin:0;font-size:13.5px">If you turn this on, your password is encrypted with a key kept in the phone's secure hardware. The key can be used only right after a fingerprint or face check, and it stops working if fingerprints or faces are added or removed on this phone (then you use your password and turn it on again). Anyone who can pass a biometric check on this phone can still open this tool. Your password always keeps working. Leave this off if you share biometrics or want maximum protection.</p>
       <button class="btn ${on ? 'alt' : ''}" id="bio-t" style="min-height:44px">${on ? 'Turn off biometric unlock' : 'Turn on biometric unlock'}</button><div class="status" id="bio-e"></div></div>`);
     set.appendChild(c);
     $('#bio-t', c).addEventListener('click', async () => {
       const e = $('#bio-e', c);
       if (Store.get(BIO_KEY, false)) {
         try { await NB().deleteCredentials({ server: BIO_SRV }); } catch (x) { /* ignore */ }
-        Store.set(BIO_KEY, false); toast('Biometric unlock is off'); buildSettings(); return;
+        Store.set(BIO_KEY, false); Store.set(BIO_V2, false); toast('Biometric unlock is off'); buildSettings(); return;
       }
-      const pw = await askPassword(el, 'Confirm your password', 'Enter your password once to store it behind biometrics.');
+      const pw = await askPassword(el, 'Confirm your password', 'Enter your password once. It will be stored behind your fingerprint or face check.');
       if (pw === null) return;
       try {
         await sealedOpen(cfg.name, rec, pw);
       } catch (x) { e.textContent = 'That password is not correct.'; return; }
       try {
-        await NB().verifyIdentity({ reason: 'Turn on biometric unlock', title: 'Biometric unlock' });
-        await NB().setCredentials({ username: cfg.name, password: pw, server: BIO_SRV });
-        Store.set(BIO_KEY, true); toast('Biometric unlock is on'); buildSettings();
-      } catch (x) { e.textContent = 'Could not turn on biometric unlock.'; }
+        await NB().setCredentials({ username: cfg.name, password: pw, server: BIO_SRV, accessControl: 1 /* BIOMETRY_CURRENT_SET */, title: 'Turn on biometric unlock' });
+        Store.set(BIO_KEY, true); Store.set(BIO_V2, true); toast('Biometric unlock is on'); buildSettings();
+      } catch (x) {
+        try { await NB().deleteCredentials({ server: BIO_SRV }); } catch (y) { /* ignore */ }
+        e.textContent = 'Could not turn on biometric unlock.';
+      }
     });
   }
 
   function buildSettings() {
     const set = $('#sx-set', box);
     if (!set) return;
+    let forced = false;
     set.innerHTML = `<h3>Change password</h3>
-      ${pwField('c0', 'Current password', '', 'current-password')}
-      ${pwField('c1', 'New password', 'At least 8 characters', 'new-password')}
+      ${pwField('c0', 'Current password', '', 'off')}
+      ${pwField('c1', 'New password', 'At least 8 characters', 'off')}
       <div class="sx-meter" id="c-meter"><i></i></div>
-      ${pwField('c2', 'Confirm new password', '', 'new-password')}
+      ${pwField('c2', 'Confirm new password', '', 'off')}
       <div class="status" id="c-err" role="alert"></div><div class="status info" id="sx-cpmsg"></div>
+      <button class="btn alt" id="c-any" style="min-height:44px" hidden>Use this weak password anyway</button>
       <button class="btn" id="c-go" style="min-height:44px">Change password</button>
       <p class="muted" style="margin:0;font-size:13px">A new password creates a new encryption key and re-encrypts everything. It cannot be undone, and the old password stops working.</p>`;
     wireEyes(set);
-    $('#c1', set).addEventListener('input', e => paintMeter($('#c-meter', set), assess(e.target.value)));
+    $('#c1', set).addEventListener('input', e => { forced = false; $('#c-any', set).hidden = true; paintMeter($('#c-meter', set), assess(e.target.value)); });
+    $('#c-any', set).addEventListener('click', () => { forced = true; $('#c-go', set).click(); });
     $('#c-go', set).addEventListener('click', async () => {
       if (busy) return;
       const cur = $('#c0', set).value, n1 = $('#c1', set).value, n2 = $('#c2', set).value, err = $('#c-err', set);
       err.textContent = '';
       if (n1.length < 8) { err.textContent = 'The new password needs at least 8 characters.'; return; }
       if (n1 !== n2) { err.textContent = 'The new passwords do not match.'; return; }
+      const a = assess(n1);
+      if (isWeak(a) && !forced) { err.textContent = weakMsg(a); $('#c-any', set).hidden = false; return; }
       busy = true; const b = $('#c-go', set); b.disabled = true;
       try {
         try { await sealedOpen(cfg.name, rec, cur); } catch (e) { err.textContent = 'Current password is not correct.'; return; }
@@ -668,11 +879,16 @@ function sealedShell(el, cfg) {
         const nu = await sealedCreate(cfg.name, n1, data);
         if (cfg.rekey) await cfg.rekey(S, key, nu.key, nu.rec); else await db.put('kv', 'rec', nu.rec);
         key = nu.key; rec = nu.rec;
+        let bioNote = '';
         if (cfg.bio && NB() && Store.get(BIO_KEY, false)) {
-          try { await NB().setCredentials({ username: cfg.name, password: n1, server: BIO_SRV }); }
-          catch (e) { Store.set(BIO_KEY, false); }
+          try { await NB().setCredentials({ username: cfg.name, password: n1, server: BIO_SRV, accessControl: 1 /* BIOMETRY_CURRENT_SET */, title: 'Update biometric unlock' }); }
+          catch (e) {
+            Store.set(BIO_KEY, false); Store.set(BIO_V2, false);
+            try { await NB().deleteCredentials({ server: BIO_SRV }); } catch (x) { /* ignore */ }
+            bioNote = ' Biometric unlock was turned off; turn it on again if you want it.';
+          }
         }
-        toast('Password changed'); buildSettings(); buildBody();
+        toast('Password changed.' + bioNote); buildSettings(); buildBody();
       } catch (e) {
         err.textContent = 'Could not change the password: ' + (e && e.message || 'error') + '. Nothing was changed.';
         S.progress('');
@@ -684,23 +900,25 @@ function sealedShell(el, cfg) {
 
   function buildBackup(set) {
     const c = h(`<div class="sx-card"><h3>Encrypted backup</h3>
-      <div class="sx-warn"><span>⚠️</span><span>The backup file is encrypted with your <b>current master password</b>. Keep the file and remember that password: without it the backup is useless, and a weak password makes the backup easy to attack.</span></div>
+      <div class="sx-warn"><span>⚠️</span><span>The backup file is encrypted with your <b>current master password</b>. Keep the file and remember that password: without it the backup is useless, and a weak password makes the backup easy to attack. Android's own cloud backup is turned off for this app, so this file is the only copy besides this phone.</span></div>
       <div class="row"><button class="btn alt" id="b-ex" style="min-height:44px">Export backup</button><button class="btn alt" id="b-im" style="min-height:44px">Import backup</button></div>
-      <input type="file" id="b-file" accept=".json,application/json" hidden><div class="status info" id="b-msg"></div></div>`);
+      <input type="file" id="b-file" aria-label="Backup file" accept=".json,application/json" hidden><div class="status info" id="b-msg"></div></div>`);
     set.appendChild(c);
     const msg = t => { $('#b-msg', c).textContent = t; };
     $('#b-ex', c).addEventListener('click', async () => {
       S.hold(60000);
       const out = JSON.stringify(Object.assign({ app: 'PocketKit', type: cfg.name }, rec));
       const d = new Date();
-      const ok = await saveFile(new Blob([out], { type: 'application/json' }), 'pocketkit-' + cfg.name + '-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '.pkbackup.json');
-      if (ok) msg('Backup exported. Store it somewhere safe.');
+      try {
+        const ok = await saveFile(new Blob([out], { type: 'application/json' }), 'pocketkit-' + cfg.name + '-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '.pkbackup.json');
+        if (ok) msg('Backup exported. Store it somewhere safe.');
+      } finally { S.release(); }
     });
-    $('#b-im', c).addEventListener('click', () => { S.hold(120000); $('#b-file', c).click(); });
+    $('#b-im', c).addEventListener('click', () => S.pick($('#b-file', c), 120000));
     $('#b-file', c).addEventListener('change', async ev => {
       const f = ev.target.files && ev.target.files[0]; ev.target.value = '';
       if (!f || !key) return;
-      if (f.size > 30 * 1048576) { msg('That file is too big to be a backup.'); return; }
+      if (f.size > 20 * 1048576) { msg('That file is too big to be a backup (over 20 MB).'); return; }
       let b;
       try { b = JSON.parse(await f.text()); } catch (e) { msg('That is not a PocketKit backup file.'); return; }
       if (!b || b.app !== 'PocketKit' || b.type !== cfg.name) { msg('That backup belongs to a different tool.'); return; }
@@ -717,22 +935,51 @@ function sealedShell(el, cfg) {
     });
   }
 
-  function onVis() {
-    if (document.hidden) {
-      hiddenAt = Date.now(); clearTimeout(hideT);
-      hideT = setTimeout(() => { if (document.hidden && key && Date.now() > holdUntil) lock(); }, 60000);
-    } else {
-      clearTimeout(hideT);
-      if (hiddenAt && key && Date.now() - hiddenAt >= 60000 && Date.now() > holdUntil) lock();
-      hiddenAt = 0;
-    }
+  /* Leaving the screen: lock after 60 s away. Sources: page visibility and the Capacitor App events (appStateChange, pause, resume). */
+  function away() {
+    if (hiddenAt) return;
+    hiddenAt = Date.now(); hiddenPerf = nowP(); clearTimeout(hideT);
+    hideT = setTimeout(() => { if (hiddenAt && key && nowP() > holdUntil) lock(); }, AWAY_MS);
   }
+  function back() {
+    clearTimeout(hideT);
+    if (hiddenAt && key) {
+      const gone = Math.max(nowP() - hiddenPerf, Date.now() - hiddenAt); // whichever clock says longer
+      if (gone >= AWAY_MS && nowP() > holdUntil) lock();
+    }
+    hiddenAt = 0; lastIn = nowP();
+  }
+  const onVis = () => { if (document.hidden) away(); else back(); };
+  const touch = () => { lastIn = nowP(); };
+  const onFocus = () => setTimeout(() => { holdUntil = 0; }, 1500); // a picker or share sheet has closed
+  const INPUT_EVENTS = ['pointerdown', 'keydown', 'input', 'touchstart', 'scroll'];
   document.addEventListener('visibilitychange', onVis);
+  window.addEventListener('focus', onFocus);
+  INPUT_EVENTS.forEach(ev => document.addEventListener(ev, touch, true));
+  try {
+    const A = window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.App;
+    if (A && A.addListener) {
+      appHandles.push(A.addListener('appStateChange', st => { if (st && st.isActive) back(); else away(); }));
+      appHandles.push(A.addListener('pause', away));
+      appHandles.push(A.addListener('resume', back));
+    }
+  } catch (e) { /* not available in a browser */ }
+  idleT = setInterval(() => {
+    if (!key) return;
+    if (el.closest('[hidden]')) { lock(); return; } // Settings or another screen is covering the tool
+    if ($$('video,audio', el).some(m => !m.paused && !m.ended)) touch(); // playing media counts as use
+    if (nowP() > holdUntil && nowP() - lastIn > IDLE_MS) lock();
+  }, 2000);
   start();
   return () => {
-    alive = false; document.removeEventListener('visibilitychange', onVis); clearTimers();
+    alive = false; clearTimers(); clearInterval(idleT);
+    document.removeEventListener('visibilitychange', onVis); window.removeEventListener('focus', onFocus);
+    INPUT_EVENTS.forEach(ev => document.removeEventListener(ev, touch, true));
+    appHandles.forEach(p => { try { Promise.resolve(p).then(x => x && x.remove && x.remove()).catch(() => {}); } catch (e) { /* ignore */ } });
     if (bodyClean) { try { bodyClean(); } catch (e) { /* ignore */ } }
+    closeDialogs();
     key = null; data = null; rec = null; db.close();
+    setSec(false); cleanExports();
   };
 }
 
@@ -758,26 +1005,44 @@ async function makeThumb(file) {
   } catch (e) { return null; }
 }
 
+/* Storage layout (IndexedDB 'pk-locker' v2): 'meta' = encrypted name/size/type and thumbnail per file (small, listed on open),
+   'blobs' = encrypted file bodies (read only when a file is viewed, exported or re-keyed), 'stage' = scratch space while changing the password.
+   Version 1 kept everything in one 'files' store; lockerUpgrade() moves it across one record at a time inside the upgrade transaction. */
+const MAX_FILE = 200 * 1048576, WARN_FILE = 100 * 1048576;
+function lockerUpgrade(d, tx) {
+  if (!d.objectStoreNames.contains('files')) return;
+  const files = tx.objectStore('files'), meta = tx.objectStore('meta'), blobs = tx.objectStore('blobs');
+  files.openCursor().onsuccess = ev => {
+    const c = ev.target.result;
+    if (!c) { d.deleteObjectStore('files'); return; } // only reached when every record was copied; any error aborts the whole upgrade and keeps version 1
+    const r = c.value;
+    meta.put({ id: r.id, mi: r.mi, mc: r.mc, ti: r.ti || null, tc: r.tc || null }, c.key);
+    blobs.put({ id: r.id, di: r.di, dc: r.dc }, c.key);
+    c.continue();
+  };
+}
+
 function lockerBuild(body, S) {
   const db = S.db;
-  let urls = [], dead = false;
+  let urls = [], viewUrls = new Set(), dead = false;
   const lim = () => proLimit('locker');
   body.innerHTML = `<div class="card sx-card"><div class="sx-head"><div class="grow"><b id="lk-sum">Your files</b><small id="lk-sub"></small></div></div>
       <div class="progress"><i id="lk-bar" style="width:0"></i></div></div>
     <div class="sx-drop"><div style="font-size:36px">🗂️</div><b>Add files to the locker</b>
-      <span class="muted" style="font-size:13.5px">Photos, videos and documents. Each file is encrypted with AES-256 before it is stored.</span>
+      <span class="muted" style="font-size:13.5px">Photos, videos and documents up to 200 MB each. Each file is encrypted with AES-256 before it is stored.</span>
       <button class="btn" id="lk-add" style="min-height:48px;padding:0 24px">＋ Choose files</button>
-      <input type="file" id="lk-in" multiple hidden></div>
+      <input type="file" id="lk-in" aria-label="Choose files to lock" multiple hidden></div>
     <div class="status info" id="lk-msg" role="status"></div>
     <div class="list" id="lk-list"></div>
-    <div class="sx-note"><span>ℹ️</span><span>The originals stay in your gallery or Files app until you delete them yourself. Deleting from here removes only the locked copy.</span></div>`;
+    <div class="sx-note"><span>ℹ️</span><span>The originals stay in your gallery or Files app until you delete them yourself. Deleting from here removes only the locked copy. Locked files live only on this phone: they are not part of Android backups, and uninstalling the app or clearing its data deletes them.</span></div>`;
   const msg = t => { if (!dead) $('#lk-msg', body).textContent = t; };
   const aad = fAad;
+  db.clear('stage').catch(() => {}); // leftovers of an interrupted password change
 
   async function load() {
     urls.forEach(u => URL.revokeObjectURL(u)); urls = [];
     let recs = [];
-    try { recs = await db.all('files'); } catch (e) { msg('Could not read the locker storage.'); return; }
+    try { recs = await db.all('meta'); } catch (e) { msg('Could not read the locker storage.'); return; }
     const items = [];
     for (const r of recs) {
       if (dead || !S.key) return;
@@ -803,13 +1068,16 @@ function lockerBuild(body, S) {
   }
 
   async function addFiles(files) {
-    const arr = [...files];
+    if (S.busy) { msg('Wait until the password change has finished.'); return; }
+    const arr = [...files], skipped = [];
     let done = 0;
     for (const f of arr) {
       if (dead || !S.key) return;
-      const count = await db.count('files');
+      const count = await db.count('meta');
+      if (count >= MAX_ITEMS) { msg('The locker holds at most ' + MAX_ITEMS + ' files.'); break; }
       if (count >= lim() && needPro('locker')) { msg('Free limit reached. Upgrade to Pro for unlimited files.'); break; }
-      if (f.size > 100 * 1048576 && !confirm(f.name + ' is ' + fmtSize(f.size) + '. Large files use a lot of memory and may fail on some phones. Continue?')) continue;
+      if (f.size > MAX_FILE) { skipped.push(f.name); continue; }
+      if (f.size > WARN_FILE && !confirm(f.name + ' is ' + fmtSize(f.size) + '. Large files use a lot of memory and may fail on some phones. Continue?')) continue;
       msg('Encrypting ' + (done + 1) + ' of ' + arr.length + ': ' + f.name);
       try {
         const buf = new Uint8Array(await f.arrayBuffer()), id = hex(rnd(8)), type = f.type || guessType(f.name);
@@ -818,17 +1086,20 @@ function lockerBuild(body, S) {
         const m = await sealBytes(S.key, te.encode(JSON.stringify({ name: f.name, size: f.size, type, added: Date.now() })), aad('m', id));
         const tb = await makeThumb(f);
         const t = tb ? await sealBytes(S.key, tb, aad('t', id)) : null;
-        await db.put('files', id, { id, di: d.iv, dc: d.ct, mi: m.iv, mc: m.ct, ti: t && t.iv, tc: t && t.ct });
+        await db.batch([{ s: 'blobs', k: id, v: { id, di: d.iv, dc: d.ct } }, { s: 'meta', k: id, v: { id, mi: m.iv, mc: m.ct, ti: t && t.iv, tc: t && t.ct } }]);
         done++;
       } catch (e) { msg('Could not add ' + f.name + ' (the file may be too large for this device).'); await sleep(1500); }
     }
-    if (done) msg(done + (done === 1 ? ' file locked.' : ' files locked.')); else if (!$('#lk-msg', body).textContent) msg('');
+    const big = skipped.length ? ' ' + skipped.length + (skipped.length === 1 ? ' file was' : ' files were') + ' skipped because ' + (skipped.length === 1 ? 'it is' : 'they are') + ' over 200 MB (' + skipped.slice(0, 2).join(', ') + (skipped.length > 2 ? ', …' : '') + '). Phones cannot encrypt files that large in memory.' : '';
+    if (done) msg(done + (done === 1 ? ' file locked.' : ' files locked.') + big); else if (big) msg(big.trim()); else if (!$('#lk-msg', body).textContent) msg('');
     await load();
   }
 
   async function plain(id) {
-    const r = await db.get('files', id), meta = JSON.parse(td.decode(await openBytes(S.key, r.mi, r.mc, aad('m', id))));
-    const bytes = await openBytes(S.key, r.di, r.dc, aad('f', id));
+    const [m, b] = await Promise.all([db.get('meta', id), db.get('blobs', id)]);
+    if (!m || !b) throw new Error('missing');
+    const meta = JSON.parse(td.decode(await openBytes(S.key, m.mi, m.mc, aad('m', id))));
+    const bytes = await openBytes(S.key, b.di, b.dc, aad('f', id));
     return { meta, bytes };
   }
   async function view(id) {
@@ -837,6 +1108,7 @@ function lockerBuild(body, S) {
       const { meta, bytes } = await plain(id);
       msg('');
       const t = meta.type || '', url = URL.createObjectURL(new Blob([bytes], { type: t }));
+      viewUrls.add(url);
       let inner;
       if (/^image\//.test(t)) inner = `<img alt="" src="${url}" style="max-width:100%;max-height:60vh;border-radius:12px;display:block;margin:0 auto">`;
       else if (/^video\//.test(t)) inner = `<video src="${url}" controls playsinline style="max-height:60vh"></video>`;
@@ -845,7 +1117,7 @@ function lockerBuild(body, S) {
       else inner = '<p class="muted" style="margin:0">No preview for this type of file. Use Export to open it in another app.</p>';
       const d = dialog(S.root, `<h2 class="sx-ell">${esc(meta.name)}</h2>${inner}<button class="btn" id="v-x" style="min-height:48px">Close</button>`);
       $('#v-x', d).onclick = () => d.close();
-      d.addEventListener('close', () => URL.revokeObjectURL(url));
+      d.addEventListener('close', () => { URL.revokeObjectURL(url); viewUrls.delete(url); });
     } catch (e) { msg('Could not decrypt this file.'); }
   }
   async function exportFile(id) {
@@ -855,9 +1127,10 @@ function lockerBuild(body, S) {
       await saveFile(new Blob([bytes], { type: meta.type || 'application/octet-stream' }), meta.name);
       msg('Exported. The exported copy is NOT encrypted; delete it when you are done.');
     } catch (e) { msg('Could not export this file.'); }
+    finally { S.release(); }
   }
 
-  $('#lk-add', body).addEventListener('click', () => { S.hold(180000); $('#lk-in', body).click(); });
+  $('#lk-add', body).addEventListener('click', () => S.pick($('#lk-in', body), 180000));
   $('#lk-in', body).addEventListener('change', ev => { const fs = ev.target.files; if (fs && fs.length) addFiles(fs).finally(() => { ev.target.value = ''; }); });
   $('#lk-list', body).addEventListener('click', async ev => {
     const b = ev.target.closest('button[data-a]');
@@ -865,29 +1138,64 @@ function lockerBuild(body, S) {
     const id = b.closest('[data-id]').dataset.id;
     if (b.dataset.a === 'view') view(id);
     else if (b.dataset.a === 'exp') exportFile(id);
-    else if (b.dataset.a === 'del' && confirm('Delete this locked file permanently? This cannot be undone.')) { await db.del('files', id); load(); }
+    else if (b.dataset.a === 'del' && confirm('Delete this locked file permanently? This cannot be undone.')) {
+      await db.batch([{ s: 'meta', k: id, del: true }, { s: 'blobs', k: id, del: true }]); load();
+    }
   });
   load();
-  return () => { dead = true; urls.forEach(u => URL.revokeObjectURL(u)); urls = []; };
+  return () => {
+    dead = true;
+    $$('dialog', S.root).forEach(d => { try { d.close(); } catch (e) { d.remove(); } });
+    urls.forEach(u => URL.revokeObjectURL(u)); urls = [];
+    viewUrls.forEach(u => URL.revokeObjectURL(u)); viewUrls.clear();
+  };
 }
 
+/* Change password without holding the whole locker in memory and without a half-switched state:
+   1. every file is re-encrypted ONE AT A TIME (peak memory about 3x the largest file) into the 'stage' store;
+   2. a single transaction then copies the staged records over the live ones (cursor, one record at a time) and writes the new key record.
+   A crash or error before step 2 commits leaves the old key and all old data untouched. */
 async function lockerRekey(S, oldKey, newKey, newRec) {
-  const recs = await S.db.all('files'), ops = [];
+  const db = S.db, ids = await db.keys('meta');
+  await db.clear('stage');
   let i = 0;
-  for (const r of recs) {
-    S.progress('Re-encrypting ' + (++i) + ' of ' + recs.length + '…');
-    const n = { id: r.id };
-    for (const [k, iv, ct] of [['f', 'di', 'dc'], ['m', 'mi', 'mc'], ['t', 'ti', 'tc']]) {
-      if (!r[ct]) continue;
-      const pt = await openBytes(oldKey, r[iv], r[ct], fAad(k, r.id));
-      const s = await sealBytes(newKey, pt, fAad(k, r.id));
-      pt.fill(0); n[iv] = s.iv; n[ct] = s.ct;
+  const staged = new Set();
+  try {
+    for (const id of ids) {
+      S.progress('Re-encrypting ' + (++i) + ' of ' + ids.length + '…');
+      const [m, b] = await Promise.all([db.get('meta', id), db.get('blobs', id)]);
+      const n = { id };
+      try {
+        if (!m || !b) throw new Error('missing');
+        for (const [k, iv, ct, src] of [['f', 'di', 'dc', b], ['m', 'mi', 'mc', m], ['t', 'ti', 'tc', m]]) {
+          if (!src[ct]) continue;
+          const pt = await openBytes(oldKey, src[iv], src[ct], fAad(k, id));
+          const s = await sealBytes(newKey, pt, fAad(k, id));
+          pt.fill(0); n[iv] = s.iv; n[ct] = s.ct;
+        }
+      } catch (e) {
+        // Only an item that was ALREADY unreadable (failed authentication or missing half) may be left behind; any other error aborts with nothing changed.
+        if (e && (e.name === 'OperationError' || e.message === 'missing')) continue;
+        throw e;
+      }
+      await db.put('stage', id, n); staged.add(id);
     }
-    ops.push({ s: 'files', k: r.id, v: n });
-  }
-  ops.push({ s: 'kv', k: 'rec', v: newRec });
-  S.progress('Saving…');
-  await S.db.batch(ops); // one transaction: either everything switches to the new key or nothing does
+    const now = await db.keys('meta');
+    if (now.length !== ids.length || now.some(k => !ids.includes(k))) throw new Error('The locker changed while the password was being changed');
+    if (ids.length && !staged.size) throw new Error('No file could be re-encrypted');
+    S.progress('Saving…');
+    await db.tx(['stage', 'meta', 'blobs', 'kv'], 'readwrite', t => {
+      const st = t.objectStore('stage'), meta = t.objectStore('meta'), blobs = t.objectStore('blobs');
+      st.openCursor().onsuccess = ev => {
+        const c = ev.target.result;
+        if (!c) { t.objectStore('kv').put(newRec, 'rec'); return; }
+        const v = c.value;
+        blobs.put({ id: v.id, di: v.di, dc: v.dc }, v.id);
+        meta.put({ id: v.id, mi: v.mi, mc: v.mc, ti: v.ti || null, tc: v.tc || null }, v.id);
+        c.delete(); c.continue();
+      };
+    });
+  } finally { try { await db.clear('stage'); } catch (e) { /* ignore */ } }
 }
 
 Tools.register({
@@ -896,7 +1204,7 @@ Tools.register({
   keys: ['vault', 'encrypt', 'private', 'hide', 'photos', 'safe'], needs: ['storage'],
   render(el) {
     return sealedShell(el, {
-      name: 'locker', db: 'locker', stores: ['files'], icon: '🔐', title: 'File Locker', bio: true,
+      name: 'locker', db: 'locker', stores: ['meta', 'blobs', 'stage'], dbVersion: 2, upgrade: lockerUpgrade, icon: '🔐', title: 'File Locker', bio: true,
       blurb: 'Photos, videos and documents are encrypted with AES-256 and a key made from your password. Everything stays on this phone.',
       init: () => ({ ok: 1 }), build: lockerBuild, rekey: lockerRekey
     });
@@ -929,13 +1237,14 @@ function vaultBuild(body, S) {
   function edit(id) {
     const cur = id ? items().find(e => e.id === id) : null;
     if (!cur && items().length >= proLimit('vault') && needPro('vault')) return;
+    if (!cur && items().length >= MAX_ITEMS) { toast('The vault is full (' + MAX_ITEMS + ' entries).'); return; }
     const e = cur || { id: hex(rnd(8)), title: '', user: '', pass: '', url: '', notes: '' };
     const d = dialog(S.root, `<h2>${cur ? 'Edit entry' : 'New entry'}</h2>
-      <label class="f">Title<input type="text" id="e-t" maxlength="80" autocomplete="off" value="${esc(e.title)}"></label>
+      <label class="f">Title<input type="text" id="e-t" maxlength="80" required autocomplete="off" value="${esc(e.title)}"></label>
       <label class="f">Username or email<input type="text" id="e-u" maxlength="160" autocomplete="off" autocapitalize="off" value="${esc(e.user)}"></label>
       <label class="f">Password<div class="sx-pw"><input type="password" id="e-p" maxlength="256" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(e.pass)}"><button type="button" class="sx-eye" data-eye="e-p" aria-label="Show or hide password">👁</button></div></label>
       <div class="sx-meter" id="e-m"><i></i></div>
-      <div class="row"><label class="f">Length<input type="number" id="e-len" min="8" max="64" value="20"></label><button class="btn alt" id="e-gen" style="margin-top:18px;min-height:44px">🎲 Generate</button></div>
+      <div class="row"><label class="f">Length<input type="number" id="e-len" min="8" max="64" step="1" value="20"></label><button class="btn alt" id="e-gen" style="margin-top:18px;min-height:44px">🎲 Generate</button></div>
       <label class="f">Website<input type="text" id="e-w" maxlength="200" autocomplete="off" autocapitalize="off" value="${esc(e.url)}"></label>
       <label class="f">Notes<textarea id="e-n" rows="3" maxlength="2000">${esc(e.notes)}</textarea></label>
       <div class="status" id="e-err"></div>
@@ -989,7 +1298,8 @@ Tools.register({
       backup: {
         merge(data, inc) {
           let n = 0;
-          for (const e of (inc && inc.items) || []) {
+          for (const e of (inc && Array.isArray(inc.items) ? inc.items : []).slice(0, MAX_IMPORT)) {
+            if (data.items.length >= MAX_ITEMS) break;
             if (!e || typeof e.id !== 'string' || data.items.some(x => x.id === e.id)) continue;
             if (data.items.length >= proLimit('vault') && needPro('vault')) break;
             data.items.push({ id: e.id, title: String(e.title || '').slice(0, 80), user: String(e.user || '').slice(0, 160), pass: String(e.pass || '').slice(0, 256), url: String(e.url || '').slice(0, 200), notes: String(e.notes || '').slice(0, 2000), updated: Number(e.updated) || 0 });
@@ -1017,6 +1327,7 @@ function notesBuild(body, S) {
   }
   function edit(id) {
     const cur = id ? items().find(n => n.id === id) : null, n = cur || { id: hex(rnd(8)), title: '', body: '' };
+    if (!cur && items().length >= MAX_ITEMS) { toast('Too many notes (' + MAX_ITEMS + ' at most).'); return; }
     const d = dialog(S.root, `<h2>${cur ? 'Edit note' : 'New note'}</h2>
       <label class="f">Title<input type="text" id="o-t" maxlength="80" autocomplete="off" value="${esc(n.title)}"></label>
       <label class="f">Note<textarea id="o-b" rows="9" maxlength="20000">${esc(n.body)}</textarea></label>
@@ -1052,7 +1363,8 @@ Tools.register({
       backup: {
         merge(data, inc) {
           let n = 0;
-          for (const e of (inc && inc.items) || []) {
+          for (const e of (inc && Array.isArray(inc.items) ? inc.items : []).slice(0, MAX_IMPORT)) {
+            if (data.items.length >= MAX_ITEMS) break;
             if (!e || typeof e.id !== 'string' || data.items.some(x => x.id === e.id)) continue;
             data.items.push({ id: e.id, title: String(e.title || '').slice(0, 80), body: String(e.body || '').slice(0, 20000), updated: Number(e.updated) || 0 });
             n++;
@@ -1085,9 +1397,9 @@ function totpBuild(body, S) {
   }
   async function update() {
     if (dead) return;
-    const now = Date.now();
+    const now = Date.now(), cards = new Map($$('.card[data-id]', body).map(c => [c.dataset.id, c]));
     for (const a of items()) {
-      const card = $('[data-id="' + a.id + '"]', body);
+      const card = cards.get(a.id); // looked up by value, never through a selector built from the id
       if (!card) continue;
       const step = Math.floor(now / 1000 / a.period), left = a.period - (Math.floor(now / 1000) % a.period);
       let c = cache.get(a.id);
@@ -1108,7 +1420,7 @@ function totpBuild(body, S) {
       <label class="f">Account (optional)<input type="text" id="a-a" maxlength="100" placeholder="you@example.com" autocomplete="off" autocapitalize="off"></label>
       <label class="f">Secret key or otpauth:// link<input type="password" id="a-s" maxlength="400" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="JBSWY3DPEHPK3PXP"></label>
       <details><summary style="min-height:44px;display:flex;align-items:center">Advanced</summary>
-        <div class="row"><label class="f">Digits<select id="a-d"><option>6</option><option>7</option><option>8</option></select></label><label class="f">Period (s)<input type="number" id="a-p" min="10" max="120" value="30"></label></div>
+        <div class="row"><label class="f">Digits<select id="a-d"><option>6</option><option>7</option><option>8</option></select></label><label class="f">Period (s)<input type="number" id="a-p" min="10" max="120" step="1" value="30"></label></div>
         <label class="f" style="margin-top:8px">Algorithm<select id="a-g"><option value="SHA-1">SHA-1 (default)</option><option value="SHA-256">SHA-256</option><option value="SHA-512">SHA-512</option></select></label></details>
       <div class="status" id="a-e"></div>
       <div class="row"><button class="btn alt" id="a-c">Cancel</button><button class="btn" id="a-s2">Add</button></div>`);
@@ -1119,9 +1431,11 @@ function totpBuild(body, S) {
       try {
         if (/^otpauth:/i.test(acc.secret)) { const p = parseOtpauth(acc.secret); acc = Object.assign(acc, p, { issuer: p.issuer || acc.issuer, account: p.account || acc.account }); }
         acc.secret = acc.secret.replace(/[\s-]+/g, '').toUpperCase();
+        if (acc.secret.length < 10) throw new Error('too short');
         await totp(b32decode(acc.secret), Date.now(), acc); // must produce a code
       } catch (e) { err.textContent = 'That secret key does not look valid. It should use letters A to Z and digits 2 to 7.'; return; }
       if (!acc.issuer && !acc.account) { err.textContent = 'Give the account a name.'; return; }
+      if (items().length >= MAX_ITEMS) { err.textContent = 'Too many accounts (' + MAX_ITEMS + ' at most).'; return; }
       acc.id = hex(rnd(8)); items().push(acc);
       try { await S.save(); } catch (e) { err.textContent = 'Could not save.'; return; }
       $('#a-s', d).value = ''; d.close(); layout();
@@ -1151,10 +1465,14 @@ Tools.register({
       backup: {
         merge(data, inc) {
           let n = 0;
-          for (const e of (inc && inc.items) || []) {
-            if (!e || typeof e.id !== 'string' || typeof e.secret !== 'string' || data.items.some(x => x.id === e.id)) continue;
+          for (const e of (inc && Array.isArray(inc.items) ? inc.items : []).slice(0, MAX_IMPORT)) {
+            if (data.items.length >= MAX_ITEMS) break;
+            if (!e || typeof e.secret !== 'string') continue;
             try { b32decode(e.secret); } catch (x) { continue; }
-            data.items.push({ id: e.id, issuer: String(e.issuer || '').slice(0, 60), account: String(e.account || '').slice(0, 100), secret: e.secret, algo: ['SHA-1', 'SHA-256', 'SHA-512'].includes(e.algo) ? e.algo : 'SHA-1', digits: [6, 7, 8].includes(e.digits) ? e.digits : 6, period: Math.min(120, Math.max(10, Number(e.period) || 30)) });
+            let id = typeof e.id === 'string' && /^[0-9a-f]{16}$/.test(e.id) ? e.id : '';
+            if (id ? data.items.some(x => x.id === id) : data.items.some(x => x.secret === e.secret && x.issuer === String(e.issuer || '').slice(0, 60))) continue;
+            if (!id) do { id = hex(rnd(8)); } while (data.items.some(x => x.id === id));
+            data.items.push({ id, issuer: String(e.issuer || '').slice(0, 60), account: String(e.account || '').slice(0, 100), secret: e.secret, algo: ['SHA-1', 'SHA-256', 'SHA-512'].includes(e.algo) ? e.algo : 'SHA-1', digits: [6, 7, 8].includes(e.digits) ? e.digits : 6, period: Math.min(120, Math.max(10, Number(e.period) || 30)) });
             n++;
           }
           return n;
@@ -1203,19 +1521,22 @@ Tools.register({
   keys: ['generator', 'random', 'diceware', 'passphrase', 'pin', 'password generator'], needs: [],
   render(el) {
     const box = mount(el);
-    const st = Object.assign({ mode: 'pin', pinLen: 6, easy: true, words: 5, sep: '-', cap: false, num: false, pwLen: 16, opt: { lower: true, upper: true, digit: true, symbol: true } }, Store.get('pingen.s', {}));
+    const st = Object.assign({ mode: 'pin', pinLen: 6, easy: true, words: 7, sep: '-', cap: false, num: false, pwLen: 16, opt: { lower: true, upper: true, digit: true, symbol: true } }, Store.get('pingen.s', {}));
     st.mode = 'pin';
+    st.pinLen = clampInt(st.pinLen, 4, 12, 6); st.words = clampInt(st.words, 3, 10, 7); st.pwLen = clampInt(st.pwLen, 8, 64, 16);
+    if (typeof st.sep !== 'string' || st.sep.length > 1) st.sep = '-';
+    if (!st.opt || typeof st.opt !== 'object') st.opt = { lower: true, upper: true, digit: true, symbol: true };
     box.innerHTML = `<div class="sx-seg" role="tablist"><button data-m="pin">PIN</button><button data-m="phrase">Passphrase</button><button data-m="pw">Password</button></div>
       <div class="card sx-card" id="g-opt"></div>
       <button class="btn" id="g-go" style="min-height:50px;font-size:17px">🎲 Generate</button>
       <div class="list" id="g-out"></div>
       <div class="status info" id="g-bits" style="text-align:center"></div>
-      <div class="sx-note"><span>🔐</span><span>Made with your phone's cryptographic random generator. Nothing is stored or sent. Copied values clear from the clipboard after 30 s where Android allows it.</span></div>`;
+      <div class="sx-note"><span>🔐</span><span>Made with your phone's cryptographic random generator. Nothing is stored or sent. After you copy, the message tells you whether this phone clears the clipboard by itself after 30 s.</span></div>`;
     const range = (id, label, v, min, max) => `<label class="f">${label}: <b id="${id}-v" style="color:var(--text)">${v}</b><input type="range" id="${id}" min="${min}" max="${max}" value="${v}" style="width:100%;accent-color:var(--accent);min-height:36px"></label>`;
     const chk = (id, label, on) => `<label class="sx-t"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span>${label}</span></label>`;
     function opts() {
       const o = $('#g-opt', box);
-      if (st.mode === 'pin') o.innerHTML = range('pl', 'Length', st.pinLen, 4, 12) + chk('pe', 'Avoid easy PINs (0000, 1234)', st.easy);
+      if (st.mode === 'pin') o.innerHTML = range('pl', 'Length', st.pinLen, 4, 12) + chk('pe', 'Avoid easy PINs (0000, 1234, 1122, 1212, 2580, years)', st.easy);
       else if (st.mode === 'phrase') o.innerHTML = range('wc', 'Words', st.words, 3, 10) + `<label class="f">Separator<select id="ws"><option value="-">Hyphen -</option><option value=" ">Space</option><option value=".">Dot .</option><option value="_">Underscore _</option><option value="">None</option></select></label>` + chk('wcap', 'Capitalise words', st.cap) + chk('wnum', 'Add a number at the end', st.num);
       else o.innerHTML = range('xl', 'Length', st.pwLen, 8, 64) + chk('xa', 'Lowercase a-z', st.opt.lower) + chk('xb', 'Uppercase A-Z', st.opt.upper) + chk('xc', 'Digits 0-9', st.opt.digit) + chk('xd', 'Symbols !@#', st.opt.symbol);
       const ws = $('#ws', box); if (ws) ws.value = st.sep;
@@ -1223,18 +1544,18 @@ Tools.register({
     }
     function read() {
       const v = id => { const e = $('#' + id, box); return e; };
-      if (st.mode === 'pin') { st.pinLen = Number(v('pl').value); st.easy = v('pe').checked; }
-      else if (st.mode === 'phrase') { st.words = Number(v('wc').value); st.sep = v('ws').value; st.cap = v('wcap').checked; st.num = v('wnum').checked; }
-      else { st.pwLen = Number(v('xl').value); st.opt = { lower: v('xa').checked, upper: v('xb').checked, digit: v('xc').checked, symbol: v('xd').checked }; if (!Object.values(st.opt).some(Boolean)) st.opt.lower = true; }
+      if (st.mode === 'pin') { st.pinLen = clampInt(v('pl').value, 4, 12, 6); st.easy = v('pe').checked; }
+      else if (st.mode === 'phrase') { st.words = clampInt(v('wc').value, 3, 10, 7); st.sep = v('ws').value; st.cap = v('wcap').checked; st.num = v('wnum').checked; }
+      else { st.pwLen = clampInt(v('xl').value, 8, 64, 16); st.opt = { lower: v('xa').checked, upper: v('xb').checked, digit: v('xc').checked, symbol: v('xd').checked }; if (!Object.values(st.opt).some(Boolean)) st.opt.lower = true; }
     }
     function gen() {
       read();
       let vals, bits;
-      if (st.mode === 'pin') { vals = Array.from({ length: 5 }, () => genPin(st.pinLen, st.easy)); bits = st.pinLen * Math.log2(10); }
+      if (st.mode === 'pin') { vals = Array.from({ length: 5 }, () => genPin(st.pinLen, st.easy)); bits = pinBits(st.pinLen, st.easy); }
       else if (st.mode === 'phrase') { vals = Array.from({ length: 4 }, () => genPassphrase(st.words, st.sep, st.cap, st.num)); bits = st.words * Math.log2(WORDS.length) + (st.num ? Math.log2(100) : 0); }
       else { vals = Array.from({ length: 4 }, () => genPassword(st.pwLen, st.opt)); bits = st.pwLen * Math.log2(Object.keys(SETS).filter(k => st.opt[k]).map(k => SETS[k]).join('').length || 26); }
       $('#g-out', box).innerHTML = vals.map(v => `<div class="item" style="gap:8px"><span class="grow sx-mono" style="font-size:${st.mode === 'pin' ? 22 : 15}px;font-weight:${st.mode === 'pin' ? 700 : 500};letter-spacing:${st.mode === 'pin' ? '.1em' : '0'}">${esc(v)}</span><button class="btn alt" data-v="${esc(v)}" style="min-height:44px">Copy</button></div>`).join('');
-      $('#g-bits', box).textContent = 'About ' + Math.round(bits) + ' bits of randomness' + (st.mode === 'phrase' ? ' (word list of ' + WORDS.length + ')' : '');
+      $('#g-bits', box).textContent = 'About ' + Math.round(bits) + ' bits of randomness' + (st.mode === 'phrase' ? ' (word list of ' + WORDS.length + '; each word adds about ' + Math.log2(WORDS.length).toFixed(1) + ' bits)' + (bits < 60 ? '. Use 7 or more words for a strong passphrase.' : '') : '');
       Store.set('pingen.s', { pinLen: st.pinLen, easy: st.easy, words: st.words, sep: st.sep, cap: st.cap, num: st.num, pwLen: st.pwLen, opt: st.opt });
     }
     $$('.sx-seg button', box).forEach(b => b.addEventListener('click', () => { const m = b.dataset.m; $$('.sx-seg button', box).forEach(x => x.classList.toggle('on', x.dataset.m === m)); st.mode = m; opts(); gen(); }));
@@ -1253,17 +1574,19 @@ Tools.register({
   keys: ['encrypt', 'decrypt', 'message', 'secret', 'aes', 'cipher', 'base64'], needs: [],
   render(el) {
     const box = mount(el);
-    let mode = 'enc', busy = false;
+    const MAX_TEXT_BYTES = 14000;
+    let mode = 'enc', busy = false, forced = false;
     box.innerHTML = `<div class="sx-seg"><button data-m="enc" class="on">Lock a message</button><button data-m="dec">Unlock a message</button></div>
       <div class="card sx-card">
-        <label class="f" id="tl-lab">Message<textarea id="tl-in" rows="6" maxlength="20000" placeholder="Type the secret message" spellcheck="false"></textarea></label>
+        <label class="f" id="tl-lab">Message<textarea id="tl-in" rows="6" maxlength="14000" placeholder="Type the secret message" spellcheck="false"></textarea></label>
         ${pwField('tl-pw', 'Password', 'Share it separately, never in the same chat', 'off')}
         <div class="sx-meter" id="tl-m"><i></i></div>
         <div class="status" id="tl-e" role="alert"></div>
+        <button class="btn alt" id="tl-any" style="min-height:44px" hidden>Use this weak password anyway</button>
         <button class="btn" id="tl-go" style="min-height:48px">🔒 Lock message</button>
       </div>
       <div class="card sx-card" id="tl-oc" hidden><h3 id="tl-ot">Result</h3>
-        <textarea id="tl-out" rows="6" readonly spellcheck="false" class="sx-mono" style="font-size:13px"></textarea>
+        <textarea id="tl-out" rows="6" readonly maxlength="120000" aria-label="Result" spellcheck="false" class="sx-mono" style="font-size:13px"></textarea>
         <div class="row"><button class="btn alt" id="tl-cp" style="min-height:44px">Copy</button><button class="btn alt" id="tl-sh" style="min-height:44px">Share</button></div></div>
       <div class="sx-note"><span>ℹ️</span><span>Uses AES-256-GCM with a key made from your password (PBKDF2-SHA256, ${KDF_ITER.toLocaleString()} rounds). A wrong password or any change to the code makes unlocking fail. The recipient needs this app and the password. A weak password can still be guessed offline, so use a long one.</span></div>`;
     wireEyes(box);
@@ -1272,25 +1595,30 @@ Tools.register({
       mode = m; $$('.sx-seg button', box).forEach(b => b.classList.toggle('on', b.dataset.m === m));
       $('#tl-lab', box).firstChild.textContent = m === 'enc' ? 'Message' : 'Locked code';
       inp.placeholder = m === 'enc' ? 'Type the secret message' : 'Paste the locked code here';
+      inp.maxLength = m === 'enc' ? 14000 : 100000; // a locked code is longer than the message it holds
+      $('#tl-any', box).hidden = true; forced = false;
       $('#tl-go', box).textContent = m === 'enc' ? '🔒 Lock message' : '🔓 Unlock message';
       $('#tl-m', box).hidden = m !== 'enc'; $('#tl-oc', box).hidden = true; out.value = ''; err.textContent = '';
       $('#tl-ot', box).textContent = m === 'enc' ? 'Locked code' : 'Decrypted message';
     };
     $$('.sx-seg button', box).forEach(b => b.addEventListener('click', () => setMode(b.dataset.m)));
-    pw.addEventListener('input', () => paintMeter($('#tl-m', box), assess(pw.value)));
+    pw.addEventListener('input', () => { forced = false; $('#tl-any', box).hidden = true; paintMeter($('#tl-m', box), assess(pw.value)); });
+    $('#tl-any', box).addEventListener('click', () => { forced = true; $('#tl-go', box).click(); });
     $('#tl-go', box).addEventListener('click', async () => {
       if (busy) return;
       err.textContent = '';
       if (!inp.value.trim()) { err.textContent = mode === 'enc' ? 'Type a message first.' : 'Paste a locked code first.'; return; }
+      if (mode === 'enc' && te.encode(inp.value).length > MAX_TEXT_BYTES) { err.textContent = 'That message is too long (' + te.encode(inp.value).length.toLocaleString() + ' of ' + MAX_TEXT_BYTES.toLocaleString() + ' bytes). Split it into parts.'; return; }
       if (mode === 'enc' && pw.value.length < 8) { err.textContent = 'Use a password of at least 8 characters.'; return; }
       if (!pw.value) { err.textContent = 'Enter the password.'; return; }
+      if (mode === 'enc') { const a = assess(pw.value); if (isWeak(a) && !forced) { err.textContent = weakMsg(a); $('#tl-any', box).hidden = false; return; } }
       busy = true; const b = $('#tl-go', box), label = b.textContent; b.disabled = true; b.textContent = 'Working…';
       try {
         out.value = mode === 'enc' ? await encryptText(inp.value, pw.value) : await decryptText(inp.value, pw.value);
         $('#tl-oc', box).hidden = false;
       } catch (e) {
         $('#tl-oc', box).hidden = true; out.value = '';
-        err.textContent = mode === 'dec' ? (/not a PocketKit/.test(e.message) ? 'That is not a valid locked code.' : 'Wrong password, or the code was changed.') : 'Could not lock the message.';
+        err.textContent = mode === 'dec' ? (/not a PocketKit/.test(e.message) ? 'That is not a valid locked code (it may be cut off or from another app).' : 'Wrong password, or the code was changed.') : 'Could not lock the message.';
       } finally { busy = false; b.disabled = false; b.textContent = label; }
     });
     $('#tl-cp', box).addEventListener('click', () => copyText(out.value, mode === 'dec' ? 30000 : 0));
@@ -1306,13 +1634,14 @@ Tools.register({
   keys: ['hash', 'sha256', 'sha512', 'verify', 'integrity', 'download', 'apk'], needs: ['storage'],
   render(el) {
     const box = mount(el);
+    const MAX_HASH = 1024 * 1048576;
     let file = null, token = 0;
     box.innerHTML = hero('🧾', 'Verify a file', 'Check that a download is exactly what the publisher released. The file is hashed on this phone and never uploaded.') +
       `<div class="card sx-card">
-        <button class="btn alt" id="ck-pick" style="min-height:48px">📂 Choose a file</button><input type="file" id="ck-in" hidden>
+        <button class="btn alt" id="ck-pick" style="min-height:48px">📂 Choose a file</button><input type="file" id="ck-in" aria-label="Choose a file to check" hidden>
         <div id="ck-file" class="muted" style="font-size:14px">No file chosen</div>
         <label class="f">Algorithm<select id="ck-alg"><option value="SHA-256">SHA-256</option><option value="SHA-512">SHA-512</option><option value="SHA-384">SHA-384</option><option value="SHA-1">SHA-1 (legacy)</option></select></label>
-        <label class="f">Expected hash (optional)<textarea id="ck-exp" rows="2" maxlength="300" class="sx-mono" autocapitalize="off" spellcheck="false" placeholder="Paste the hash published by the source"></textarea></label>
+        <label class="f">Expected hash (optional)<textarea id="ck-exp" rows="2" maxlength="800" class="sx-mono" autocapitalize="off" spellcheck="false" placeholder="Paste the hash, or the whole line from sha256sum"></textarea></label>
         <button class="btn" id="ck-go" style="min-height:48px" disabled>Calculate</button>
         <div class="status info" id="ck-st" role="status"></div></div>
       <div class="card sx-card" id="ck-res" hidden><div id="ck-verdict" class="center" style="font-size:20px;font-weight:700"></div>
@@ -1320,20 +1649,20 @@ Tools.register({
         <button class="btn alt" id="ck-cp" style="min-height:44px">Copy hash</button></div>
       <div class="sx-note"><span>ℹ️</span><span>The phone's crypto engine hashes a whole file at once, so very large files (over about 500 MB) may fail on low-memory phones. Prefer SHA-256 or SHA-512; SHA-1 is only for old checklists.</span></div>`;
     const st = t => { $('#ck-st', box).textContent = t; };
-    const norm = s => s.replace(/[^0-9a-fA-F]/g, '').toLowerCase();
     $('#ck-pick', box).addEventListener('click', () => $('#ck-in', box).click());
     $('#ck-in', box).addEventListener('change', ev => {
       file = ev.target.files && ev.target.files[0] || null; token++;
       $('#ck-file', box).textContent = file ? file.name + ' · ' + fmtSize(file.size) : 'No file chosen';
       $('#ck-go', box).disabled = !file; $('#ck-res', box).hidden = true; st('');
-      if (file && file.size > 500 * 1048576) st('This file is large. Hashing may be slow or fail on this phone.');
+      if (file && file.size > MAX_HASH) { st('That file is over ' + fmtSize(MAX_HASH) + ', too large to hash on a phone.'); $('#ck-go', box).disabled = true; }
+      else if (file && file.size > 500 * 1048576) st('This file is large. Hashing may be slow or fail on this phone.');
     });
     $('#ck-exp', box).addEventListener('input', ev => {
-      const n = norm(ev.target.value).length, a = { 40: 'SHA-1', 64: 'SHA-256', 96: 'SHA-384', 128: 'SHA-512' }[n];
+      const n = extractHash(ev.target.value).length, a = { 40: 'SHA-1', 64: 'SHA-256', 96: 'SHA-384', 128: 'SHA-512' }[n];
       if (a) $('#ck-alg', box).value = a;
     });
     $('#ck-go', box).addEventListener('click', async () => {
-      if (!file) return;
+      if (!file || file.size > MAX_HASH) return;
       const my = ++token, b = $('#ck-go', box);
       b.disabled = true; st('Calculating…'); $('#ck-res', box).hidden = true;
       try {
@@ -1341,8 +1670,9 @@ Tools.register({
         const dig = hex(new Uint8Array(await SC.subtle.digest($('#ck-alg', box).value, buf)));
         if (my !== token) return;
         $('#ck-hash', box).textContent = dig;
-        const exp = norm($('#ck-exp', box).value), v = $('#ck-verdict', box);
+        const alg = $('#ck-alg', box).value, exp = extractHash($('#ck-exp', box).value), v = $('#ck-verdict', box);
         if (!exp) { v.textContent = 'Hash calculated'; v.style.color = ''; }
+        else if (exp.length !== ALG_LEN[alg]) { v.textContent = 'The pasted hash has ' + exp.length + ' characters, the wrong length for ' + alg + ' (' + ALG_LEN[alg] + '). Pick the matching algorithm or check what you pasted.'; v.style.color = 'var(--muted)'; }
         else if (exp === dig) { v.textContent = '✅ Match. The file is intact.'; v.style.color = 'var(--ok)'; }
         else { v.textContent = '❌ No match. Do not trust this file.'; v.style.color = 'var(--danger)'; }
         $('#ck-res', box).hidden = false; st('');
@@ -1427,6 +1757,7 @@ Tools.register({
   keys: ['ice', 'medical', 'blood', 'allergy', 'contact', 'first aid', 'in case of emergency'], needs: ['storage'],
   render(el) {
     const box = mount(el);
+    const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     const F = [['name', 'Full name'], ['dob', 'Date of birth'], ['blood', 'Blood group'], ['allergies', 'Allergies'], ['conditions', 'Medical conditions'], ['meds', 'Medicines'], ['donor', 'Organ donor'], ['c1n', 'Contact 1 name'], ['c1p', 'Contact 1 phone'], ['c2n', 'Contact 2 name'], ['c2p', 'Contact 2 phone'], ['notes', 'Other notes']];
     let card = Store.get('emergency.card', null), editing = !card;
     const tel = p => String(p || '').replace(/[^0-9+]/g, '');
@@ -1449,11 +1780,15 @@ Tools.register({
           ? `<label class="f">${l}<select id="em-${k}"><option value=""></option>${['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(b => `<option${c[k] === b ? ' selected' : ''}>${b}</option>`).join('')}</select></label>`
           : k === 'donor' ? `<label class="f">${l}<select id="em-${k}"><option value=""></option><option${c[k] === 'Yes' ? ' selected' : ''}>Yes</option><option${c[k] === 'No' ? ' selected' : ''}>No</option></select></label>`
           : /allergies|conditions|meds|notes/.test(k) ? `<label class="f">${l}<textarea id="em-${k}" rows="2" maxlength="400">${esc(c[k] || '')}</textarea></label>`
-          : `<label class="f">${l}<input type="${/p$/.test(k) && k !== 'dob' ? 'tel' : 'text'}" id="em-${k}" maxlength="80" autocomplete="off" value="${esc(c[k] || '')}"></label>`).join('')}
+          : k === 'dob' ? `<label class="f">${l}<input type="date" id="em-${k}" min="1900-01-01" max="${today}" value="${/^\d{4}-\d\d-\d\d$/.test(c[k] || '') ? esc(c[k]) : ''}"></label>`
+          : /p$/.test(k) ? `<label class="f">${l}<input type="tel" id="em-${k}" maxlength="20" pattern="[0-9+() .\-]{0,20}" title="Digits, spaces and + ( ) - only" inputmode="tel" autocomplete="off" value="${esc(c[k] || '')}"></label>`
+          : `<label class="f">${l}<input type="text" id="em-${k}" maxlength="60" autocomplete="off" value="${esc(c[k] || '')}"></label>`).join('')}
           <button class="btn" id="em-save" style="min-height:48px">Save card</button>${card ? '<button class="btn alt" id="em-cancel" style="min-height:44px">Cancel</button>' : ''}</div>`;
       $('#em-save', box).addEventListener('click', () => {
         const n = {};
         F.forEach(([k]) => { n[k] = $('#em-' + k, box).value.trim(); });
+        n.c1p = n.c1p.replace(/[^0-9+() .\-]/g, '').slice(0, 20); n.c2p = n.c2p.replace(/[^0-9+() .\-]/g, '').slice(0, 20);
+        if (n.dob && (n.dob < '1900-01-01' || n.dob > today)) n.dob = '';
         card = n; Store.set('emergency.card', n); editing = false; view(); toast('Saved');
       });
       const cn = $('#em-cancel', box); if (cn) cn.addEventListener('click', () => { editing = false; view(); });
