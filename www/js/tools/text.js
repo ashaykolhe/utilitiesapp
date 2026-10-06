@@ -556,6 +556,12 @@ TX.numStats = (a) => {
 };
 TX.teams = (names, k, rnd) => { const t = Array.from({ length: k }, () => []); TX.shuffle(names, rnd).forEach((n, i) => t[i % k].push(n)); return t; };
 
+/* Export of notes as Markdown (one note, or all notes in one file). */
+const mdLine = (s) => String(s == null ? '' : s).replace(/[\r\n\t]+/g, ' ').trim();
+TX.noteMarkdown = (n) => '# ' + (mdLine(n.t) || 'Untitled') + '\n\n' + String(n.b == null ? '' : n.b).replace(/\r\n?/g, '\n').trimEnd() + '\n';
+TX.notesMarkdown = (items, date) => '# Notes (' + date + ')\n\n' + items.length + ' note' + (items.length === 1 ? '' : 's') + '\n\n' +
+  items.map((n) => '## ' + (n.pin ? '[pinned] ' : '') + (mdLine(n.t) || 'Untitled') + '\n\n' + String(n.b == null ? '' : n.b).replace(/\r\n?/g, '\n').trimEnd() + '\n').join('\n---\n\n');
+TX.fileSlug = (s) => (String(s == null ? '' : s).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 30)) || 'note';
 if (typeof module === 'object' && module.exports) module.exports = TX;
 
 /* ====================== UI helpers ====================== */
@@ -563,6 +569,14 @@ const reg = (o) => Tools.register(Object.assign({ cat: 'text', needs: [] }, o));
 const WRAP = 'display:flex;flex-wrap:wrap;gap:8px', BTN = 'flex:1 1 28%;min-height:44px';
 const MONO = 'font-family:ui-monospace,Consolas,monospace;word-break:break-all';
 
+/* Hands a text file to the share sheet (or downloads it in a browser) and says so with a toast. */
+const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+async function sendFile(name, text, mime, what) {
+  if (text.length > 2e6) { toast('Too much data to export (over 2 MB)'); return false; }
+  const ok = await saveTextFile(name, text, mime);
+  if (ok) toast((what || 'Exported') + ': ' + name);
+  return ok;
+}
 function copy(s, msg) {
   const done = () => toast(msg || 'Copied');
   const fb = () => {
@@ -756,8 +770,14 @@ reg({ id: 'notes', name: 'Notes', icon: '📝', desc: 'Quick notes with a title 
   const showList = () => {
     cur = null;
     el.innerHTML = `<div class="list"><div class="row"><input type="search" id="q" maxlength="100" placeholder="Search notes" aria-label="Search notes" value="${esc(q)}"><button class="btn" id="new" style="flex:none">+ New</button></div>
-      <div class="muted">${items.length} note${items.length === 1 ? '' : 's'}${isPro() ? '' : ' (free plan: up to ' + proLimit('notes') + ')'}</div><div class="list" id="lst"></div></div>`;
+      <div class="muted">${items.length} note${items.length === 1 ? '' : 's'}${isPro() ? '' : ' (free plan: up to ' + proLimit('notes') + ')'}</div><div class="list" id="lst"></div>
+      <button class="btn alt" id="exall">Export all notes (.md)</button></div>`;
     rows();
+    $('#exall', el).onclick = () => {
+      const all = items.filter(n => !blank(n));
+      if (!all.length) { toast('No notes to export yet. Write one first.'); return; }
+      sendFile('notes-' + today() + '.md', TX.notesMarkdown(all.slice().sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0) || b.ts - a.ts), today()), 'text/markdown', 'Exported ' + all.length + ' note' + (all.length === 1 ? '' : 's'));
+    };
     $('#q', el).oninput = (e) => { q = e.target.value.toLowerCase(); rows(); };
     $('#new', el).onclick = () => {
       if (items.length >= proLimit('notes') && needPro('notes')) return;
@@ -774,7 +794,7 @@ reg({ id: 'notes', name: 'Notes', icon: '📝', desc: 'Quick notes with a title 
     el.innerHTML = `<div class="list"><div class="row"><button class="btn alt" id="bk">‹ Done</button><button class="btn alt" id="pin"></button></div>
       <input id="t" type="text" maxlength="120" placeholder="Title" aria-label="Title" value="${esc(n.t)}">
       <textarea id="b" rows="12" maxlength="${MAX_BODY}" placeholder="Write something..." aria-label="Note text">${esc(n.b.slice(0, MAX_BODY))}</textarea>
-      <div class="row"><button class="btn alt" id="cp">Copy</button><button class="btn danger" id="del">Delete</button></div></div>`;
+      <div class="row"><button class="btn alt" id="cp">Copy</button><button class="btn alt" id="ex">Export (.md)</button><button class="btn danger" id="del">Delete</button></div></div>`;
     const pinTxt = () => { $('#pin', el).textContent = n.pin ? '📌 Pinned' : 'Pin'; };
     pinTxt();
     const touch = () => {
@@ -785,6 +805,10 @@ reg({ id: 'notes', name: 'Notes', icon: '📝', desc: 'Quick notes with a title 
     $('#t', el).oninput = touch; $('#b', el).oninput = touch;
     $('#pin', el).onclick = () => { n.pin = !n.pin; if (items.includes(n)) persist(); pinTxt(); };
     $('#cp', el).onclick = () => copy((n.t ? n.t + '\n\n' : '') + n.b);
+    $('#ex', el).onclick = () => {
+      if (blank(n)) { toast('This note is empty, nothing to export.'); return; }
+      sendFile('note-' + TX.fileSlug(n.t) + '-' + today() + '.md', TX.noteMarkdown(n), 'text/markdown', 'Note exported');
+    };
     $('#bk', el).onclick = () => { items = items.filter(x => !blank(x)); persist(); showList(); };
     $('#del', el).onclick = () => {
       if (!delArm) { delArm = 1; $('#del', el).textContent = 'Tap again to delete'; setTimeout(() => { const b = $('#del', el); if (b) { delArm = 0; b.textContent = 'Delete'; } }, 2500); return; }

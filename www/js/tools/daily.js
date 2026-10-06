@@ -196,6 +196,31 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const dayKey = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 
+/*EXPORT-START*/
+/* ---------- export builders (pure, tested in Node) ---------- */
+// A text cell that starts with = + - @ (or a tab / CR) would run as a formula in a spreadsheet, so it gets a leading quote.
+const csvText = (v) => { v = v == null ? '' : String(v); return /^[=+\-@\t\r]/.test(v) ? "'" + v : v; };
+const oneLine = (s) => String(s == null ? '' : s).replace(/[\r\n\t]+/g, ' ').trim();
+const expenseRows = (list) => [['Date', 'Category', 'Amount', 'Note']].concat(list.slice().sort((a, b) => String(a.date).localeCompare(String(b.date)) || (a.at || 0) - (b.at || 0))
+  .map((e) => [e.date, csvText(e.cat), Number.isFinite(+e.amt) ? (+e.amt).toFixed(2) : '', csvText(e.note)]));
+const todoText = (items, date) => {
+  const open = items.filter((t) => !t.done), done = items.filter((t) => t.done);
+  const line = (t) => (t.done ? '[x] ' : '[ ] ') + oneLine(t.text) + (t.cat || t.due ? ' (' + [oneLine(t.cat), t.due ? 'due ' + t.due : ''].filter(Boolean).join(', ') + ')' : '');
+  return 'To-do list, ' + date + '\n' + open.length + ' open, ' + done.length + ' done\n\n' + open.concat(done).map(line).join('\n');
+};
+const shopText = (items, date) => {
+  const line = (i) => (i.done ? '[x] ' : '[ ] ') + i.q + ' x ' + oneLine(i.n);
+  return 'Shopping list, ' + date + '\n' + items.filter((i) => !i.done).length + ' to buy, ' + items.filter((i) => i.done).length + ' in the basket\n\n' + items.filter((i) => !i.done).concat(items.filter((i) => i.done)).map(line).join('\n');
+};
+/* Hand a CSV (or other text file) to the share sheet / a download and say so. */
+async function sendFile(name, text, mime, what) {
+  if (text.length > 2e6) { toast('Too much data to export (over 2 MB)'); return false; }
+  const ok = await saveTextFile(name, text, mime);
+  if (ok) toast((what || 'Exported') + ': ' + name);
+  return ok;
+}
+/*EXPORT-END*/
+
 /* Pill buttons that behave like a segmented control. */
 function segHtml(items, cur, o) {
   o = o || {};
@@ -300,10 +325,11 @@ async function copyText(text) {
 }
 async function shareText(title, text) {
   try {
-    if (P().Share) { await P().Share.share({ title, text, dialogTitle: title }); return; }
-    if (navigator.share) { await navigator.share({ title, text }); return; }
-  } catch (e) { if (/cancel|abort/i.test(String(e && (e.message || e.name)))) return; }
+    if (P().Share) { await P().Share.share({ title, text, dialogTitle: title }); return true; }
+    if (navigator.share) { await navigator.share({ title, text }); return true; }
+  } catch (e) { if (/cancel|abort/i.test(String(e && (e.message || e.name)))) return false; }
   copyText(text);
+  return true;
 }
 async function saveFile(name, text, mime) {
   const pl = P();
@@ -980,7 +1006,7 @@ Tools.register({ id: 'todo', name: 'To-do List', icon: '✅', cat: 'daily', desc
       <div class="row"><input id="du" type="date" aria-label="Due date" min="2000-01-01" max="2100-12-31"><select id="ct" aria-label="Category">${CATS_T.map(c => `<option>${c}</option>`).join('')}</select></div>
       <button class="btn" id="add">Add task</button></div>
     <input id="se" type="search" maxlength="60" placeholder="Search tasks" aria-label="Search tasks">
-    <div id="fl"></div><div class="list" id="ls"></div><button class="btn alt" id="cl">Clear completed</button>`;
+    <div id="fl"></div><div class="list" id="ls"></div><button class="btn alt" id="cl">Clear completed</button><button class="btn alt" id="sh">Share checklist (text)</button>`;
   const today = dayKey(new Date());
   function draw() {
     $('#fl', el).innerHTML = segHtml([['all', 'All'], ...CATS_T.map(c => [c, c]), ['done', 'Done']], filter, { row: 'gap:6px;overflow-x:auto;padding-bottom:2px', btn: 'flex:none;padding:9px 14px' });
@@ -1014,6 +1040,11 @@ Tools.register({ id: 'todo', name: 'To-do List', icon: '✅', cat: 'daily', desc
     if (x) { items = items.filter(z => z.id !== x.dataset.x); save(); draw(); }
   };
   $('#cl', el).onclick = () => { items = items.filter(t => !t.done); save(); draw(); };
+  $('#sh', el).onclick = async () => {
+    if (!items.length) { toast('Nothing to share yet. Add a task first.'); return; }
+    const text = todoText(items.slice(0, 500), today);
+    if (await shareText('To-do list ' + today, text)) toast('Checklist shared');
+  };
   bindSeg($('#fl', el), (k) => { filter = k; draw(); });
   draw();
 } });
@@ -1141,7 +1172,7 @@ Tools.register({ id: 'shopping', name: 'Shopping List', icon: '🛒', cat: 'dail
   const save = () => Store.set('daily.shop', items);
   el.innerHTML = `<div class="card list" style="gap:10px"><div class="row"><input id="nm" type="text" maxlength="40" placeholder="Add an item" aria-label="Item"><input id="qt" type="number" min="1" max="99" value="1" inputmode="numeric" aria-label="Quantity" style="flex:0 0 64px"><button class="btn" id="add" style="flex:0 0 auto">Add</button></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${['Milk', 'Bread', 'Eggs', 'Rice', 'Fruit', 'Water'].map(n => `<button class="btn alt" data-q="${n}" style="padding:6px 12px;font-size:13px;border-radius:99px">+ ${n}</button>`).join('')}</div></div>
-    <div id="sm" class="muted" style="font-size:13px;margin:0 4px"></div><div class="list" id="ls"></div><button class="btn alt" id="cl">Remove checked items</button>`;
+    <div id="sm" class="muted" style="font-size:13px;margin:0 4px"></div><div class="list" id="ls"></div><button class="btn alt" id="cl">Remove checked items</button><button class="btn alt" id="sh">Share list (text)</button>`;
   const root = rootOf(el);
   function draw() {
     const v = items.slice().sort((a, b) => a.done - b.done || a.at - b.at), left = items.filter(i => !i.done).length;
@@ -1163,6 +1194,11 @@ Tools.register({ id: 'shopping', name: 'Shopping List', icon: '🛒', cat: 'dail
     save(); draw();
   });
   $('#cl', el).onclick = () => { items = items.filter(i => !i.done); save(); draw(); };
+  $('#sh', el).onclick = async () => {
+    if (!items.length) { toast('Your list is empty, nothing to share.'); return; }
+    const day = dayKey(new Date());
+    if (await shareText('Shopping list ' + day, shopText(items.slice(0, 200), day))) toast('List shared');
+  };
   draw();
 } });
 
@@ -1179,6 +1215,7 @@ Tools.register({ id: 'expenses', name: 'Expense Tracker', icon: '💸', cat: 'da
     <div class="row" style="gap:8px"><button class="btn alt" id="pv" aria-label="Previous month" style="flex:0 0 52px">‹</button><div id="mh" class="center" style="font-weight:700;font-size:17px"></div><button class="btn alt" id="nx" aria-label="Next month" style="flex:0 0 52px">›</button></div>
     <div class="card center" style="${GRAD}"><div class="muted" style="font-size:12px;letter-spacing:.08em;text-transform:uppercase">Month total</div><div id="tt" style="font-size:38px;font-weight:800;font-variant-numeric:tabular-nums"></div></div>
     <div class="card" id="bars"></div><div class="card"><div style="${H2};margin:0 0 8px">Last 6 months</div><canvas id="mc" style="height:150px;display:block"></canvas></div>
+    <button class="btn alt" id="ex">Export all as CSV</button>
     <div class="list" id="ls"></div>`;
   const inMonth = (e, d) => e.date.startsWith(d.getFullYear() + '-' + pad(d.getMonth() + 1));
   function chart() {
@@ -1207,10 +1244,14 @@ Tools.register({ id: 'expenses', name: 'Expense Tracker', icon: '💸', cat: 'da
   }
   $('#add', el).onclick = () => {
     const amt = Math.round((+$('#am', el).value) * 100) / 100; if (!(amt > 0)) { toast('Enter an amount'); return; }
-    const date = /^d{4}-d{2}-d{2}$/.test($('#dt', el).value) ? $('#dt', el).value : dayKey(new Date());
+    const date = /^\d{4}-\d{2}-\d{2}$/.test($('#dt', el).value) ? $('#dt', el).value : dayKey(new Date());
     if (list.length >= 5000) { toast('Up to 5000 expenses. Delete some old ones first.'); return; }
     list.push({ id: uid(), amt: Math.min(amt, 1e9), cat: $('#ct', el).value, note: $('#nt', el).value.trim().slice(0, 40), date, at: Date.now() });
     save(); $('#am', el).value = ''; $('#nt', el).value = ''; vm = new Date(date + 'T00:00'); vm.setDate(1); toast('Added'); draw();
+  };
+  $('#ex', el).onclick = () => {
+    if (!list.length) { toast('No expenses to export yet. Add one first.'); return; }
+    sendFile('expenses-' + dayKey(new Date()) + '.csv', '\uFEFF' + toCSV(expenseRows(list)), 'text/csv', 'Exported ' + list.length + ' expense' + (list.length === 1 ? '' : 's'));
   };
   $('#cu', el).oninput = (e) => { cur = e.target.value.trim(); Store.set('daily.expcur', cur); draw(); };
   $('#pv', el).onclick = () => { vm.setMonth(vm.getMonth() - 1); draw(); };

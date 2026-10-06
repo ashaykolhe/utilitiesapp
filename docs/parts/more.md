@@ -3,7 +3,7 @@
 - category: calculate
 - plan: free
 - needs: storage
-- what: Converts between about 35 major currencies with no network, using a built-in table of approximate rates relative to the US dollar. The user can edit every rate, save them on the device, swap the two currencies and keep a favourites list that shows the converted amount for each. The date the rates were last edited is always shown and the tool states plainly that rates are manual.
+- what: Converts between about 35 major currencies with no network, using a built-in table of approximate rates relative to the US dollar. The user can edit every rate, save them on the device, swap the two currencies and keep a favourites list that shows the converted amount for each. The date the rates were last edited is always shown and the tool states plainly that rates are manual. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button.
 - test:
   1. Open the tool: 100 USD to INR shows 8,350 INR and "1 USD = 83.5 INR". The note says rates are manual and shows "(built-in, approximate)" as the last edited date.
   2. Tap Swap: From becomes INR, To becomes USD and the result updates.
@@ -11,13 +11,14 @@
   4. In Edit rates, clear a field or enter 0 and tap Save: a message asks for a rate above 0 and nothing is saved. Reset restores built-in rates and the built-in date.
   5. Pick a To currency and tap Add to favourites: it appears in Favourites with a converted value; the X button removes it. Empty amount shows "Enter an amount" without errors.
   6. Enter -5 as Amount (refused) and 99999999999999 (limited to 1,000,000,000,000). In Edit rates a rate of 0 or above 1,000,000,000 is refused with a message.
+  7. History: type an amount, wait 2 seconds: the clock button appears and lists "250 USD to INR" with the result and the rate used; copy works.
 
 ## Recipe Scaler
 - id: recipescale
 - category: calculate
 - plan: free
 - needs: storage
-- what: Scales an ingredient list from the original servings to the number you want to serve. It understands amounts such as 1 1/2, 2.5, 3/4, unicode fractions and ranges like 2-3, keeps the units and prints results as kitchen fractions. Recipes can be saved and reopened from a list on the device.
+- what: Scales an ingredient list from the original servings to the number you want to serve. It understands amounts such as 1 1/2, 2.5, 3/4, unicode fractions and ranges like 2-3, keeps the units and prints results as kitchen fractions. Recipes can be saved and reopened from a list on the device. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button.
 - test:
   1. Open the tool with the sample recipe (serves 4). Set "I want to serve" to 8: 2 cups flour becomes 4 cups, 1 1/2 tsp becomes 3 tsp, 3/4 cup becomes 1 1/2 cup, 2.5 tbsp becomes 5 tbsp and "Pinch of salt" is unchanged.
   2. Tap Half: servings become 2 and amounts halve (3/4 cup becomes 3/8 cup).
@@ -25,6 +26,7 @@
   4. Enter 0 in either servings box: the result says to enter servings above zero. Tap Save recipe with empty ingredients: a message asks for ingredients.
   5. Name the recipe and tap Save recipe, tap New, then open it from Saved recipes: name, servings and text return. The bin icon deletes it. Copy scaled copies the scaled text.
   6. Enter 0 or 5000 in a servings box: a message shows and the value is limited to the range 0.5 to 1000. At most 100 recipes can be saved.
+  7. History: change the servings you want, wait 2 seconds: the clock button appears and lists the recipe with the scale factor. Copy scaled also records it.
 
 ## Holiday Calendar
 - id: holidays

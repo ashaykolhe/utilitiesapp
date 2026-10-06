@@ -58,6 +58,33 @@ L.invoiceText = (inv) => {
   return out.join('\n');
 };
 
+/* ---- export (CSV rows and a printable invoice page) ---- */
+// A text cell that starts with = + - @ (or a tab / CR) would run as a formula in a spreadsheet, so it gets a leading quote.
+L.csvText = (v) => { v = v == null ? '' : String(v); return /^[=+\-@\t\r]/.test(v) ? "'" + v : v; };
+L.escHtml = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+L.invoiceRows = (list) => {
+  const rows = [['Invoice', 'Date', 'Business', 'Customer', 'Item', 'Quantity', 'Price', 'Line total', 'Subtotal', 'Discount', 'Tax', 'Total']];
+  list.forEach((inv) => {
+    const t = L.invoice(inv.items, inv.tax, inv.dt, inv.dv);
+    const items = inv.items.length ? inv.items : [{ d: '', q: 0, p: 0 }];
+    items.forEach((i, k) => rows.push([inv.no, inv.date, L.csvText(inv.biz), L.csvText(inv.cust), L.csvText(i.d), i.q || 0, i.p || 0, L.r2((i.q || 0) * (i.p || 0))].concat(k ? ['', '', '', ''] : [t.sub, t.disc, t.tax, t.total])));
+  });
+  return rows;
+};
+L.invoiceHtml = (inv) => {
+  const t = L.invoice(inv.items, inv.tax, inv.dt, inv.dv), c = inv.cur || '', m = (n) => L.escHtml(c + L.fx(n)), e = L.escHtml;
+  const lines = inv.items.map((i, k) => '<tr><td>' + (k + 1) + '</td><td>' + e(i.d || 'Item') + '</td><td class="r">' + e(L.sig(i.q || 0)) + '</td><td class="r">' + m(i.p || 0) + '</td><td class="r">' + m(L.r2((i.q || 0) * (i.p || 0))) + '</td></tr>').join('');
+  const sum = [['Subtotal', m(t.sub)]];
+  if (t.disc) sum.push(['Discount' + (inv.dt === 'pct' ? ' (' + e(L.sig(inv.dv)) + '%)' : ''), '-' + m(t.disc)]);
+  if (inv.tax) sum.push(['Tax (' + e(L.sig(inv.tax)) + '%)', m(t.tax)]);
+  const css = 'body{font-family:Arial,Helvetica,sans-serif;color:#111;max-width:720px;margin:24px auto;padding:0 16px}h1{margin:0 0 4px;font-size:26px}.m{color:#555;margin:2px 0}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{padding:8px 6px;border-bottom:1px solid #ddd;text-align:left}th{background:#f3f3f3}.r{text-align:right}.s td{border:0;padding:4px 6px}.tot td{font-weight:bold;font-size:18px;border-top:2px solid #111}@media print{body{margin:0}}';
+  return '<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Invoice ' + e(inv.no) + '</title>\n<style>' + css + '</style></head><body>\n<h1>INVOICE #' + e(inv.no) + '</h1>' +
+    (inv.biz ? '<p class="m"><b>' + e(inv.biz) + '</b></p>' : '') + '<p class="m">Date: ' + e(inv.date) + '</p>' + (inv.cust ? '<p class="m">Bill to: ' + e(inv.cust) + '</p>' : '') +
+    '\n<table><tr><th>#</th><th>Item</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Amount</th></tr>' + lines + '</table>\n<table style="width:50%;margin-left:50%">' +
+    sum.map((r) => '<tr class="s"><td>' + r[0] + '</td><td class="r">' + r[1] + '</td></tr>').join('') + '<tr class="tot"><td>Total</td><td class="r">' + m(t.total) + '</td></tr></table>\n</body></html>';
+};
+L.tallyRows = (list) => [['Counter', 'Value']].concat(list.map((x) => [L.csvText(x.n), x.v]));
+
 /* ---- dates (day numbers = days since 1970-01-01, UTC, so DST never matters) ---- */
 L.pd = (s) => {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
@@ -552,6 +579,23 @@ const shareText = async (title, text) => {
   } catch (e) { if (e && e.name === 'AbortError') return; }
   copyText(text);
 };
+/* Result history. kit(id).add(label, value) stores a settled result (never throws, skips empty ones);
+   kit(id).soon(key, fn) runs fn about 1.5 s after the last call with the same key, so only a result the user stopped on is kept. */
+const kit = (id) => {
+  const t = {};
+  return {
+    add(label, value) { try { if (typeof Hist !== 'undefined' && label && value) Hist.add(id, String(label), String(value)); } catch (e) { /* history is optional */ } },
+    soon(key, fn) { clearTimeout(t[key]); t[key] = setTimeout(() => { try { fn(); } catch (e) { /* ignore */ } }, 1500); },
+    stop() { Object.keys(t).forEach((k) => clearTimeout(t[k])); }
+  };
+};
+/* Hands a text file to the share sheet (or downloads it in a browser). Returns true when it was sent; a toast says so. */
+const sendFile = async (name, text, mime, what) => {
+  if (text.length > 2e6) { toast('Too much data to export (over 2 MB)'); return false; }
+  const done = await saveTextFile(name, text, mime);
+  if (done) toast((what || 'Exported') + ': ' + name);
+  return done;
+};
 const buzz = (ms = 12) => { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* ignore */ } };
 const todayStr = () => L.ds(L.today());
 
@@ -571,7 +615,8 @@ function fieldHtml(f, val) {
 }
 
 /* Builds one card per section: fields -> live result. Returns a cleanup function. */
-function multi(el, id, sections) {
+function multi(el, id, sections, name) {
+  const hk = kit(id);
   const saved = Store.get('calc.' + id, {});
   const dflt = (f) => (typeof f.v === 'function' ? f.v() : f.v === undefined ? '' : f.v);
   // a saved value is reused only when it still fits the field's limits (older versions had none)
@@ -605,21 +650,48 @@ function multi(el, id, sections) {
     if (outOfRange) html = '<div class="status">' + esc(outOfRange.l) + ': enter a value from ' + esc(outOfRange.a) + ' up to ' + esc(outOfRange.b) + '.</div>';
     if (html && /(NaN|Infinity|undefined)/.test(html.replace(/<[^>]*>/g, ' '))) html = BIG;
     out.innerHTML = html || '<div class="muted center" style="font-size:13px">Enter the values above.</div>';
+    card._ok = !!html && !outOfRange && !out.querySelector('.status') && html !== BIG;
     return v;
+  };
+  /* Headline of a result: the big number (with its caption), or the first rows, or the text card. */
+  const headline = (out) => {
+    const tx = (n) => (n ? n.textContent.replace(/\s+/g, ' ').trim() : '');
+    const mid = out.querySelector('.mid');
+    if (mid) { const cap = tx(mid.previousElementSibling && mid.previousElementSibling.classList.contains('muted') ? mid.previousElementSibling : null); return (cap ? cap + ': ' : '') + tx(mid); }
+    const items = $$('.item', out).slice(0, 3).map((r) => tx(r.firstElementChild) + ': ' + tx(r.lastElementChild));
+    return items.length ? items.join('; ') : tx(out.querySelector('.card'));
+  };
+  /* What was calculated: the tool, the section and every input the person typed (long text is cut short). */
+  const labelOf = (i, card) => {
+    const s = sections[i], parts = $$('[data-k]', card).map((x) => {
+      const lab = x.parentNode && x.parentNode.firstChild ? x.parentNode.firstChild.textContent.trim() : x.dataset.k;
+      const val = x.tagName === 'SELECT' ? x.options[x.selectedIndex].textContent : x.value.replace(/\s*\n\s*/g, ' / ').trim();
+      return (lab.length > 28 ? lab.slice(0, 26) + '..' : lab) + ' ' + (val.length > 40 ? val.slice(0, 38) + '..' : val);
+    });
+    return (name || id) + (s.title ? ' · ' + s.title : '') + ': ' + parts.join(', ');
+  };
+  const settle = (i) => {
+    const card = $$('.card', el)[i];
+    if (!card || !card._ok) return;
+    const v = headline($('[data-r]', card)); if (!v) return;
+    const s = sections[i], custom = typeof s.lab === 'function' ? s.lab(read(card)) : '';
+    hk.add(custom || labelOf(i, card), v);
   };
   const all = () => sections.forEach((s, i) => run(i));
   el.addEventListener('input', (e) => {
     const card = e.target.closest && e.target.closest('.card');
     if (!card) return;
     run(+card.dataset.s);
+    const si = +card.dataset.s; hk.soon('s' + si, () => settle(si));
     const s = Store.get('calc.' + id, {}), keep = sections[+card.dataset.s].fields.flat().filter((f) => f.keep !== false).map((f) => f.k);
     $$('[data-k]', card).forEach((x) => { if (keep.includes(x.dataset.k)) s[card.dataset.s + '.' + x.dataset.k] = x.value; });
     Store.set('calc.' + id, s);
   });
   all();
+  return hk.stop;
 }
-const simple = (def) => reg({ id: def.id, name: def.name, icon: def.icon, desc: def.desc, keys: def.keys, needs: def.needs || [], render(el) { multi(el, def.id, def.sections); } });
-const sec = (title, fields, calc, note) => ({ title, fields, calc, note });
+const simple = (def) => reg({ id: def.id, name: def.name, icon: def.icon, desc: def.desc, keys: def.keys, needs: def.needs || [], render(el) { return multi(el, def.id, def.sections, def.name); } });
+const sec = (title, fields, calc, note, lab) => ({ title, fields, calc, note, lab });
 /* N(key, label, default, min, max, step): every number field has real limits; step 1 means whole numbers only. by = [selector key, { unit: [min, max] }] */
 const N = (k, l, v, min = 0, max = 1e12, step, by) => ({ k, l, v, min, max, step, by });
 const BIG = '<div class="status">That value gives a result that is too large to show.</div>';
@@ -638,7 +710,7 @@ simple({ id: 'emi', name: 'EMI Calculator', icon: '🏦', desc: 'Monthly loan in
   const sch = L.schedule(v.p, v.r, n, 12);
   return big('Monthly EMI', fx(e)) + rows([['Total interest', fx(total - v.p)], ['Total payment', fx(total)], ['Months', String(n)]]) +
     '<b style="margin-top:6px">First 12 months</b>' + table(['Mo', 'Principal', 'Interest', 'Balance'], sch.map((r) => [r.m, fx(r.principal), fx(r.interest), fx(r.balance)]));
-})] });
+}, undefined, (v) => 'EMI ' + sig(v.p) + ' @ ' + sig(v.r) + '% x ' + sig(v.t) + (v.u === 'y' ? ' years' : ' months'))] });
 
 /* ================= 2. Billing ================= */
 reg({ id: 'billing', name: 'Billing', icon: '📃', desc: 'Make an invoice with line items, tax and discount, save the last 20 and share or copy it as text.', keys: ['invoice', 'bill', 'receipt', 'gst', 'quotation'], needs: ['storage'], render(el) {
@@ -655,8 +727,8 @@ reg({ id: 'billing', name: 'Billing', icon: '📃', desc: 'Make an invoice with 
     <label class="f">Type<select id="dt"><option value="pct">%</option><option value="amt">Amount</option></select></label></div>
     <div class="list" id="tot"></div>
     <div class="row"><button class="btn" id="save">Save</button><button class="btn alt" id="copy">Copy</button><button class="btn alt" id="share">Share</button></div>
-    <button class="btn alt" id="new">New invoice</button></div>
-    <b>Saved invoices (last 20)</b><div class="list" id="saved"></div>`;
+    <div class="row"><button class="btn alt" id="exh">Export page (HTML)</button><button class="btn alt" id="new">New invoice</button></div></div>
+    <div class="row" style="align-items:center"><b class="grow">Saved invoices (last 20)</b><button class="btn alt" id="exc">Export all (CSV)</button></div><div class="list" id="saved"></div>`;
   $('#dt', el).value = meta.dt;
   const num = (id, max) => Math.min(max, Math.max(0, Valid.num($('#' + id, el).value) || 0));
   const cur = () => ({ biz: $('#biz', el).value.trim(), cur: $('#cur', el).value.trim(), tax: num('tax', 100), dt: $('#dt', el).value, dv: num('dv', 1e12) });
@@ -683,7 +755,7 @@ reg({ id: 'billing', name: 'Billing', icon: '📃', desc: 'Make an invoice with 
   const drawSaved = () => {
     const list = Store.get('billing.list', []);
     $('#saved', el).innerHTML = list.length ? list.map((x) => `<div class="item"><div class="grow"><b>#${esc(x.no)} ${esc(x.cust || 'No name')}</b><div class="muted" style="font-size:13px">${esc(x.date)} · ${esc(x.cur + fx(L.invoice(x.items, x.tax, x.dt, x.dv).total))}</div></div>
-      <button class="btn alt" data-view="${x.id}" aria-label="View invoice">View</button><button class="btn alt" data-sh="${x.id}" aria-label="Share invoice">📤</button><button class="btn danger" data-del="${x.id}" aria-label="Delete invoice">✕</button></div>`).join('') : '<div class="muted center">Nothing saved yet.</div>';
+      <button class="btn alt" data-view="${x.id}" aria-label="View invoice">View</button><button class="btn alt" data-sh="${x.id}" aria-label="Share invoice">📤</button><button class="btn alt" data-exh="${x.id}" aria-label="Export invoice as a printable page">🖨️</button><button class="btn danger" data-del="${x.id}" aria-label="Delete invoice">✕</button></div>`).join('') : '<div class="muted center">Nothing saved yet.</div>';
   };
   const persistMeta = () => { const c = cur(); Store.set('billing.meta', { biz: c.biz, cur: c.cur, tax: c.tax, dt: c.dt, dv: c.dv }); };
   el.addEventListener('input', (e) => {
@@ -698,6 +770,15 @@ reg({ id: 'billing', name: 'Billing', icon: '📃', desc: 'Make an invoice with 
     if (b.dataset.rm !== undefined) { items.splice(+b.dataset.rm, 1); if (!items.length) items.push({ d: '', q: 1, p: 0 }); drawItems(); drawTot(); return; }
     if (b.id === 'copy') { copyText(text()); return; }
     if (b.id === 'share') { shareText('Invoice', text()); return; }
+    if (b.id === 'exh') {
+      if (!clean().length) { toast('Add at least one item to export'); return; }
+      const r = record(); sendFile('invoice-' + r.no + '-' + todayStr() + '.html', L.invoiceHtml(r), 'text/html', 'Invoice exported'); return;
+    }
+    if (b.id === 'exc') {
+      const all = Store.get('billing.list', []);
+      if (!all.length) { toast('No saved invoices to export yet'); return; }
+      sendFile('invoices-' + todayStr() + '.csv', '\uFEFF' + toCSV(L.invoiceRows(all)), 'text/csv', 'Exported ' + all.length + ' invoice' + (all.length === 1 ? '' : 's')); return;
+    }
     if (b.id === 'new') { items = [{ d: '', q: 1, p: 0 }]; editing = null; $('#cust', el).value = ''; drawItems(); drawTot(); return; }
     if (b.id === 'save') {
       if (!clean().length) { toast('Add at least one item'); return; }
@@ -713,6 +794,9 @@ reg({ id: 'billing', name: 'Billing', icon: '📃', desc: 'Make an invoice with 
       items = x.items.map((i) => Object.assign({}, i)); editing = x.id;
       $('#biz', el).value = x.biz; $('#cust', el).value = x.cust; $('#cur', el).value = x.cur; $('#tax', el).value = x.tax; $('#dv', el).value = x.dv; $('#dt', el).value = x.dt;
       drawItems(); drawTot(); toast('Loaded invoice #' + x.no); window.scrollTo(0, 0);
+    } else if (b.dataset.exh) {
+      const x = list.find((y) => String(y.id) === b.dataset.exh);
+      if (x) sendFile('invoice-' + x.no + '-' + x.date + '.html', L.invoiceHtml(x), 'text/html', 'Invoice exported');
     } else if (b.dataset.sh) {
       const x = list.find((y) => String(y.id) === b.dataset.sh);
       if (x) shareText('Invoice #' + x.no, L.invoiceText(x));
@@ -737,18 +821,21 @@ reg({ id: 'days', name: 'Days Counter', icon: '📆', desc: 'Days between two da
     <div class="row"><label class="f">Event name<input id="en" type="text" maxlength="40"></label><label class="f">Date<input id="ed" type="date" min="1900-01-01" max="2200-12-31" value="${L.ds(t + 7)}"></label></div>
     <button class="btn" id="ea">Save event</button><div class="list" id="ev"></div></div>`;
   const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
-  const r1 = () => {
+  const hk = kit('days');
+  const r1 = (quiet) => {
     const a = L.pd($('#a', el).value), b = L.pd($('#b', el).value);
     if (!ok(a, b)) { $('#r1', el).innerHTML = '<div class="muted center">Pick both dates.</div>'; return; }
     const lo = Math.min(a, b), hi = Math.max(a, b), d = hi - lo, y = L.ymd(lo, hi);
+    if (!quiet) hk.soon('r1', () => hk.add('Days from ' + L.ds(a) + ' to ' + L.ds(b), plural(d, 'day') + ' (' + y.y + 'y ' + y.m + 'm ' + y.d + 'd)'));
     $('#r1', el).innerHTML = big(b < a ? 'Days (To is earlier)' : 'Days', String(d)) + rows([['Weeks', Math.floor(d / 7) + ' w ' + (d % 7) + ' d'], ['Years, months, days', y.y + 'y ' + y.m + 'm ' + y.d + 'd'], ['Total weeks', sig(d / 7, 5)], ['Total hours', fx(d * 24, 0)]]);
   };
-  const r2 = (sign) => {
+  const r2 = (sign, quiet) => {
     const s = L.pd($('#s', el).value), n = Math.round(Valid.num($('#n', el).value));
     if (!ok(s, n)) { $('#r2', el).innerHTML = '<div class="muted center">Enter a date and number of days.</div>'; return; }
     const r = s + sign * n;
     if (Math.abs(n) > 2.9e6 || !(r >= L.pd('1000-01-01') && r <= L.pd('9999-12-31'))) { $('#r2', el).innerHTML = '<div class="status">That date is out of range (years 1000 to 9999).</div>'; return; }
     $('#r2', el).innerHTML = big(sign > 0 ? 'Date after' : 'Date before', L.ds(r)) + `<div class="center muted">${L.DAYS[L.dow(r)]}</div>`;
+    if (!quiet) hk.add(L.ds(s) + (sign > 0 ? ' + ' : ' − ') + plural(Math.abs(n), 'day'), L.ds(r) + ' (' + L.DAYS[L.dow(r)] + ')');
   };
   const events = () => Store.get('days.events', []);
   const drawEv = () => {
@@ -771,7 +858,8 @@ reg({ id: 'days', name: 'Days Counter', icon: '📆', desc: 'Days between two da
       list.push({ id: String(Date.now()), n, d }); Store.set('days.events', list); $('#en', el).value = ''; drawEv();
     } else if (b.dataset.del) { Store.set('days.events', events().filter((x) => x.id !== b.dataset.del)); drawEv(); }
   });
-  r1(); r2(1); drawEv();
+  r1(true); r2(1, true); drawEv();
+  return hk.stop;
 } });
 
 /* ================= 4. Tally counter ================= */
@@ -784,7 +872,8 @@ reg({ id: 'tally', name: 'Tally Counter', icon: '🔘', desc: 'Big plus and minu
     <div class="row"><button class="btn alt" id="minus" aria-label="Subtract" style="min-height:96px;font-size:44px">−</button><button class="btn" id="plus" aria-label="Add" style="min-height:96px;font-size:44px">+</button></div></div>
     <div class="row"><label class="f">Step<input id="step" type="number" inputmode="numeric" step="1" min="1" max="1000000" value="${esc(st.step)}"></label><button class="btn alt" id="reset" style="align-self:flex-end">Reset</button></div>
     <div class="card list"><b>Counters</b><div class="list" id="list"></div>
-    <div class="row"><input id="newn" type="text" maxlength="30" placeholder="New counter name" aria-label="New counter name"><button class="btn" id="addc" style="flex:0 0 auto">Add</button></div></div>`;
+    <div class="row"><input id="newn" type="text" maxlength="30" placeholder="New counter name" aria-label="New counter name"><button class="btn" id="addc" style="flex:0 0 auto">Add</button></div>
+    <button class="btn alt" id="exp">Export CSV</button></div>`;
   const save = () => Store.set('tally.state', st);
   const draw = () => {
     const c = st.list[st.sel];
@@ -805,6 +894,7 @@ reg({ id: 'tally', name: 'Tally Counter', icon: '🔘', desc: 'Big plus and minu
     const b = e.target.closest('button'), c = st.list[st.sel];
     if (b && (b.id === 'plus' || b.id === 'minus')) { c.v = Math.max(-1e15, Math.min(1e15, c.v + (b.id === 'plus' ? 1 : -1) * stepV())); buzz(12); save(); draw(); return; }
     if (b && b.id === 'reset') { if (arm('reset', 'Tap Reset again to confirm')) { c.v = 0; buzz(30); save(); draw(); } return; }
+    if (b && b.id === 'exp') { sendFile('tally-' + todayStr() + '.csv', '\uFEFF' + toCSV(L.tallyRows(st.list)), 'text/csv', 'Counters exported'); return; }
     if (b && b.id === 'addc') {
       if (st.list.length >= 20) { toast('Max 20 counters'); return; }
       st.list.push({ n: $('#newn', el).value.trim() || 'Counter ' + (st.list.length + 1), v: 0 }); st.sel = st.list.length - 1; $('#newn', el).value = ''; save(); draw(); return;
@@ -888,7 +978,7 @@ simple({ id: 'gst', name: 'Discount & GST', icon: '🔖', desc: 'Final price aft
   if (!ok(v.p, v.d, v.t) || v.p < 0 || v.d < 0 || v.d > 100 || v.t < 0) return null;
   const r = L.gst(v.p, v.d, v.t, v.m === 'in');
   return big('Final price', fx(r.final)) + rows([['You save', fx(r.saving)], ['Price after discount', fx(r.after)], ['Price before tax', fx(r.base)], ['Tax amount', fx(r.tax)]]);
-})] });
+}, undefined, (v) => 'Price ' + sig(v.p) + ', ' + sig(v.d) + '% off, ' + sig(v.t) + '% tax ' + (v.m === 'in' ? '(included)' : '(added)'))] });
 
 /* ================= 8. Tip ================= */
 simple({ id: 'tip', name: 'Tip Splitter', icon: '🍽️', desc: 'Split a bill between friends with a tip, optionally rounding each share up.', keys: ['bill', 'split', 'restaurant', 'gratuity'], sections: [sec('', [
@@ -898,7 +988,7 @@ simple({ id: 'tip', name: 'Tip Splitter', icon: '🍽️', desc: 'Split a bill b
   if (!ok(v.b, v.t, n) || v.b < 0 || v.t < 0 || n < 1 || n > 1000) return null;
   const r = L.tip(v.b, v.t, n, v.r === 'up');
   return big('Each person pays', fx(r.per)) + rows([['Tip total', fx(r.tip)], ['Total with tip', fx(r.total)], ['Bill share (no tip)', fx(r.billPer)]]);
-})] });
+}, undefined, (v) => 'Bill ' + sig(v.b) + ' + ' + sig(v.t) + '% tip, ' + Math.round(v.n) + ' people')] });
 
 /* ================= 9. Age ================= */
 simple({ id: 'age', name: 'Age Calculator', icon: '🎈', desc: 'Exact age in years, months and days, total days lived and the countdown to the next birthday.', keys: ['birthday', 'dob', 'born', 'years old'], sections: [sec('', [
@@ -933,6 +1023,7 @@ simple({ id: 'invest', name: 'Investment', icon: '🌱', desc: 'Compound interes
 
 /* ================= 11. Scientific ================= */
 reg({ id: 'sci', name: 'Scientific', icon: '🔬', desc: 'Scientific calculator with brackets, trig in degrees or radians, logs, roots, powers, factorial and memory keys.', keys: ['sin', 'cos', 'tan', 'log', 'sqrt', 'calculator', 'factorial', 'scientific'], needs: [], render(el) {
+  const hk = kit('sci');
   let deg = true, mem = 0, ans = 0, shown = false, fresh = false; // fresh: the box holds a result, so a digit starts a new sum
   const layout = [['DEG', 'MC', 'MR', 'M+', 'M−'], ['sin', 'cos', 'tan', 'ln', 'log'], ['asin', 'acos', 'atan', '√', '^'], ['(', ')', '!', 'π', 'e'], ['7', '8', '9', '÷', '⌫'], ['4', '5', '6', '×', 'AC'], ['1', '2', '3', '−', 'Ans'], ['0', '.', '%', '+', '=']];
   el.innerHTML = `<div class="card"><div class="muted" id="st" style="min-height:20px;font-size:13px"></div>
@@ -954,7 +1045,7 @@ reg({ id: 'sci', name: 'Scientific', icon: '🔬', desc: 'Scientific calculator 
   };
   const FN = ['sin', 'cos', 'tan', 'ln', 'log', 'asin', 'acos', 'atan', '√'];
   // '=' and Enter: the result goes back into the box as plain text (L.num), never as locale text such as 0,333
-  const equals = () => { shown = true; const r = preview(); if (r !== null) { ans = r; ex.value = L.num(r); fresh = true; shown = false; $('#rs', el).textContent = ''; } };
+  const equals = () => { shown = true; const src = ex.value.trim(), r = preview(); if (r !== null) { hk.add(src + (/sin|cos|tan/i.test(src) ? (deg ? ' [DEG]' : ' [RAD]') : ''), sig(r, 12)); ans = r; ex.value = L.num(r); fresh = true; shown = false; $('#rs', el).textContent = ''; } };
   el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-k]');
     if (!b) return;
@@ -979,6 +1070,7 @@ reg({ id: 'sci', name: 'Scientific', icon: '🔬', desc: 'Scientific calculator 
     else if (fresh && e.key.length === 1 && /[0-9.a-zπ(]/i.test(e.key) && !e.ctrlKey && !e.metaKey) { ex.value = ''; fresh = false; }
   });
   status();
+  return hk.stop;
 } });
 
 /* ================= more calculators ================= */
@@ -1061,7 +1153,10 @@ reg({ id: 'fraction', name: 'Fractions', icon: '➗', desc: 'Add, subtract, mult
     const r = L.fop(a, b, $('#o', el).value);
     $('#r', el).innerHTML = r && r.over ? '<div class="status">These numbers are too large to calculate exactly. Use smaller fractions.</div>' : r ? big('Result', L.fstr(r)) + rows([['Mixed number', L.fmixed(r)], ['Decimal', sig(r.n / r.d, 10)], ['Percent', sig(r.n / r.d * 100, 8) + '%']]) : '<div class="status">Cannot divide by zero.</div>';
   };
-  el.addEventListener('input', run); run();
+  const hk = kit('fraction');
+  const run2 = () => { run(); const a = L.pfrac($('#a', el).value), b = L.pfrac($('#b', el).value); if (!a || !b) return; const o = $('#o', el).value, r = L.fop(a, b, o); if (r && !r.over) hk.soon('f', () => hk.add(L.fstr(a) + ' ' + ({ '+': '+', '-': '−', '*': '×', '/': '÷' })[o] + ' ' + L.fstr(b), L.fstr(r) + ' (' + sig(r.n / r.d, 10) + ')')); };
+  el.addEventListener('input', run2); run();
+  return hk.stop;
 } });
 
 simple({ id: 'ratio', name: 'Ratio', icon: '⚗️', desc: 'Simplify a ratio, solve a proportion (a : b = c : x) and split an amount in a ratio.', keys: ['proportion', 'divide in ratio', 'simplify', 'scale'], sections: [
@@ -1115,25 +1210,29 @@ simple({ id: 'quad', name: 'Quadratic', icon: '🎢', desc: 'Solve ax² + bx + c
 })] });
 
 reg({ id: 'shapes', name: 'Area & Volume', icon: '🔷', desc: 'Area, perimeter, surface area and volume of common 2D and 3D shapes.', keys: ['geometry', 'circle', 'cylinder', 'sphere', 'rectangle', 'cone', 'perimeter'], render(el) {
-  const names = Object.keys(L.shapes);
+  const names = Object.keys(L.shapes), hk = kit('shapes');
   el.innerHTML = `<div class="card list"><label class="f">Shape<select id="s">${names.map((n) => `<option>${n}</option>`).join('')}</select></label><div class="list" id="f"></div><div class="list" id="r"></div></div>`;
-  const run = () => {
+  const run = (ev) => {
     const sh = L.shapes[$('#s', el).value], v = $$('input', el).map((i) => { const n = Valid.num(i.value); return n !== null && n <= +i.max ? n : NaN; });
-    $('#r', el).innerHTML = v.length && v.every((x) => Number.isFinite(x) && x > 0) ? rows(sh.f(...v).map((r) => [r[0], sig(r[1], 8)])) : '<div class="muted center">Enter positive sizes.</div>';
+    const good = v.length && v.every((x) => Number.isFinite(x) && x > 0);
+    $('#r', el).innerHTML = good ? rows(sh.f(...v).map((r) => [r[0], sig(r[1], 8)])) : '<div class="muted center">Enter positive sizes.</div>';
+    if (good && ev) hk.soon('s', () => hk.add($('#s', el).value + ' ' + sh.d.map((d, i) => d + ' ' + sig(v[i])).join(', '), sh.f(...v).slice(0, 2).map((r) => r[0] + ' ' + sig(r[1], 8)).join('; ')));
   };
   const build = () => {
     const sh = L.shapes[$('#s', el).value];
     $('#f', el).innerHTML = sh.d.map((d, i) => `<label class="f">${esc(d)}<input type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="${[10, 5, 4][i]}"></label>`).join('');
     run();
   };
-  $('#s', el).onchange = build; el.addEventListener('input', (e) => { if (e.target.tagName === 'INPUT') run(); });
+  $('#s', el).onchange = build; el.addEventListener('input', (e) => { if (e.target.tagName === 'INPUT') run(e); });
   build();
+  return hk.stop;
 } });
 
 reg({ id: 'triangle', name: 'Triangle', icon: '🔺', desc: 'Solve a triangle from three sides or from two sides and the angle between them: angles, area, type and radii.', keys: ['trigonometry', 'heron', 'angles', 'sides', 'geometry'], render(el) {
+  const hk = kit('triangle');
   el.innerHTML = `<div class="card list"><label class="f">Known<select id="m"><option value="sss">Three sides (a, b, c)</option><option value="sas">Two sides and the angle between (a, b, C°)</option></select></label>
     <div class="row"><label class="f"><span>Side a</span><input id="a" type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="3"></label><label class="f"><span>Side b</span><input id="b" type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="4"></label><label class="f"><span id="cl">Side c</span><input id="c" type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="5"></label></div><div class="list" id="r"></div></div>`;
-  const run = () => {
+  const run = (ev) => {
     const sas = $('#m', el).value === 'sas';
     $('#cl', el).textContent = sas ? 'Angle C (°)' : 'Side c';
     $('#c', el).max = sas ? '180' : '1000000000';
@@ -1142,9 +1241,11 @@ reg({ id: 'triangle', name: 'Triangle', icon: '🔺', desc: 'Solve a triangle fr
     let c = num('c'), pre = '';
     if (sas) { const s = ok(a, b, c) && a > 0 && b > 0 ? L.triSAS(a, b, c) : null; if (!s) { $('#r', el).innerHTML = '<div class="status">Angle must be between 0 and 180.</div>'; return; } pre = rows([['Side c', sig(s.c, 8)]]); c = s.c; }
     const t = ok(a, b, c) ? L.triSSS(a, b, c) : null;
+    if (t && ev && ev.type) hk.soon('t', () => hk.add('Triangle ' + (sas ? 'a ' + sig(a) + ', b ' + sig(b) + ', C ' + sig(Valid.num($('#c', el).value)) + '°' : 'sides ' + sig(a) + ', ' + sig(b) + ', ' + sig(c)), 'Area ' + sig(t.area, 8) + '; ' + t.type));
     $('#r', el).innerHTML = t ? pre + rows([['Angle A', sig(t.A, 7) + '°'], ['Angle B', sig(t.B, 7) + '°'], ['Angle C', sig(t.C, 7) + '°'], ['Type', t.type], ['Area', sig(t.area, 8)], ['Perimeter', sig(t.perimeter, 8)], ['Inradius', sig(t.inradius, 6)], ['Circumradius', sig(t.circumradius, 6)]]) : '<div class="status">These sides cannot form a triangle.</div>';
   };
   el.addEventListener('input', run); el.addEventListener('change', run); run();
+  return hk.stop;
 } });
 
 simple({ id: 'powercost', name: 'Power Cost', icon: '🔌', desc: 'Electricity used and cost of an appliance per day, month and year from its watts and daily hours.', keys: ['electricity', 'kwh', 'watt', 'bill', 'appliance', 'energy'], sections: [sec('', [

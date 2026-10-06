@@ -10,6 +10,15 @@ const sv = (k, v) => { try { Store.set(k, v); } catch (e) { toast('Could not sav
 const p2 = (n) => String(n).padStart(2, '0');
 const dstr = (y, m, d) => y + '-' + p2(m + 1) + '-' + p2(d);
 const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+/* Result history: add() stores one settled result (never throws); soon() waits about 1.5 s after the last call so only a result the person stopped on is kept. */
+const kit = (id) => {
+  let t = null;
+  return {
+    add(label, value) { try { if (typeof Hist !== 'undefined' && label && value) Hist.add(id, String(label), String(value)); } catch (e) { /* history is optional */ } },
+    soon(fn) { clearTimeout(t); t = setTimeout(() => { try { fn(); } catch (e) { /* ignore */ } }, 1500); },
+    stop() { clearTimeout(t); }
+  };
+};
 const tbl = (cv, type) => new Promise((res) => cv.toBlob(res, type || 'image/png'));
 const readB64 = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
 async function saveBlob(blob, name) {
@@ -74,6 +83,9 @@ reg({ id: 'currency', name: 'Currency', icon: '💱', desc: 'Convert between abo
   let favs = ld('currency.favs', ['USD', 'EUR', 'INR']);
   let from = ld('currency.from', 'USD'), to = ld('currency.to', 'INR'), editing = false;
   const names = {}; CUR.forEach(([c, n]) => { names[c] = n; });
+  const hk = kit('currency');
+  let lastRes = null; // [label, value] of the conversion on screen
+  const later = () => hk.soon(() => { if (lastRes) hk.add(lastRes[0], lastRes[1]); });
   const opts = (sel) => CUR.map(([c, n]) => `<option value="${c}"${c === sel ? ' selected' : ''}>${c} - ${esc(n)}</option>`).join('');
   function draw() {
     if (editing) return drawEdit();
@@ -91,12 +103,13 @@ reg({ id: 'currency', name: 'Currency', icon: '💱', desc: 'Convert between abo
     function calc() {
       let a = num(am.value); if (!(a >= 0 && a <= 1e12)) a = NaN; sv('currency.amt', am.value); sv('currency.from', from); sv('currency.to', to);
       const r = curConvert(a, from, to, rates), x = curCross(from, to, rates);
+      lastRes = Number.isFinite(r) ? [fmtN(a, 4) + ' ' + from + ' to ' + to, fmtN(r, curDigits(r)) + ' ' + to + ' (1 ' + from + ' = ' + fmtN(x, 6) + ' ' + to + ')'] : null;
       $('#out', el).innerHTML = Number.isFinite(r) ? `<div class="muted">${fmtN(a, 4)} ${from} =</div><div class="mid" style="word-break:break-all">${fmtN(r, curDigits(r))} ${to}</div><div class="muted" style="font-size:13px;margin-top:4px">1 ${from} = ${fmtN(x, 6)} ${to}</div>` : '<div class="muted">Enter an amount</div>';
       $('#fl', el).innerHTML = favs.length ? favs.map((c) => { const v = curConvert(a, from, c, rates); return `<div class="item"><span class="grow"><b>${c}</b><div class="muted" style="font-size:12px">${esc(names[c] || '')}</div></span><span>${Number.isFinite(v) ? fmtN(v, curDigits(v)) : '—'}</span><button class="btn alt" data-r="${c}" aria-label="Remove ${c}" style="padding:8px 12px;min-height:44px">✕</button></div>`; }).join('') : '<div class="muted">No favourites yet. Pick a currency in To and tap Add to favourites.</div>';
       $$('[data-r]', el).forEach((b) => { b.onclick = () => { favs = favs.filter((c) => c !== b.dataset.r); sv('currency.favs', favs); draw(); }; });
     }
-    am.oninput = calc; fr.onchange = () => { from = fr.value; calc(); }; tt.onchange = () => { to = tt.value; draw(); };
-    $('#sw', el).onclick = () => { const t = from; from = to; to = t; draw(); };
+    am.oninput = () => { calc(); later(); }; fr.onchange = () => { from = fr.value; calc(); later(); }; tt.onchange = () => { to = tt.value; draw(); later(); };
+    $('#sw', el).onclick = () => { const t = from; from = to; to = t; draw(); later(); };
     $('#fv', el).onclick = () => { if (!favs.includes(to)) favs.push(to); sv('currency.favs', favs); draw(); };
     $('#ed', el).onclick = () => { editing = true; draw(); };
     calc();
@@ -116,6 +129,7 @@ reg({ id: 'currency', name: 'Currency', icon: '💱', desc: 'Convert between abo
     $('#cn', el).onclick = () => { Object.assign(rates, committed); editing = false; draw(); };
   }
   draw();
+  return hk.stop;
 } });
 
 /* ================= 2. Recipe Scaler ================= */
@@ -184,6 +198,12 @@ reg({ id: 'recipescale', name: 'Recipe Scaler', icon: '🍲', desc: 'Scale a rec
     <div class="card"><b>Saved recipes</b><div id="ls" class="list" style="margin-top:8px"></div></div>
     <div class="muted" style="font-size:12px">Lines without a leading amount (like "Pinch of salt") are left as they are. Units are kept; no unit conversion is done.</div>`;
   const nm = $('#nm', el), fr = $('#fr', el), to = $('#to', el), tx = $('#tx', el);
+  const hk = kit('recipescale');
+  const record = () => {
+    const a = num(fr.value), b = num(to.value);
+    if (!(a >= 0.5 && b >= 0.5 && a <= 1000 && b <= 1000) || !tx.value.trim()) return;
+    hk.add((nm.value.trim().slice(0, 40) || 'Recipe') + ': serves ' + fmtQty(a) + ' to ' + fmtQty(b), 'x' + fmtN(b / a, 3) + ' (' + tx.value.split('\n').filter((l) => l.trim()).length + ' lines scaled)');
+  };
   const load = (r) => { cur = Object.assign({}, r); nm.value = cur.name; fr.value = cur.from; to.value = cur.to; tx.value = cur.text; upd(); };
   function upd() {
     const a = num(fr.value), b = num(to.value), ok = a >= 0.5 && b >= 0.5 && a <= 1000 && b <= 1000;
@@ -195,9 +215,9 @@ reg({ id: 'recipescale', name: 'Recipe Scaler', icon: '🍲', desc: 'Scale a rec
     $$('[data-o]', el).forEach((b) => { b.onclick = () => load(recipes.find((r) => r.id === b.dataset.o)); });
     $$('[data-d]', el).forEach((b) => { b.onclick = () => { recipes = recipes.filter((r) => r.id !== b.dataset.d); sv('recipescale.list', recipes); list(); }; });
   }
-  [nm, fr, to, tx].forEach((i) => { i.oninput = upd; });
-  $$('[data-m]', el).forEach((b) => { b.onclick = () => { const a = num(fr.value); if (a > 0) { to.value = Math.round(a * +b.dataset.m * 100) / 100; upd(); } }; });
-  $('#cp', el).onclick = () => copyText($('#res', el).textContent);
+  [nm, fr, to, tx].forEach((i) => { i.oninput = () => { upd(); hk.soon(record); }; });
+  $$('[data-m]', el).forEach((b) => { b.onclick = () => { const a = num(fr.value); if (a > 0) { to.value = Math.round(a * +b.dataset.m * 100) / 100; upd(); hk.soon(record); } }; });
+  $('#cp', el).onclick = () => { record(); copyText($('#res', el).textContent); };
   $('#nw', el).onclick = () => load({ id: null, name: '', from: 4, to: 4, text: '' });
   $('#sa', el).onclick = () => {
     const a = num(fr.value), b = num(to.value);
@@ -210,6 +230,7 @@ reg({ id: 'recipescale', name: 'Recipe Scaler', icon: '🍲', desc: 'Scale a rec
     sv('recipescale.list', recipes); list(); toast('Recipe saved');
   };
   load(cur); list();
+  return hk.stop;
 } });
 
 /* ================= 3. Holiday Calendar ================= */

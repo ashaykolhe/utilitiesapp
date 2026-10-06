@@ -13,6 +13,14 @@ Tools.register({ id: 'converter', name: 'Unit Converter', icon: '🔁', cat: 'ca
     <div class="card list"><label class="f" for="v">Value</label><input id="v" type="number" value="1" min="-1000000000000" max="1000000000000" step="any" inputmode="decimal"><label class="f" for="a">From</label><select id="a"></select>
     <div class="center muted">=</div><div class="mid" id="o" role="status" aria-live="polite"></div><label class="f" for="b">To</label><select id="b"></select></div>`;
   const temp = { C: 1, F: 1, K: 1 };
+  let timer = null;
+  // the result is kept in the history once the person has stopped typing or choosing for a moment
+  const settle = () => {
+    const o = $('#o', el).textContent;
+    if (!o || o === '—') return;
+    try { if (typeof Hist !== 'undefined') Hist.add('converter', $('#t', el).value + ': ' + +parseFloat($('#v', el).value).toPrecision(10) + ' ' + $('#a', el).value, o); } catch (e) { /* history is optional */ }
+  };
+  const later = () => { clearTimeout(timer); timer = setTimeout(settle, 1500); };
   const fill = () => {
     const names = Object.keys($('#t', el).value === 'Temperature' ? temp : UNITS[$('#t', el).value]);
     $('#a', el).innerHTML = names.map(n => `<option>${esc(n)}</option>`).join('');
@@ -26,6 +34,7 @@ Tools.register({ id: 'converter', name: 'Unit Converter', icon: '🔁', cat: 'ca
     const r = type === 'Temperature' ? fromC(toC(v, a), b) : v * UNITS[type][a] / UNITS[type][b];
     $('#o', el).textContent = Number.isFinite(r) ? +r.toPrecision(10) + ' ' + b : '—';
   }
-  $('#t', el).onchange = fill; ['v', 'a', 'b'].forEach(i => { $('#' + i, el).oninput = calc; });
+  $('#t', el).onchange = () => { fill(); later(); }; ['v', 'a', 'b'].forEach(i => { $('#' + i, el).oninput = () => { calc(); later(); }; });
   fill();
+  return () => clearTimeout(timer);
 } });

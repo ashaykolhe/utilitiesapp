@@ -109,7 +109,7 @@
 - category: daily
 - plan: free
 - needs: storage
-- what: Tasks with a due date, category, done toggle, search, filter chips and a clear-completed button. Overdue tasks are highlighted. Stored locally.
+- what: Tasks with a due date, category, done toggle, search, filter chips and a clear-completed button. Overdue tasks are highlighted. Stored locally. The list can be shared as a plain text checklist.
 - test:
   1. Add "Buy stamps" due tomorrow in category Home: it appears with "Home" and the date.
   2. Tick it: it is crossed out and moves to the bottom. The Done filter lists it.
@@ -117,6 +117,7 @@
   4. Type part of a task name in Search: the list narrows.
   5. Tap Clear completed: ticked tasks disappear. Adding an empty task shows a toast.
   6. The list holds 500 tasks; when full the oldest completed task is dropped (with a toast), and open tasks are never dropped.
+  7. Export: with an empty list tap "Share checklist (text)": a message says there is nothing to share. Add tasks, tick one, tap Share: the share sheet opens with a text checklist, "[ ] task (Category, due date)" for open tasks and "[x] ..." for done ones.
 
 ## Battery & Network
 - id: devstatus
@@ -162,26 +163,28 @@
 - category: daily
 - plan: free
 - needs: storage
-- what: A shopping list with quantity steppers, quick-add chips, check-off while you shop and one tap to remove everything in the basket.
+- what: A shopping list with quantity steppers, quick-add chips, check-off while you shop and one tap to remove everything in the basket. The list can be shared as a plain text checklist.
 - test:
   1. Type "Apples", set quantity 3 and tap Add: it appears with 3.
   2. Tap the "+ Milk" chip twice: the quantity of Milk becomes 2 instead of a duplicate.
   3. Tick Apples: it is crossed out and moves down; the summary counts items in the basket.
   4. Press minus down to 1: it does not go lower. Tap "Remove checked items": ticked items go.
   5. Add an empty name: a toast asks you to type an item.
+  6. Export: with an empty list tap "Share list (text)": a message says it is empty. Add items, check one, tap Share: the share sheet opens with a text checklist such as "[ ] 2 x Milk" and "[x] 1 x Bread".
 
 ## Expense Tracker
 - id: expenses
 - category: daily
 - plan: free
 - needs: storage
-- what: Logs spending with category, note and date. Shows the month total, a bar for each category and a six-month column chart, with month navigation and a currency symbol. Stored locally.
+- what: Logs spending with category, note and date. Shows the month total, a bar for each category and a six-month column chart, with month navigation and a currency symbol. Stored locally. All expenses can be exported as a CSV file (date, category, amount, note); notes that start with = + - or @ are quoted so a spreadsheet never runs them as a formula.
 - test:
   1. Add 12.50 as Food and 40 as Transport: the month total shows 52.50 and two category bars appear.
   2. The "Last 6 months" chart shows a bar for the current month. Set the currency to "EUR": amounts show it.
   3. Add an expense dated last month: the view jumps to that month; use the arrows to return.
   4. Delete an entry: totals and charts update.
   5. Add with an empty or zero amount: a toast asks for an amount. The amount is limited to 0.01 to 1,000,000,000 and the list to 5000 entries.
+  6. Export: with no expenses tap "Export all as CSV": a message says there is nothing to export. Add two expenses (one with the note =1+1), tap Export: the share sheet opens with expenses-YYYY-MM-DD.csv that opens in a spreadsheet with columns Date, Category, Amount, Note; the note shows as '=1+1 (text), never as a formula.
 
 ## Tip of the Day
 - id: tipday

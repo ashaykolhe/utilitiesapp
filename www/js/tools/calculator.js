@@ -122,6 +122,7 @@ Tools.register({ id: 'calculator', name: 'Calculator', icon: '🧮', cat: 'calcu
         const r = evaluate(st.expr);
         if (!isFinite(r)) throw 0;
         $('#ex', el).textContent = st.expr + ' =';
+        try { if (typeof Hist !== 'undefined') Hist.add('calculator', st.expr, fmtResult(r)); } catch (e2) { /* history is optional */ }
         st = { expr: fmtResult(r), fresh: true };
       } catch (e) { toast('Invalid expression'); }
     } else st = pressKey(st, k);

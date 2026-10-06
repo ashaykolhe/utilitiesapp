@@ -161,6 +161,43 @@
   const hm = ms => { const m = Math.floor(ms / 60000); return Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0') + 'm'; };
 
   /* ------------------------------------------------------------------ shared UI helpers */
+  /* ---- export builders (pure, tested in Node) ---- */
+  // A text cell that starts with = + - @ (or a tab / CR) would run as a formula in a spreadsheet, so it gets a leading quote.
+  const csvText = v => { v = v == null ? '' : String(v); return /^[=+\-@\t\r]/.test(v) ? "'" + v : v; };
+  const MOOD_NAMES = ['Awful', 'Bad', 'Okay', 'Good', 'Great'];
+  const healthRows = entries => [['Date', 'Measure', 'Value', 'Value 2 (diastolic)', 'Unit', 'Note']].concat(entries.slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : (a.id || 0) - (b.id || 0)).map(e => {
+    const bp = e.type === 'bp', name = e.type === 'custom' ? (e.name || 'Custom') : e.type === 'weight' ? 'Weight' : bp ? 'Blood pressure' : 'Sugar';
+    return [e.date, csvText(name), e.v, bp ? e.v2 : '', csvText(e.type === 'custom' ? e.unit : bp ? 'mmHg' : e.type === 'weight' ? 'kg' : 'mg/dL'), csvText(e.note)];
+  }));
+  const dayKeys = days => Object.keys(days || {}).filter(k => /^\d{4}-\d\d-\d\d$/.test(k)).sort();
+  const waterRows = (days, goal) => [['Date', 'Water (ml)', 'Goal (ml)']].concat(dayKeys(days).filter(k => days[k] > 0).map(k => [k, days[k], goal]));
+  const stepsRows = (days, goal, heightCm, kg) => [['Date', 'Steps', 'Goal', 'Distance (km)', 'Calories (kcal)']].concat(dayKeys(days).filter(k => days[k] > 0).map(k =>
+    [k, days[k], goal, +(days[k] * heightCm * 0.415 / 100 / 1000).toFixed(2), Math.round(days[k] * 0.00057 * kg)]));
+  const moodRows = days => [['Date', 'Mood', 'Score (1-5)', 'Note']].concat(dayKeys(days).map(k => { const m = days[k] || {}, i = MOOD_NAMES[m.m] ? m.m : 2; return [k, MOOD_NAMES[i], i + 1, csvText(m.n)]; }));
+  /* Result history: add() stores one settled result (never throws); soon() waits about 1.5 s after the last call so only a result the person stopped on is kept. */
+  const kit = id => {
+    let t = null;
+    return {
+      /* Health history keeps only the result, never the body measurements or dates that went in; pregnancy dates are not kept at all. */
+      add(label, value) {
+        try {
+          const generic = { bmi: 'BMI', bmr: 'Calorie & BMR', bodyfat: 'Body fat', idealweight: 'Ideal weight', macros: 'Macros' };
+          if (id === 'duedate' || typeof Hist === 'undefined' || !label || !value) return;
+          Hist.add(id, generic[id] || String(label), String(value));
+        } catch (e) { /* history is optional */ }
+      },
+      soon(fn) { clearTimeout(t); t = setTimeout(() => { try { fn(); } catch (e) { /* ignore */ } }, 1500); },
+      stop() { clearTimeout(t); }
+    };
+  };
+  /* Share a text file (CSV) through the share sheet or a download; says so with a toast. */
+  async function sendFile(name, text, mime, what) {
+    if (text.length > 2e6) { toast('Too much data to export (over 2 MB)'); return false; }
+    const ok = await saveTextFile(name, text, mime);
+    if (ok) toast((what || 'Exported') + ': ' + name);
+    return ok;
+  }
+  const csvFile = rows => '\uFEFF' + toCSV(rows);
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const num = (el, sel) => { const e = $(sel, el); const v = e ? parseFloat(String(e.value).replace(',', '.')) : NaN; return isFinite(v) ? v : NaN; };
   const MUTED = 'font-size:13px;color:var(--muted)';
@@ -291,7 +328,8 @@
         ? `<div class="row">${field('cm', 'Height (cm)', 'value="' + Store.get('bmi.cm', 170) + '" min="50" max="260"')}${field('kg', 'Weight (kg)', 'value="' + Store.get('bmi.kg', 70) + '" min="10" max="400" step="0.1"')}</div>`
         : `<div class="row">${field('ft', 'Feet', 'value="' + Store.get('bmi.ft', 5) + '" min="1" max="8"')}${field('inch', 'Inches', 'value="' + Store.get('bmi.in', 7) + '" min="0" max="11"')}${field('lb', 'Weight (lb)', 'value="' + Store.get('bmi.lb', 154) + '" min="20" max="900"')}</div>`;
     }
-    function calc() {
+    const hk = kit('bmi');
+    function calc(ev) {
       let m, kg;
       if (unit === 'm') { m = num(el, '#cm') / 100; kg = num(el, '#kg'); Store.set('bmi.cm', num(el, '#cm') || 170); Store.set('bmi.kg', kg || 70); }
       else { m = ((num(el, '#ft') || 0) * 12 + (num(el, '#inch') || 0)) * 0.0254; kg = num(el, '#lb') * 0.45359237; Store.set('bmi.ft', num(el, '#ft') || 5); Store.set('bmi.in', num(el, '#inch') || 0); Store.set('bmi.lb', num(el, '#lb') || 154); }
@@ -300,10 +338,12 @@
       const c = bmiCat(b), r = healthyRange(m);
       $('#b', el).textContent = b.toFixed(1); $('#cat', el).textContent = c.label; $('#cat', el).style.color = c.col;
       mk.style.opacity = 1; mk.style.left = (clamp((b - 15) / 25, 0, 1) * 100) + '%';
+      if (ev && ev.type) hk.soon(() => hk.add('BMI ' + (unit === 'm' ? num(el, '#cm') + ' cm, ' + num(el, '#kg') + ' kg' : num(el, '#ft') + ' ft ' + (num(el, '#inch') || 0) + ' in, ' + num(el, '#lb') + ' lb'), b.toFixed(1) + ' (' + c.label + ')'));
       $('#rng', el).textContent = unit === 'm' ? `Healthy range for your height: ${r[0].toFixed(1)} to ${r[1].toFixed(1)} kg` : `Healthy range for your height: ${(r[0] / 0.45359237).toFixed(0)} to ${(r[1] / 0.45359237).toFixed(0)} lb`;
     }
     segBind(el, 'un', v => { unit = v; Store.set('bmi.unit', v); build(); calc(); });
     el.addEventListener('input', calc); build(); calc();
+    return hk.stop;
   } });
 
   /* ================================================================== 2. Step counter */
@@ -316,6 +356,7 @@
         <div style="position:absolute;inset:0;display:grid;place-content:center"><div class="big" id="n" style="margin:0;font-size:46px">0</div><div style="${MUTED}" id="of"></div></div></div>
         <div id="msg" style="${MUTED};margin-top:8px;min-height:18px"></div></div>
       <div class="row"><button class="btn" id="go">Start counting</button><button class="btn alt" id="rs">Reset today</button></div>
+      <button class="btn alt" id="ex">Export history (CSV)</button>
       <div class="row">${stat('km', 'Distance', '0 km')}${stat('kc', 'Calories', '0')}</div>
       <div class="card"><div style="${LBL};margin-bottom:8px">Last 14 days</div><canvas id="cv" style="${CANVAS};height:130px"></canvas></div>
       <div class="card list"><div style="${LBL}">Settings</div><div class="row">${field('gl', 'Daily goal', 'min="100" max="100000" step="500"')}${field('ht', 'Height (cm)', 'min="100" max="250"')}${field('kg', 'Weight (kg)', 'min="20" max="300"')}</div></div>
@@ -348,6 +389,11 @@
     function stop() { removeEventListener('devicemotion', onMotion); running = false; save(); if ($('#go', el)) { $('#go', el).textContent = 'Start counting'; say(el, 'Paused'); } }
     $('#go', el).onclick = () => running ? stop() : start();
     $('#rs', el).onclick = () => { if (!n() || confirm('Reset today\'s steps to zero?')) { days[today()] = 0; save(); paint(); } };
+    $('#ex', el).onclick = () => {
+      save(); const rows = stepsRows(days, goal, height, kg);
+      if (rows.length < 2) { toast('No step history to export yet'); return; }
+      sendFile('steps-' + dkey() + '.csv', csvFile(rows), 'text/csv', 'Step history exported');
+    };
     el.addEventListener('input', () => {
       goal = clamp(num(el, '#gl') || 8000, 100, 100000); height = clamp(num(el, '#ht') || 170, 100, 250); kg = clamp(num(el, '#kg') || 70, 20, 300);
       Store.set('steps.goal', goal); Store.set('steps.height', height); Store.set('steps.kg', kg); paint();
@@ -369,6 +415,7 @@
         <div style="position:absolute;inset:0;display:grid;place-content:center"><div class="big" id="ml" style="margin:0;font-size:38px" aria-live="polite">0</div><div style="text-align:center;font-size:13px" id="of"></div></div></div></div>
       <div class="row">${[150, 250, 330, 500].map(v => `<button class="btn alt add" data-v="${v}" style="padding:12px 0;font-size:15px">+${v}</button>`).join('')}</div>
       <div class="row"><input id="cu" type="number" inputmode="numeric" placeholder="Custom ml" min="1" max="5000" aria-label="Custom amount in ml"><button class="btn" id="ca">Add</button><button class="btn alt" id="un">Undo</button></div>
+      <button class="btn alt" id="ex">Export history (CSV)</button>
       <div class="card"><div style="${LBL};margin-bottom:8px">Last 14 days (ml)</div><canvas id="cv" style="${CANVAS};height:130px"></canvas></div>
       <div class="card">${field('gl', 'Daily goal (ml)', 'min="500" max="10000" step="100"')}</div>
       <div style="${NOTE}">Needs vary with weather, size and activity. A common guide is about 2 litres a day. ${MED}</div></div>`;
@@ -390,6 +437,11 @@
       add(v); $('#cu', el).value = '';
     };
     $('#un', el).onclick = () => { const v = log.pop(); if (v) { days[today()] = Math.max(0, cur() - v); save(); paint(); } else toast('Nothing to undo this session'); };
+    $('#ex', el).onclick = () => {
+      const rows = waterRows(days, goal);
+      if (rows.length < 2) { toast('No water history to export yet'); return; }
+      sendFile('water-' + dkey() + '.csv', csvFile(rows), 'text/csv', 'Water history exported');
+    };
     $('#gl', el).oninput = () => { goal = clamp(num(el, '#gl') || 2000, 500, 10000); Store.set('water.goal', goal); paint(); };
     requestAnimationFrame(paint);
   } });
@@ -405,15 +457,18 @@
       <div id="wn" style="${MUTED};text-align:center"></div>
       <div style="${NOTE}">BMR is what your body burns at rest. Maintenance adds daily activity. ${MED} Do not eat far below 1200 (women) or 1500 (men) kcal without medical advice.</div></div>`;
     $('#age', el).value = S.age; $('#cm', el).value = S.cm; $('#kg', el).value = S.kg; $('#act', el).value = S.act; $('#gl', el).value = S.goal;
-    function calc() {
+    const hk = kit('bmr');
+    function calc(ev) {
       S.age = num(el, '#age'); S.cm = num(el, '#cm'); S.kg = num(el, '#kg'); S.act = +$('#act', el).value; S.goal = +$('#gl', el).value; Store.set('bmr.s', S);
       const ok = S.age >= 10 && S.age <= 110 && S.cm >= 100 && S.cm <= 250 && S.kg >= 20 && S.kg <= 300;
       if (!ok) { $('#tg', el).textContent = '--'; $('#bm', el).textContent = $('#td', el).textContent = '--'; $('#wn', el).textContent = 'Enter age 10 to 110, height 100 to 250 cm and weight 20 to 300 kg.'; return; }
       const b = bmr(S.sex, S.kg, S.cm, S.age), t = b * ACT[S.act][1], g = t + GOALS[S.goal][1], floor = S.sex === 'm' ? 1500 : 1200;
       $('#bm', el).textContent = Math.round(b); $('#td', el).textContent = Math.round(t); $('#tg', el).textContent = Math.round(g).toLocaleString();
+      if (ev && ev.type) hk.soon(() => hk.add('BMR ' + (S.sex === 'm' ? 'male' : 'female') + ', ' + S.age + ' y, ' + S.cm + ' cm, ' + S.kg + ' kg, ' + ACT[S.act][0].split(' (')[0] + ', ' + GOALS[S.goal][0], Math.round(g).toLocaleString() + ' kcal/day (BMR ' + Math.round(b) + ', maintenance ' + Math.round(t) + ')'));
       $('#wn', el).textContent = g < floor ? `That target is below ${floor} kcal, which is usually too low. Aim higher or talk to a professional.` : '';
     }
     segBind(el, 'sx', v => { S.sex = v; calc(); }); el.addEventListener('input', calc); el.addEventListener('change', calc); calc();
+    return hk.stop;
   } });
 
   /* ================================================================== 5. Breathing */
@@ -470,15 +525,18 @@
       <div class="card list"><label class="f"><span id="lb">Wake-up time</span><input id="tm" type="time" maxlength="5" value="07:00" style="font-size:28px;text-align:center;font-weight:700"></label><button class="btn alt" id="nw" style="display:none">Use the current time</button></div>
       <div id="out" class="list"></div>
       <div style="${NOTE}">An average cycle is about 90 minutes and most adults need 5 to 6 cycles (7.5 to 9 hours). ${MED}</div></div>`;
-    function calc() {
+    const hk = kit('sleepcalc');
+    function calc(ev) {
       const v = $('#tm', el).value; if (!v) { $('#out', el).innerHTML = ''; return; }
       const [h, m] = v.split(':').map(Number), list = sleepTimes(h * 60 + m, mode);
+      if (ev && ev.type !== 'click') hk.soon(() => hk.add((mode === 'wake' ? 'Wake at ' : 'Bed at ') + v, (mode === 'wake' ? 'Go to bed at ' : 'Wake up at ') + list.slice(0, 2).map(s => fmtT(s.at) + ' (' + s.cycles + ' cycles)').join(' or ')));
       $('#out', el).innerHTML = (mode === 'wake' ? 'Go to bed at' : 'Wake up at').replace(/^/, `<div style="${LBL};padding:0 4px">`) + '</div>' + list.map((s, i) =>
         `<div class="item" style="padding:14px 16px;${i < 2 ? 'border-color:var(--ok)' : ''}"><div class="grow"><div style="font-size:26px;font-weight:700">${fmtT(s.at)}</div><div style="${MUTED}">${s.cycles} cycles · ${s.hours} hours of sleep${i < 2 ? ' · recommended' : ''}</div></div></div>`).join('');
     }
     segBind(el, 'md', v => { mode = v; $('#lb', el).textContent = v === 'wake' ? 'Wake-up time' : 'Bedtime'; $('#nw', el).style.display = v === 'bed' ? '' : 'none'; calc(); });
-    $('#nw', el).onclick = () => { const d = new Date(); $('#tm', el).value = pad(d.getHours(), 2) + ':' + pad(d.getMinutes(), 2); calc(); };
+    $('#nw', el).onclick = () => { const d = new Date(); $('#tm', el).value = pad(d.getHours(), 2) + ':' + pad(d.getMinutes(), 2); calc(); hk.soon(() => { const v = $('#tm', el).value, [h, m] = v.split(':').map(Number), l = sleepTimes(h * 60 + m, mode); hk.add('Bed at ' + v, 'Wake up at ' + l.slice(0, 2).map(s => fmtT(s.at) + ' (' + s.cycles + ' cycles)').join(' or ')); }); };
     el.addEventListener('input', calc); calc();
+    return hk.stop;
   } });
 
   /* ================================================================== 7. Health log */
@@ -492,6 +550,7 @@
       <div class="card"><canvas id="cv" style="${CANVAS}"></canvas><div id="lg" style="${MUTED};margin-top:8px"></div></div>
       <div id="ls" class="list"></div>
       <div class="row"><button class="btn alt" id="ex">Export as text</button><button class="btn alt" id="cp">Copy text</button></div>
+      <button class="btn alt" id="csv">Export CSV (spreadsheet)</button>
       <div style="${NOTE}">Stored only on this device. ${MED}</div></div>`;
     $('#dt', el).value = dkey();
     const series = e => e.type === 'custom' ? 'c:' + (e.name || '') : e.type;
@@ -524,6 +583,10 @@
     };
     $('#ls', el).onclick = e => { const b = e.target.closest('.del'); if (!b || !confirm('Delete this entry?')) return; entries = entries.filter(x => String(x.id) !== b.dataset.id); Store.set('hlog.entries', entries); paint(); };
     $('#ex', el).onclick = () => saveText('health-log.txt', text());
+    $('#csv', el).onclick = () => {
+      if (!entries.length) { toast('Nothing to export yet. Add an entry first.'); return; }
+      sendFile('health-log-' + dkey() + '.csv', csvFile(healthRows(entries)), 'text/csv', 'Health log exported');
+    };
     $('#cp', el).onclick = () => { safe(() => navigator.clipboard.writeText(text()).then(() => toast('Copied'), () => toast('Could not copy'))); };
     segBind(el, 'ty', v => { type = v; vals(); paint(); });
     $('#nm', el).oninput = paint;
@@ -606,13 +669,16 @@
       <div class="card center"><div style="${LBL}">Estimated body fat</div><div class="big" id="bf" style="margin:2px 0">--</div><div id="ct" style="font-weight:700;font-size:18px"></div></div>
       <div style="${NOTE}">The Navy formula can be off by several percent. ${MED}</div></div>`;
     ['cm', 'nk', 'wa', 'hi'].forEach(k => { if (S[k]) $('#' + k, el).value = S[k]; });
-    function calc() {
+    const hk = kit('bodyfat');
+    function calc(ev) {
       $('#hw', el).style.display = S.sex === 'f' ? '' : 'none';
       ['cm', 'nk', 'wa', 'hi'].forEach(k => S[k] = num(el, '#' + k)); Store.set('bodyfat.s', S);
       const v = navyBodyFat(S.sex, S.cm, S.wa, S.nk, S.hi);
       $('#bf', el).textContent = v == null ? '--' : v.toFixed(1) + '%'; $('#ct', el).textContent = v == null ? '' : bodyFatCat(S.sex, v);
+      if (v != null && ev && ev.type) hk.soon(() => hk.add('Body fat (Navy) ' + (S.sex === 'm' ? 'male' : 'female') + ', height ' + S.cm + ', neck ' + S.nk + ', waist ' + S.wa + (S.sex === 'f' ? ', hip ' + S.hi : '') + ' cm', v.toFixed(1) + '% (' + bodyFatCat(S.sex, v) + ')'));
     }
     segBind(el, 'sx', v => { S.sex = v; calc(); }); el.addEventListener('input', calc); calc();
+    return hk.stop;
   } });
 
   /* ================================================================== 10. Ideal weight */
@@ -622,14 +688,17 @@
       <div id="hh" class="row"></div></div><div class="card list" id="out"></div>
       <div style="${NOTE}">Formulas ignore build and age. They are rough guides. ${MED}</div></div>`;
     const build = () => { $('#hh', el).innerHTML = imp ? field('ft', 'Feet', 'value="5" min="1" max="8"') + field('inch', 'Inches', 'value="9" min="0" max="11"') : field('cm', 'Height (cm)', 'value="175" min="100" max="250"'); };
-    function calc() {
+    const hk = kit('idealweight');
+    function calc(ev) {
       const cm = imp ? ((num(el, '#ft') || 0) * 12 + (num(el, '#inch') || 0)) * 2.54 : num(el, '#cm');
       if (!(cm >= 100 && cm <= 250)) { $('#out', el).innerHTML = `<div class="center muted">Enter a height</div>`; return; }
       const w = idealWeights(sex, cm), r = healthyRange(cm / 100), f = k => imp ? (k / 0.45359237).toFixed(0) + ' lb' : k.toFixed(1) + ' kg';
       $('#out', el).innerHTML = Object.keys(w).map(k => `<div class="item"><span class="grow">${k}</span><b>${f(w[k])}</b></div>`).join('') + `<div class="item" style="border-color:var(--ok)"><span class="grow">Healthy BMI range</span><b>${f(r[0])} to ${f(r[1])}</b></div>`;
+      if (ev && ev.type) hk.soon(() => hk.add('Ideal weight ' + (sex === 'm' ? 'male' : 'female') + ', ' + (imp ? num(el, '#ft') + ' ft ' + (num(el, '#inch') || 0) + ' in' : Math.round(cm) + ' cm'), Object.keys(w).map(k => k + ' ' + f(w[k])).join('; ') + '; healthy BMI ' + f(r[0]) + ' to ' + f(r[1])));
     }
     segBind(el, 'sx', v => { sex = v; calc(); }); segBind(el, 'un', v => { imp = v === 'i'; build(); calc(); });
     el.addEventListener('input', calc); build(); calc();
+    return hk.stop;
   } });
 
   /* ================================================================== 11. Waist to hip */
@@ -649,16 +718,19 @@
         <div class="progress" style="margin-top:12px"><i id="pg" style="width:0;transition:width .5s"></i></div><div id="lf" style="${MUTED};margin-top:8px"></div></div>
       <div style="${NOTE}">Only about 5 in 100 babies arrive on the due date. Confirm dates with your midwife or doctor. ${MED}</div></div>`;
     $('#lm', el).value = Store.get('due.lmp', '');
-    function calc() {
+    const hk = kit('duedate');
+    function calc(ev) {
       const l = parseD($('#lm', el).value); Store.set('due.lmp', $('#lm', el).value || '');
       if (!l) { $('#edd', el).textContent = '--'; return; }
-      const d = dueDate(l, clamp(Math.round(num(el, '#cy')) || 28, 20, 45));
+      const cyc = clamp(Math.round(num(el, '#cy')) || 28, 20, 45), d = dueDate(l, cyc);
+      if (ev && ev.type) hk.soon(() => hk.add('Due date from last period ' + $('#lm', el).value + ', cycle ' + cyc + ' days', dkey(d.edd) + ' (' + (d.days >= 0 ? d.weeks + ' weeks ' + d.rem + ' days now' : 'start date in the future') + ')'));
       $('#edd', el).textContent = d.edd.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
       if (d.days < 0) { $('#wk', el).textContent = 'Date is in the future'; $('#tr', el).textContent = ''; $('#lf', el).textContent = ''; $('#pg', el).style.width = '0'; return; }
       $('#wk', el).textContent = `${d.weeks} weeks ${d.rem} days`; $('#tr', el).textContent = `Trimester ${d.tri}`;
       $('#pg', el).style.width = clamp(d.days / 280, 0, 1) * 100 + '%'; $('#lf', el).textContent = d.left >= 0 ? `${d.left} days to go` : `${-d.left} days past the estimated date`;
     }
     el.addEventListener('input', calc); calc();
+    return hk.stop;
   } });
 
   /* ================================================================== 13. Period tracker */
@@ -825,7 +897,8 @@
       <div id="wn" style="${MUTED};text-align:center"></div>
       <div style="${NOTE}">Carbs and protein give 4 kcal per gram, fat gives 9. Use the Calorie & BMR tool to find a target. ${MED}</div></div>`;
     $('#kc', el).value = Store.get('macro.kc', 2000);
-    function calc() {
+    const hk = kit('macros');
+    function calc(ev) {
       const kc0 = num(el, '#kc'), kc = kc0 >= 500 && kc0 <= 10000 ? kc0 : NaN; if (kc > 0) Store.set('macro.kc', kc);
       if (key === 'custom') r = [num(el, '#rc'), num(el, '#rp'), num(el, '#rf')].map(v => isFinite(v) ? clamp(v, 0, 100) : 0);
       const sum = r[0] + r[1] + r[2];
@@ -834,9 +907,11 @@
       ['pc', 'pp', 'pf'].forEach((id, i) => $('#' + id, el).textContent = ['Carbs', 'Protein', 'Fat'][i] + ' · ' + Math.round(r[i] / (sum || 1) * 100) + '%');
       if (!(kc > 0) || !sum) { $('#gc', el).textContent = $('#gp', el).textContent = $('#gf', el).textContent = '--'; return; }
       const m = macros(kc, r[0], r[1], r[2]); $('#gc', el).textContent = Math.round(m.carbs) + ' g'; $('#gp', el).textContent = Math.round(m.protein) + ' g'; $('#gf', el).textContent = Math.round(m.fat) + ' g';
+      if (ev && ev.type) hk.soon(() => hk.add('Macros ' + Math.round(kc) + ' kcal, ' + ({ bal: 'balanced', hp: 'high protein', lc: 'low carb', keto: 'keto', custom: 'custom' })[key] + ' (' + r.map(x => Math.round(x / sum * 100)).join('/') + '% C/P/F)', 'Carbs ' + Math.round(m.carbs) + ' g, Protein ' + Math.round(m.protein) + ' g, Fat ' + Math.round(m.fat) + ' g'));
     }
     segBind(el, 'pr', v => { key = v; $('#cu', el).style.display = v === 'custom' ? '' : 'none'; if (v !== 'custom') r = PRE[v].slice(); else { $('#rc', el).value = r[0]; $('#rp', el).value = r[1]; $('#rf', el).value = r[2]; } calc(); });
     el.addEventListener('input', calc); calc();
+    return hk.stop;
   } });
 
   /* ================================================================== 19. Eye rest 20-20-20 */
@@ -880,7 +955,7 @@
     const FACES = [['😞', 'Awful', 'var(--danger)'], ['🙁', 'Bad', '#f97316'], ['😐', 'Okay', '#f59e0b'], ['🙂', 'Good', '#84cc16'], ['😄', 'Great', 'var(--ok)']];
     const fc = m => FACES[m && m.m] || FACES[2]; // tolerate a bad stored value
     el.innerHTML = `<div style="${wrap}"><div class="card center"><div style="${LBL}">How are you today?</div><div class="row" id="fc" style="margin-top:12px;gap:6px">${FACES.map((f, i) => `<button class="btn alt fc" data-i="${i}" aria-label="${f[1]}" style="font-size:30px;padding:10px 0;min-height:60px;border-radius:16px;transition:transform .15s">${f[0]}</button>`).join('')}</div>
-        <label class="f" style="margin-top:12px;text-align:left">Note<input id="nt" type="text" maxlength="80" placeholder="optional"></label><button class="btn" id="sv" style="width:100%;margin-top:10px">Save today</button></div>
+        <label class="f" style="margin-top:12px;text-align:left">Note<input id="nt" type="text" maxlength="80" placeholder="optional"></label><button class="btn" id="sv" style="width:100%;margin-top:10px">Save today</button><button class="btn alt" id="ex" style="width:100%;margin-top:8px">Export log (CSV)</button></div>
       <div class="card"><div style="${LBL};margin-bottom:8px">Last 14 days</div><div id="gr" class="row" style="gap:3px;align-items:flex-end;height:90px"></div></div><div id="ls" class="list"></div>
       <div style="${NOTE}">If low mood lasts for weeks, please talk to someone you trust or a health professional. ${MED}</div></div>`;
     const sel = i => { pick = i; $$('.fc', el).forEach((b, j) => { b.style.transform = j === i ? 'scale(1.12)' : ''; b.style.borderColor = j === i ? FACES[i][2] : ''; b.style.opacity = i === -1 || j === i ? 1 : .55; }); };
@@ -890,9 +965,14 @@
     }
     $('#fc', el).onclick = e => { const b = e.target.closest('.fc'); if (b) sel(+b.dataset.i); };
     $('#sv', el).onclick = () => { if (pick < 0) { toast('Pick a face first'); return; } days[dkey()] = { m: pick, n: $('#nt', el).value.trim().slice(0, 80) }; const k = Object.keys(days).sort(); while (k.length > 400) delete days[k.shift()]; Store.set('mood.days', days); paint(); toast('Saved'); };
+    $('#ex', el).onclick = () => {
+      const rows = moodRows(days);
+      if (rows.length < 2) { toast('Nothing to export yet. Save a mood first.'); return; }
+      sendFile('mood-log-' + dkey() + '.csv', csvFile(rows), 'text/csv', 'Mood log exported');
+    };
     const t = days[dkey()]; if (t) { $('#nt', el).value = t.n || ''; sel(t.m); } else sel(-1);
     pick = t ? t.m : -1; paint();
   } });
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { bmiOf, bmiCat, healthyRange, bmr, sleepTimes, StepDetector, resample, ppgFilter, ppgBpm, navyBodyFat, idealWeights, whrOf, whrRisk, dueDate, periodPredict, streakOf, macros, phaseAt, hiitSchedule, parseD, dkey, addDays, ACT };
+  if (typeof module !== 'undefined' && module.exports) module.exports = { bmiOf, bmiCat, healthyRange, bmr, csvText, healthRows, waterRows, stepsRows, moodRows, sleepTimes, StepDetector, resample, ppgFilter, ppgBpm, navyBodyFat, idealWeights, whrOf, whrRisk, dueDate, periodPredict, streakOf, macros, phaseAt, hiitSchedule, parseD, dkey, addDays, ACT };
 })();

@@ -29,13 +29,14 @@
 - category: text
 - plan: free with limit: 10 notes (unlimited with Pro)
 - needs: storage
-- what: Quick notes with a title and body. Search, pin notes to the top, copy or delete. Everything is saved on the device as you type.
+- what: Quick notes with a title and body. Search, pin notes to the top, copy or delete. Everything is saved on the device as you type. All notes can be exported as one Markdown file, or a single note on its own.
 - test:
   1. Tap New, type a title and body, tap Done. The note appears in the list. Close and reopen the app: it is still there.
   2. Create a second note and pin it, then pin the first: pinned notes (with 📌) sort above others; newest edited first within each group.
   3. Type part of a word in Search: the list filters. Search for something absent: "No matches".
   4. Tap New and then Done without typing: the empty note is discarded.
   5. Tap Delete once: the button says "Tap again to delete". Tap again: note is removed. As a free user, create notes up to 10, then tap New for the 11th: the Pro sheet opens and no note is added.
+  6. Export: with no notes, "Export all notes (.md)" says there is nothing to export. With notes, it opens the share sheet with notes-YYYY-MM-DD.md containing every note under its own "##" heading (pinned first). Inside a note, "Export (.md)" shares just that note as note-title-YYYY-MM-DD.md; an empty note says so.
 
 ## Base64 & URL
 - id: b64

@@ -88,6 +88,7 @@ _Free. Needs: storage_
 - [ ] Add an expense dated last month: the view jumps to that month; use the arrows to return.
 - [ ] Delete an entry: totals and charts update.
 - [ ] Add with an empty or zero amount: a toast asks for an amount. The amount is limited to 0.01 to 1,000,000,000 and the list to 5000 entries.
+- [ ] Export: with no expenses tap "Export all as CSV": a message says there is nothing to export. Add two expenses (one with the note =1+1), tap Export: the share sheet opens with expenses-YYYY-MM-DD.csv that opens in a spreadsheet with columns Date, Category, Amount, Note; the note shows as '=1+1 (text), never as a formula.
 
 ### Flashlight
 _Free. Needs: camera_
@@ -198,6 +199,7 @@ _Free. Needs: storage_
 - [ ] Tick Apples: it is crossed out and moves down; the summary counts items in the basket.
 - [ ] Press minus down to 1: it does not go lower. Tap "Remove checked items": ticked items go.
 - [ ] Add an empty name: a toast asks you to type an item.
+- [ ] Export: with an empty list tap "Share list (text)": a message says it is empty. Add items, check one, tap Share: the share sheet opens with a text checklist such as "[ ] 2 x Milk" and "[x] 1 x Bread".
 
 ### Signal Light
 _Free. Needs: camera (torch, optional)_
@@ -242,6 +244,7 @@ _Free. Needs: storage_
 - [ ] Type part of a task name in Search: the list narrows.
 - [ ] Tap Clear completed: ticked tasks disappear. Adding an empty task shows a toast.
 - [ ] The list holds 500 tasks; when full the oldest completed task is dropped (with a toast), and open tasks are never dropped.
+- [ ] Export: with an empty list tap "Share checklist (text)": a message says there is nothing to share. Add tasks, tick one, tap Share: the share sheet opens with a text checklist, "[ ] task (Category, due date)" for open tasks and "[x] ..." for done ones.
 
 ### World Clock
 _Free. Needs: storage_
@@ -487,6 +490,7 @@ _Free_
 - [ ] Birth date 2000-02-29: it works in non-leap years (birthday counts as Mar 1).
 - [ ] The date fields accept 1900 to 2200 only; a date outside that shows an "Earliest is..." or "Latest is..." message.
 - [ ] Set "Age on" earlier than the birth date: shows the prompt, no error.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Area & Volume
 _Free_
@@ -495,6 +499,7 @@ _Free_
 - [ ] Circle radius 1: area 3.1415927, circumference 6.2831853.
 - [ ] Sphere radius 3: volume 113.09734. Cone radius 3 height 4: slant height 5.
 - [ ] Change shape: the input boxes change to match. Zero or empty values show a prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Billing
 _Free. Needs: storage_
@@ -505,6 +510,7 @@ _Free. Needs: storage_
 - [ ] Tap New invoice, save a different one, then tap View on the first: its items, customer and tax load back into the editor.
 - [ ] Tap Copy and paste elsewhere: the text starts "INVOICE #1" and ends with "TOTAL: ...". Tap Share to open the system share sheet.
 - [ ] Save more than 20 invoices: only the newest 20 stay. Tap the cross on one: it is deleted. Close and reopen the tool: business name, tax and saved invoices are still there.
+- [ ] Export: with no items tap "Export page (HTML)": a message asks for at least one item. Add an item named <b>Pen</b> and tap it: the share sheet opens with invoice-N-YYYY-MM-DD.html that opens in a browser as a printable page showing the text <b>Pen</b> literally (no bold). Save the invoice and tap "Export all (CSV)": a .csv with one row per item opens correctly in a spreadsheet. The 🖨️ button on a saved invoice exports that invoice as HTML.
 
 ### Break-even
 _Free_
@@ -512,6 +518,7 @@ _Free_
 - [ ] Fixed 50,000, price 250, variable 150: 500 units, revenue 125,000, profit per unit 100.
 - [ ] Add profit target 20,000: 700 units needed.
 - [ ] Price equal to or below variable cost shows an explanatory message.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Calculator
 _Free_
@@ -520,6 +527,7 @@ _Free_
 - [ ] Press 50 % . The expression shows 0.5. Enter 50 + 10 % and press =: the result is 55.
 - [ ] Enter 1 ÷ 0 and press =. A message says the expression is invalid.
 - [ ] Use backspace and clear.
+- [ ] History: press 1 2 + 3 =, the clock button appears in the header; open it: "12+3" with 15 is listed and copy works. Typing digits without = adds nothing, and = on an empty or invalid expression adds nothing.
 
 ### Cooking Units
 _Free_
@@ -528,6 +536,7 @@ _Free_
 - [ ] 227 g of butter in grams: 1 cup.
 - [ ] Switch ingredient to honey with the same 1 cup: 340 g.
 - [ ] Amount 0 shows the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Currency
 _Free. Needs: storage_
@@ -538,6 +547,7 @@ _Free. Needs: storage_
 - [ ] In Edit rates, clear a field or enter 0 and tap Save: a message asks for a rate above 0 and nothing is saved. Reset restores built-in rates and the built-in date.
 - [ ] Pick a To currency and tap Add to favourites: it appears in Favourites with a converted value; the X button removes it. Empty amount shows "Enter an amount" without errors.
 - [ ] Enter -5 as Amount (refused) and 99999999999999 (limited to 1,000,000,000,000). In Edit rates a rate of 0 or above 1,000,000,000 is refused with a message.
+- [ ] History: type an amount, wait 2 seconds: the clock button appears and lists "250 USD to INR" with the result and the rate used; copy works.
 
 ### Days Counter
 _Free. Needs: storage_
@@ -547,6 +557,7 @@ _Free. Needs: storage_
 - [ ] Start 2024-02-28, 2 days, tap Add: 2024-03-01 (Friday). Tap Subtract: 2024-02-26.
 - [ ] Save an event "Trip" a week from now: "in 7 days". Save one in the past: "N days ago". Save one today: "Today".
 - [ ] Close and reopen: the events are still listed. Delete one with the cross.
+- [ ] History: change the "To" date and wait 2 seconds: the clock button appears and lists "Days from ... to ..."; pressing Add or Subtract lists the date it gives. Opening the tool adds nothing.
 
 ### Discount & GST
 _Free_
@@ -554,6 +565,7 @@ _Free_
 - [ ] Price 1000, discount 10%, tax 18%, "Without tax": final price 1,062.00, you save 100.00, tax 162.00.
 - [ ] Price 1180, discount 0, tax 18%, "Including tax": price before tax 1,000.00, tax 180.00, final 1,180.00.
 - [ ] Discount above 100 or a negative number shows the prompt, not a wrong result.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### EMI Calculator
 _Free_
@@ -564,6 +576,7 @@ _Free_
 - [ ] Switch "Tenure in" to Months and enter 6: the table shows 6 rows ending with balance 0.00.
 - [ ] Clear the loan amount: the result is replaced by "Enter the values above." with no error.
 - [ ] Limits: type 250 in the interest field: a red "Maximum is 200" appears under it, the result says "enter a value from 0 up to 200", and leaving the field sets it back to 200. Tenure 101 years shows "Maximum is 100"; switching the unit to Months allows up to 1200. Letters, e and + cannot be typed.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### FD / RD
 _Free_
@@ -571,6 +584,7 @@ _Free_
 - [ ] FD 100,000 at 7% for 5 years, quarterly: maturity about 141,478.
 - [ ] RD 5,000 per month at 6.5% for 24 months: maturity a little above 120,000 deposited (interest roughly 8,000).
 - [ ] Zero months or years shows the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Fractions
 _Free_
@@ -579,6 +593,7 @@ _Free_
 - [ ] 1/2 - 1/3 = 1/6; 2/3 x 3/4 = 1/2; 1/2 / 1/4 = 2.
 - [ ] Enter "1 1/2" and "0.25" with +: result 7/4.
 - [ ] Divide by 0 shows "Cannot divide by zero"; typing "abc" shows a prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Fuel Cost
 _Free_
@@ -588,6 +603,7 @@ _Free_
 - [ ] Unit mpg with 30: efficiency about 12.75 km/L.
 - [ ] Mileage: 420 km with 30 L gives 14.00 km/L and 7.14 L per 100 km.
 - [ ] Efficiency 0 shows the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### GCD & LCM
 _Free_
@@ -595,6 +611,7 @@ _Free_
 - [ ] 12, 18, 30 gives GCD 6 and LCM 180.
 - [ ] 4 6 10 gives GCD 2 and LCM 60.
 - [ ] A single number, a zero or a decimal shows the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Growth Rate
 _Free_
@@ -602,6 +619,7 @@ _Free_
 - [ ] 10,000 to 18,000 over 5 years: about 12.47% per year, total growth 80%.
 - [ ] 100 to 200 over 1 year: 100% per year.
 - [ ] Zero or negative values show the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Investment
 _Free_
@@ -611,6 +629,7 @@ _Free_
 - [ ] SIP 5000 per month, 12%, 10 years: future value about 1,161,695, invested 600,000.
 - [ ] Set return to 0 for the SIP: value equals the amount invested.
 - [ ] Years 0 or empty: shows the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Loan Compare
 _Free_
@@ -618,6 +637,7 @@ _Free_
 - [ ] Defaults (1,000,000; A 9% 120 months; B 8.5% 144 months): the table shows both EMIs and totals and names the cheaper offer with the difference.
 - [ ] Make both offers identical: shows "Same total cost".
 - [ ] Months 0 shows the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Marks & GPA
 _Free_
@@ -626,6 +646,7 @@ _Free_
 - [ ] GPA lines "A 3" and "B 4": GPA 3.43 with 7 credits.
 - [ ] Add a line of garbage text: it is ignored, the rest still calculates.
 - [ ] Empty box shows the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Markup & Margin
 _Free_
@@ -633,6 +654,7 @@ _Free_
 - [ ] Cost 80, price 100: margin 20%, markup 25%, profit 20.
 - [ ] Cost 80, 25% margin: price 106.67. Cost 80, 25% markup: price 100.
 - [ ] A margin of 100% or more shows the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Matrix Calc
 _Free_
@@ -650,6 +672,7 @@ _Free_
 - [ ] Defaults: assets 450,000, debts 120,000, net worth 330,000.
 - [ ] Amounts with commas (1,500) and decimals (80.50) are read correctly; lines without a number are ignored.
 - [ ] Close and reopen: the lists are still there.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Number Patterns
 _Free_
@@ -667,6 +690,7 @@ _Free_
 - [ ] Same number International: "One hundred twenty-three million four hundred fifty-six thousand seven hundred eighty-nine".
 - [ ] 12.5 gives "... and fifty hundredths"; -5 starts with "Minus".
 - [ ] 0 gives "Zero". A number of one quadrillion or more shows the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Percentage
 _Free_
@@ -676,12 +700,14 @@ _Free_
 - [ ] From 80 to 100 shows "Increase 25%"; from 100 to 80 shows "Decrease 20%".
 - [ ] Value 250 and 12%: plus 280, minus 220, percent itself 30.
 - [ ] "X is what % of Y" with Y = 0 and "percent change" from 0 show the prompt instead of an error.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Power Cost
 _Free_
 
 - [ ] 1500 W, 1 unit, 2 h/day, 8 per kWh: 3 kWh per day, 24.00 per day, 90 kWh and 720.00 per month, 8,760.00 per year.
 - [ ] Hours per day above 24 shows the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Prime Check
 _Free_
@@ -698,6 +724,7 @@ _Free_
 - [ ] a=1, b=2, c=1: one double root -1.
 - [ ] a=1, b=0, c=1: roots 0 + 1i and 0 - 1i.
 - [ ] a=0, b=2, c=-4: "Linear: x = 2". a=0 and b=0 shows a message.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Random
 _Free_
@@ -715,6 +742,7 @@ _Free_
 - [ ] Proportion 3 : 5 = 12 : x gives x = 20.
 - [ ] Split 1000 as 2 : 3: A gets 400.00 and B gets 600.00.
 - [ ] Decimals in the simplify box show "Use whole numbers".
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Recipe Scaler
 _Free. Needs: storage_
@@ -725,6 +753,7 @@ _Free. Needs: storage_
 - [ ] Enter 0 in either servings box: the result says to enter servings above zero. Tap Save recipe with empty ingredients: a message asks for ingredients.
 - [ ] Name the recipe and tap Save recipe, tap New, then open it from Saved recipes: name, servings and text return. The bin icon deletes it. Copy scaled copies the scaled text.
 - [ ] Enter 0 or 5000 in a servings box: a message shows and the value is limited to the range 0.5 to 1000. At most 100 recipes can be saved.
+- [ ] History: change the servings you want, wait 2 seconds: the clock button appears and lists the recipe with the scale factor. Copy scaled also records it.
 
 ### Salary Convert
 _Free_
@@ -732,6 +761,7 @@ _Free_
 - [ ] 25 per hour, 40 h/week, 52 weeks: per year 52,000.00, per month 4,333.33, per week 1,000.00, per day 200.00.
 - [ ] Change "Per" to Year and enter 60,000: per hour 28.85.
 - [ ] Hours per week 0 shows the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Scientific
 _Free_
@@ -741,6 +771,7 @@ _Free_
 - [ ] 2^3^2 = 512, -2^2 = -4, 5! = 120, sqrt(144) = 12, log(1000) = 3, ln(e) = 1.
 - [ ] 1/0 and sqrt(-1) show an error in red, nothing crashes. A missing closing bracket is accepted.
 - [ ] M+ stores the current result (shown as "M = ..." at the top), MR inserts it, MC clears it. Tap the display to type with the keyboard.
+- [ ] History: type sqrt(16)+2 and press = (or Enter): the clock button appears and lists "sqrt(16)+2" with 6; copy works. Live typing before = adds nothing. Trig results are labelled [DEG] or [RAD].
 
 ### Simple Interest
 _Free_
@@ -748,6 +779,7 @@ _Free_
 - [ ] 50,000 at 7% for 3 years: interest 10,500.00, total 60,500.00.
 - [ ] Change time to 6 months at the same inputs (time 6): interest 1,750.00.
 - [ ] Negative values show the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Size Converter
 _Free_
@@ -756,6 +788,7 @@ _Free_
 - [ ] Foot length 27 cm gives US men 10.
 - [ ] Women's clothing UK 10: US 6, EU 38.
 - [ ] Chest 40 inches: 101.6 cm, EU 50, letter M.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Statistics
 _Free_
@@ -764,6 +797,7 @@ _Free_
 - [ ] 2 4 4 4 5 5 7 9: population std dev 2, sample std dev 2.1380899, median 4.5, mode 4.
 - [ ] 1 2 3 4: mode shows "none".
 - [ ] A single number: sample deviation shows a dash. Text with stray letters is skipped.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Tally Counter
 _Free. Needs: storage_
@@ -773,6 +807,7 @@ _Free. Needs: storage_
 - [ ] Tap Reset once: a toast asks to tap again. Tap again within 3 seconds: value is 0. Wait more than 3 seconds between taps: it does not reset.
 - [ ] Type a name, tap Add: a new counter is selected. Tap the first counter in the list: its own value shows.
 - [ ] Close and reopen the tool: all counters and values are kept. Delete a counter with the cross (needs a second tap); the last remaining counter has no delete button.
+- [ ] Export: tap "Export CSV": the share sheet opens with tally-YYYY-MM-DD.csv (Counter, Value) listing every counter, which opens correctly in a spreadsheet.
 
 ### Time Calc
 _Free_
@@ -782,6 +817,7 @@ _Free_
 - [ ] Start 09:00, End 17:30, break 30: worked 8:00.
 - [ ] Start 22:00, End 06:00: 8:00 and a "passes midnight" note.
 - [ ] Break longer than the shift shows an error message.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Tip Splitter
 _Free_
@@ -789,6 +825,7 @@ _Free_
 - [ ] Bill 1200, tip 10%, 4 people, Exact: each pays 330.00, tip total 120.00.
 - [ ] Bill 100, tip 15%, 3 people, "Round each share up": each pays 39.00, total 117.00, tip total 17.00.
 - [ ] People 0 or blank shows the prompt instead of dividing by zero.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Triangle
 _Free_
@@ -797,6 +834,7 @@ _Free_
 - [ ] Sides 1, 2, 3: message that they cannot form a triangle.
 - [ ] Switch to "Two sides and the angle": 3, 4 and 90 degrees gives side c = 5.
 - [ ] Angle 0 or 180 shows an error message.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ### Trig Circle
 _Free_
@@ -815,6 +853,7 @@ _Free_
 - [ ] Temperature: 100 C to F gives 212.
 - [ ] Data: 1 GB to MB gives 1024.
 - [ ] Clear the number box. The result shows a dash. Type 1e30 or letters: the field refuses it or shows a limit message.
+- [ ] History: type 10 in Value, wait 2 seconds: the clock button appears and lists "Length: 10 m" with the converted amount; copy works.
 
 ### Work Days
 _Free_
@@ -824,6 +863,7 @@ _Free_
 - [ ] Working days from 2024-01-01 to 2024-01-12: 10 (both dates included).
 - [ ] Choose "Fri + Sat" weekend: the result skips Fridays and Saturdays instead.
 - [ ] End date before start date shows the prompt.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
 ## 5. Text & Data
 
@@ -998,6 +1038,7 @@ _Free (limit: 10 notes (unlimited with Pro)). Needs: storage_
 - [ ] Type part of a word in Search: the list filters. Search for something absent: "No matches".
 - [ ] Tap New and then Done without typing: the empty note is discarded.
 - [ ] Tap Delete once: the button says "Tap again to delete". Tap again: note is removed. As a free user, create notes up to 10, then tap New for the 11th: the Pro sheet opens and no note is added.
+- [ ] Export: with no notes, "Export all notes (.md)" says there is nothing to export. With notes, it opens the share sheet with notes-YYYY-MM-DD.md containing every note under its own "##" heading (pinned first). Inside a note, "Export (.md)" shares just that note as note-title-YYYY-MM-DD.md; an empty note says so.
 
 ### Number Bases
 _Free_
@@ -1557,6 +1598,7 @@ _Free. Needs: storage_
 - [ ] Clear the weight field: shows "--" and "Enter height and weight".
 - [ ] Reopen the tool: last values and unit are restored.
 - [ ] The colour bar bands match the categories: BMI 18.4 is in the narrow blue band, 18.6 in the green band, 26 in the amber band; the arrow and the 15/18.5/25/30/35/40 labels sit at the same positions.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed (only the result and tool name, never your height, weight or dates). Due Date does not keep a history.
 
 ### Body Fat
 _Free. Needs: storage_
@@ -1564,6 +1606,7 @@ _Free. Needs: storage_
 - [ ] Male, 180 cm, neck 38, waist 85: about 16.1 percent, "Fitness" or "Average" band.
 - [ ] Switch to Female: a hip field appears; leave it empty and the result is "--", then enter 100 and a value appears.
 - [ ] Waist smaller than neck: result "--" with no error.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed (only the result and tool name, never your height, weight or dates). Due Date does not keep a history.
 
 ### Breathing
 _Free. Needs: none (vibration optional)_
@@ -1583,6 +1626,7 @@ _Free. Needs: storage_
 - [ ] Choose "Lose 0.5 kg a week": target is 500 below maintenance; for small bodies a warning about going below 1200 or 1500 appears.
 - [ ] Empty a field: results show "--" with no error.
 - [ ] Enter age 5, or height 50, or weight 500: results show "--" and a message gives the allowed ranges.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed (only the result and tool name, never your height, weight or dates). Due Date does not keep a history.
 
 ### Cycle Tracker
 _Free. Needs: storage_
@@ -1603,6 +1647,7 @@ _Free. Needs: storage_
 - [ ] Reopen: the date is remembered.
 - [ ] Pick a last-period date that is across a daylight saving change from today: the weeks and days count is still whole (no off-by-one day).
 - [ ] The date picker allows only the last 400 days up to today. Cycle length 99 is limited to 45.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed (only the result and tool name, never your height, weight or dates). Due Date does not keep a history.
 
 ### Eye Rest 20-20-20
 _Free. Needs: storage_
@@ -1639,6 +1684,7 @@ _Free. Needs: storage_
 - [ ] Add with an empty value: "Enter a value" toast.
 - [ ] Try to add a weight of 0, -5 or 9999: "That value looks out of range" shows and nothing is saved.
 - [ ] Weight: enter 5 (message and out-of-range toast on Add; limit 20 to 500). Pick a date in the future or before 1900: the picker stops it, and Add refuses a typed one.
+- [ ] Export: tap "Export CSV (spreadsheet)" with an empty log: a message says nothing to export. Add a weight and a blood pressure: the share sheet opens with health-log-YYYY-MM-DD.csv (Date, Measure, Value, Value 2, Unit, Note) that opens correctly in a spreadsheet.
 
 ### Heart Rate
 _Free. Needs: camera_
@@ -1656,6 +1702,7 @@ _Free_
 - [ ] Male, 175 cm: four formula values around 66 to 72 kg and a healthy range of about 56.7 to 76.3 kg.
 - [ ] Switch to Imperial, 5 ft 9 in: values are shown in pounds.
 - [ ] Height under 100 cm: "Enter a height".
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed (only the result and tool name, never your height, weight or dates). Due Date does not keep a history.
 
 ### Macro Calculator
 _Free. Needs: storage_
@@ -1665,6 +1712,7 @@ _Free. Needs: storage_
 - [ ] Custom with 50, 30, 30: a note says the percentages add to 110 and are scaled.
 - [ ] Empty calories: results "--".
 - [ ] In Custom, type a negative percentage: it is treated as 0. Daily calories under 500 or over 10000 show "--".
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed (only the result and tool name, never your height, weight or dates). Due Date does not keep a history.
 
 ### Meditation
 _Free_
@@ -1682,6 +1730,7 @@ _Free. Needs: storage_
 - [ ] Pick a face, add a note and Save: today's bar appears and the entry shows in the list.
 - [ ] Reopen the tool: today's face and note are pre-selected; saving again replaces today's entry.
 - [ ] A damaged saved entry shows as "Okay" instead of breaking the page.
+- [ ] Export: tap "Export log (CSV)" with nothing saved: a message says so. Save a mood: the share sheet opens with mood-log-YYYY-MM-DD.csv (Date, Mood, Score, Note) that opens correctly in a spreadsheet.
 
 ### Sleep Calculator
 _Free_
@@ -1691,6 +1740,7 @@ _Free_
 - [ ] Tap "Use the current time": the field fills with now.
 - [ ] Clear the time field: the list empties without error.
 - [ ] Clear the time field: the list empties and nothing breaks.
+- [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed (only the result and tool name, never your height, weight or dates). Due Date does not keep a history.
 
 ### Step Counter
 _Free. Needs: motion, storage_
@@ -1701,6 +1751,7 @@ _Free. Needs: motion, storage_
 - [ ] Change the goal to 1000: the ring and "of 1000 steps" update. Reopen the tool: today's total and the history bars are kept.
 - [ ] "Reset today" asks for confirmation then zeroes the count.
 - [ ] Shake the phone hard for 10 seconds, then walk normally for 30 seconds: steps are still counted for the walk.
+- [ ] Export: tap "Export history (CSV)" with no steps recorded: a message says there is nothing yet. After some steps, tap Export: the share sheet opens with steps-YYYY-MM-DD.csv (Date, Steps, Goal, Distance, Calories) that opens correctly in a spreadsheet.
 
 ### Waist-Hip Ratio
 _Free_
@@ -1719,6 +1770,7 @@ _Free. Needs: storage_
 - [ ] Reach the goal: a "Daily goal reached" toast appears and the bar turns green.
 - [ ] Change the goal to 3000: level and percentage recalculate. Reopen the tool: data is kept.
 - [ ] In the light theme with the glass nearly empty the "0 ml" label is dark and readable; once the water is over half full it turns white. Enter 0 or 9999 as a custom amount and tap Add: a message asks for 1 to 5000 ml.
+- [ ] Export: tap "Export history (CSV)" before adding water: a message says there is nothing yet. Add water, tap Export: the share sheet opens with water-YYYY-MM-DD.csv (Date, Water (ml), Goal (ml)) that opens correctly in a spreadsheet.
 
 ### Workout Timer
 _Free. Needs: storage_

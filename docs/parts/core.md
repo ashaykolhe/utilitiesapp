@@ -41,25 +41,27 @@
 - category: calculate
 - plan: free
 - needs: none
-- what: A simple calculator with add, subtract, multiply, divide, percent, backspace and clear. Leading zeros are fine (05+3), repeated operators collapse (2××3 is 2×3), percent after + or - is a share of the left value, and expressions are limited to 60 characters.
+- what: A simple calculator with add, subtract, multiply, divide, percent, backspace and clear. Leading zeros are fine (05+3), repeated operators collapse (2××3 is 2×3), percent after + or - is a share of the left value, and expressions are limited to 60 characters. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button.
 - test:
   1. Enter 12 + 30 × 2 and press =. The result is 72.
   2. Press 50 % . The expression shows 0.5. Enter 50 + 10 % and press =: the result is 55.
   3b. Enter 05 + 3 =: 8. Press = then a digit: a new expression starts.
   3. Enter 1 ÷ 0 and press =. A message says the expression is invalid.
   4. Use backspace and clear.
+  5. History: press 1 2 + 3 =, the clock button appears in the header; open it: "12+3" with 15 is listed and copy works. Typing digits without = adds nothing, and = on an empty or invalid expression adds nothing.
 
 ## Unit Converter
 - id: converter
 - category: calculate
 - plan: free
 - needs: none
-- what: Convert length, weight, volume, area, speed, data, time and temperature between common units. The value, units and category all have labels; the value is limited to +-1 trillion.
+- what: Convert length, weight, volume, area, speed, data, time and temperature between common units. The value, units and category all have labels; the value is limited to +-1 trillion. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button.
 - test:
   1. Length: 1 mile to km gives 1.609344.
   2. Temperature: 100 C to F gives 212.
   3. Data: 1 GB to MB gives 1024.
   4. Clear the number box. The result shows a dash. Type 1e30 or letters: the field refuses it or shows a limit message.
+  5. History: type 10 in Value, wait 2 seconds: the clock button appears and lists "Length: 10 m" with the converted amount; copy works.
 
 ## Compass
 - id: compass
