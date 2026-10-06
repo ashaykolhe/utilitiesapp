@@ -49,7 +49,8 @@ let F = `# PocketKit: features\n\nPocketKit has ${tools.length} tools in ${CATS.
   `| **App lock** | A 4 to 6 digit PIN (and optionally fingerprint or face) asked when the app opens or returns after 0 seconds, 30 seconds or 5 minutes. The PIN is stored only as a salted hash. 5 wrong tries cause a growing wait. |\n` +
   `| **Backup and restore** | Saves settings and tool data to a file and restores it. Pro state, the PIN, recordings, locked files and the vault are not included. |\n` +
   `| **Tour and What's new** | A three-step tour on first launch (replay in Settings) and a short note after updates. |\n` +
-  `| **Languages** | The app is built for translation packs; Hindi is planned. Missing text shows in English. |\n` +
+  `| **Languages** | English only for now. The app is built so a translation pack can be added later; none is planned. |
+` +
   `| **Haptics** | Optional vibration feedback, switchable in Settings. |\n` +
   `| **Privacy** | No accounts, no ads, no analytics. See privacy-policy.html. |\n\n`;
 for (const [id, label] of CATS) {

@@ -20,7 +20,7 @@ Ideas that need more than the web layer, extra hardware, or a network. Not built
 File Transfer, Walkie Talkie, Wi-Fi Calls, CCTV, Music Group, Peer link. Plan: WebRTC between two phones with the connection code exchanged by QR or copy and paste, no server. Some Wi-Fi networks block device-to-device traffic. Needs testing on two real phones. Marked as Pro (the `connect` Pro feature).
 
 ## App-level
-- Languages (the Daytick project has a translation workflow to reuse).
+- Languages: not planned for now (the app has a translation hook in `www/js/i18n.js` if this changes).
 - Backup and restore of tool data to a file.
 - Optional Google Drive backup for Pro.
 - Release build set up for Google Play (see RELEASE.md).
