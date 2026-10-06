@@ -1454,7 +1454,7 @@ function totpBuild(body, S) {
   return () => { dead = true; clearInterval(tick); cache.clear(); };
 }
 Tools.register({
-  id: 'totp', name: '2FA Codes', icon: '🔢', cat: 'security',
+  id: 'totp', pro: true, proKey: 'locker', name: '2FA Codes', icon: '🔢', cat: 'security',
   desc: 'Generate two-step verification codes (TOTP, RFC 6238) offline, with secrets encrypted behind your own password.',
   keys: ['totp', 'authenticator', 'otp', 'two factor', '2fa', 'google authenticator'], needs: ['storage'],
   render(el) {

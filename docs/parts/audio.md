@@ -84,7 +84,7 @@
 ## Spectrum
 - id: spectrum
 - category: audio
-- plan: free
+- plan: pro
 - needs: microphone
 - what: Live frequency spectrum bars (48 log-spaced bands, 30 Hz to 16 kHz, with falling peak caps) and a waveform trace from the microphone, plus the loudest frequency in Hz (ignores the lowest bins and interpolates between them for a steadier reading).
 - test:
@@ -110,7 +110,7 @@
 ## Drum Pad
 - id: drumpad
 - category: audio
-- plan: free
+- plan: pro
 - needs: none
 - what: Eight large synthesized drum pads (kick, snare, clap, hi-hat, open hat, tom, rim, cowbell) with multi-touch and a master volume. No sound files are used.
 - test:
@@ -148,7 +148,7 @@
 ## Audio Player
 - id: player
 - category: audio
-- plan: free
+- plan: pro
 - needs: storage
 - what: Plays audio files you pick from the device (several at once as a playlist), with seek bar, +/-10 second skip, speed from 0.5x to 2x with optional pitch preservation, an A-B loop and a five-band equalizer with presets.
 - test:
@@ -235,7 +235,7 @@
 ## Tone Sequencer
 - id: toneseq
 - category: audio
-- plan: free
+- plan: pro
 - needs: none
 - what: A 16-step by 8-note pentatonic grid for composing a looping melody, with tempo from 60 to 200 BPM, four sounds, random and clear buttons. The pattern and tempo are remembered.
 - test:

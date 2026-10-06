@@ -45,7 +45,7 @@
 ## Flashcards
 - id: flashcards
 - category: text
-- plan: free
+- plan: pro
 - needs: storage
 - what: Create decks and cards and study them with a five-box Leitner system: a correct answer moves a card up a box (review after 1, 2, 4, 8 then 16 days) and a miss sends it back to box 1. Shows due counts, per-box stats and accuracy, and decks can be imported from or exported as plain text in the form "front :: back".
 - test:
@@ -85,7 +85,7 @@
 ## Pixel Art
 - id: pixelart
 - category: create
-- plan: free
+- plan: pro
 - needs: storage
 - what: A pixel drawing board with a 16 by 16 or 32 by 32 grid, a 16 colour palette plus custom colour, pen, eraser, fill bucket and colour picker, plus undo and a grid toggle. Exports the artwork as a sharp, enlarged PNG (512 pixels wide) and automatically keeps the current drawing on the device.
 - test:
@@ -98,7 +98,7 @@
 ## Signature Pad
 - id: signature
 - category: create
-- plan: free
+- plan: pro
 - needs: none
 - what: A smooth finger or mouse drawing pad for signing, with four ink colours and adjustable pen thickness. It exports the signature as a transparent PNG tightly cropped to the ink, ready to place on documents, and saves or shares it through the system share sheet.
 - test:
@@ -165,7 +165,7 @@
 ## Matrix Calc
 - id: matrix
 - category: calculate
-- plan: free
+- plan: pro
 - needs: none
 - what: Matrix calculator for matrices up to 4 by 4: add, subtract and multiply (A times B or B times A), determinant, inverse and transpose. Cells accept integers, decimals and fractions like 1/2, results are tidied to fractions where possible, and clear messages explain size mismatches and singular matrices.
 - test:
@@ -219,7 +219,7 @@
 ## Colour Blind Sim
 - id: cbsim
 - category: camera
-- plan: free
+- plan: pro
 - needs: storage
 - what: Choose a photo and see it next to a simulation of protanopia, deuteranopia, tritanopia or total colour blindness, calculated on the device with published colour-vision matrices applied in linear RGB. The simulated image can be saved as a PNG.
 - test:

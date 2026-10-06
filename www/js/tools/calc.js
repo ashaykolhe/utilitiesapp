@@ -713,7 +713,7 @@ simple({ id: 'emi', name: 'EMI Calculator', icon: '🏦', desc: 'Monthly loan in
 }, undefined, (v) => 'EMI ' + sig(v.p) + ' @ ' + sig(v.r) + '% x ' + sig(v.t) + (v.u === 'y' ? ' years' : ' months'))] });
 
 /* ================= 2. Billing ================= */
-reg({ id: 'billing', name: 'Billing', icon: '📃', desc: 'Make an invoice with line items, tax and discount, save the last 20 and share or copy it as text.', keys: ['invoice', 'bill', 'receipt', 'gst', 'quotation'], needs: ['storage'], render(el) {
+reg({ id: 'billing', pro: true, proKey: 'trackers', name: 'Billing', icon: '📃', desc: 'Make an invoice with line items, tax and discount, save the last 20 and share or copy it as text.', keys: ['invoice', 'bill', 'receipt', 'gst', 'quotation'], needs: ['storage'], render(el) {
   let items = [{ d: '', q: 1, p: 0 }], editing = null;
   const meta = Object.assign({ biz: '', cur: '', tax: 0, dt: 'pct', dv: 0 }, Store.get('billing.meta', {}));
   let cust = '';

@@ -16,7 +16,7 @@
 ## Billing
 - id: billing
 - category: calculate
-- plan: free
+- plan: pro
 - needs: storage
 - what: Invoice maker with business name, customer, currency symbol, line items (quantity and price), tax percentage and a discount in percent or amount. Shows subtotal, discount, tax and total live. Saves the last 20 invoices on the device, where they can be viewed again, deleted, copied or shared as plain text. An invoice can be exported as a standalone printable HTML page (escaped text, inline styles), and all saved invoices as one CSV file.
 - test:

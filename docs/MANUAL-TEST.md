@@ -80,8 +80,8 @@ _Free_
 - [ ] Open it. All rows have values. Battery matches the phone's level.
 - [ ] Turn on airplane mode and reopen. Online shows No.
 
-### Expense Tracker
-_Free. Needs: storage_
+### Expense Tracker (Pro)
+_Pro. Needs: storage_
 
 - [ ] Add 12.50 as Food and 40 as Transport: the month total shows 52.50 and two category bars appear.
 - [ ] The "Last 6 months" chart shows a bar for the current month. Set the currency to "EUR": amounts show it.
@@ -501,8 +501,8 @@ _Free_
 - [ ] Change shape: the input boxes change to match. Zero or empty values show a prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
-### Billing
-_Free. Needs: storage_
+### Billing (Pro)
+_Pro. Needs: storage_
 
 - [ ] Enter an item "Widget", qty 2, price 25, tax 10: total shows 55.00. Add a second item and remove it with the cross: totals update.
 - [ ] Set discount type "%" with 10: subtotal 50, discount -5, tax 4.50, total 49.50.
@@ -656,8 +656,8 @@ _Free_
 - [ ] A margin of 100% or more shows the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
 
-### Matrix Calc
-_Free_
+### Matrix Calc (Pro)
+_Pro_
 
 - [ ] Default A = [[2,1],[5,3]], B = identity. Tap A x B: result equals A. Tap det(A): result is 1. Tap A inverse: result is [[3,-1],[-5,2]].
 - [ ] Set B to [[1,2],[3,4]] and tap A x B: result is [[5,8],[14,22]]. A + B is [[3,3],[8,7]] and A - B is [[1,-1],[2,-1]].
@@ -960,8 +960,8 @@ _Free_
 - [ ] Tap Copy on "Bold" and paste into a chat: bold-looking text appears.
 - [ ] "Upside down" reverses and flips the text; clearing the box falls back to `Hello World`.
 
-### Flashcards
-_Free. Needs: storage_
+### Flashcards (Pro)
+_Pro. Needs: storage_
 
 - [ ] Create a deck "Spanish", open it, go to Cards and add "hola" / "hello" and "adios" / "bye". Review shows "Card 1 of 2" and "0 due" turns into 2 due on the home list.
 - [ ] Tap Show answer then Got it for both cards: "All caught up" appears. Stats shows both cards in Box 2 with 100% accuracy.
@@ -1193,8 +1193,8 @@ _Free_
 
 ## 6. Audio
 
-### Audio Player
-_Free. Needs: storage_
+### Audio Player (Pro)
+_Pro. Needs: storage_
 
 - [ ] Press "Choose audio files" and pick one or more songs: the first loads; press Play and it plays. The time and seek bar update and dragging the bar seeks.
 - [ ] Set Speed to 0.5x: playback slows. Untick "Keep pitch": the pitch now drops with the speed.
@@ -1236,8 +1236,8 @@ _Free_
 - [ ] Raise volume above 70% and press Play: a confirmation appears.
 - [ ] Press Stop or leave the tool: sound fades out and stops.
 
-### Drum Pad
-_Free_
+### Drum Pad (Pro)
+_Pro_
 
 - [ ] Tap each pad: a different drum sound plays instantly and the pad flashes with a short vibration.
 - [ ] Tap two pads at the same time with two fingers: both sounds play.
@@ -1316,8 +1316,8 @@ _Free_
 - [ ] Press Stop early: sound stops and the progress resets.
 - [ ] Let it finish: sound stops, the display says Done, the phone vibrates and a message appears.
 
-### Spectrum
-_Free. Needs: microphone_
+### Spectrum (Pro)
+_Pro. Needs: microphone_
 
 - [ ] Press Start and allow the microphone: bars move with ambient sound and the waveform scrolls.
 - [ ] Whistle or play a steady tone: one tall bar appears at the matching band and the "loudest frequency" number matches roughly.
@@ -1359,8 +1359,8 @@ _Free_
 - [ ] Leave the tool while playing: sound fades out without a click.
 - [ ] Enter 99999 in Frequency: a message shows and the value is limited to 20000. Clear the field and leave it: it returns to 440.
 
-### Tone Sequencer
-_Free_
+### Tone Sequencer (Pro)
+_Pro_
 
 - [ ] Tap several cells (they turn colored) and press Play: the notes play in order and a green outline marks the current step. Higher rows are higher notes.
 - [ ] Change the tempo slider while playing: the speed changes smoothly.
@@ -1397,8 +1397,8 @@ _Free (limit: 3 saved recordings (Pro: unlimited)). Needs: microphone, storage_
 
 ## 7. Camera
 
-### Blank Cam
-_Free. Needs: camera, microphone_
+### Blank Cam (Pro)
+_Pro. Needs: camera, microphone_
 
 - [ ] Open the tool. Expected: the legal note about consent is visible.
 - [ ] Choose a camera, keep Record sound ticked and tap Start recording; allow permissions. Expected: the screen goes fully black with a faint timer and a Stop button.
@@ -1415,8 +1415,8 @@ _Free. Needs: camera_
 - [ ] Tap Scan from a picture and choose a photo or screenshot of a product barcode and then of a QR code. Expected: each is decoded; a picture with no code shows No code found.
 - [ ] Point at a barcode with a wrong digit or at a plain textured surface. Expected: nothing is reported (no wrong or made-up numbers). Check History keeps the last 20 scans and Clear history empties it. Denied camera shows a message.
 
-### Collage
-_Free. Needs: storage_
+### Collage (Pro)
+_Pro. Needs: storage_
 
 - [ ] Tap Pick pictures and choose 4 photos. Expected: a 2 x 2 collage appears.
 - [ ] Change Layout to 3 across. Expected: the collage re-arranges; with fewer pictures than cells, pictures repeat.
@@ -1424,8 +1424,8 @@ _Free. Needs: storage_
 - [ ] Tap Shuffle. Expected: the picture order changes.
 - [ ] Tap Save collage. Expected: a JPEG is offered. Pressing Save before picking pictures shows a message.
 
-### Colour Blind Sim
-_Free. Needs: storage_
+### Colour Blind Sim (Pro)
+_Pro. Needs: storage_
 
 - [ ] Open the tool and tap Choose a photo, pick a colourful photo: the normal and simulated versions appear stacked.
 - [ ] Switch the type between Deuteranopia, Protanopia, Tritanopia and Achromatopsia: the lower image changes each time and the description updates. Achromatopsia is grey-scale.
@@ -1442,8 +1442,8 @@ _Free. Needs: camera_
 - [ ] Tap a history swatch. Expected: its HEX is copied. Tap Clear history. Expected: the list empties.
 - [ ] Leave and reopen the tool. Expected: history is kept. With camera denied, a permission message shows.
 
-### Doc Scanner
-_Free. Needs: camera, storage_
+### Doc Scanner (Pro)
+_Pro. Needs: camera, storage_
 
 - [ ] Tap Take photo (or Pick image) and choose a photo of a sheet of paper taken at an angle. Expected: the photo shows with four draggable circles.
 - [ ] Drag the circles onto the page corners. Expected: the blue outline follows.
@@ -1542,8 +1542,8 @@ _Free. Needs: storage_
 - [ ] Pick several photos at once. Expected: each is listed with its own Save button.
 - [ ] Pick a file that is not a picture. Expected: Could not read this file for that item only.
 
-### Photo FX
-_Free. Needs: storage_
+### Photo FX (Pro)
+_Pro. Needs: storage_
 
 - [ ] Tap Pick a picture. Expected: it shows in the preview with its pixel size.
 - [ ] Choose Look grey, then sepia. Expected: the preview changes accordingly.
@@ -1570,8 +1570,8 @@ _Pro. Needs: camera_
 - [ ] Set the speed to 4 fps and tap Play. Expected: frames cycle in the preview; Stop returns to the camera.
 - [ ] Tap Export WebM video with at least 2 frames. Expected: a progress count, then a save/share offer of a WebM file. With fewer than 2 frames a message appears.
 
-### Time-lapse
-_Free. Needs: camera_
+### Time-lapse (Pro)
+_Pro. Needs: camera_
 
 - [ ] Choose Every 1 s and tap Start capturing. Expected: the frame counter climbs once per second.
 - [ ] Tap Stop capturing after about 10 frames, then Make video. Expected: progress text, then a video player and a Save / share video button.
@@ -1666,16 +1666,16 @@ _Free. Needs: storage_
 - [ ] Change the goal during a fast: "of N hours" updates.
 - [ ] During a fast the caption under the ring reads like "Hours 4-12 of your fast" (neutral wording, no health claims).
 
-### Habit Streaks
-_Free. Needs: storage_
+### Habit Streaks (Pro)
+_Pro. Needs: storage_
 
 - [ ] Add a habit "Read": it shows 0 days. Tap "Mark done": streak 1 and today's dot turns green.
 - [ ] Tap again to untick: streak returns to 0.
 - [ ] Delete a habit: a confirmation appears and the habit goes.
 - [ ] Reopen the tool: habits and ticks are kept.
 
-### Health Log
-_Free. Needs: storage_
+### Health Log (Pro)
+_Pro. Needs: storage_
 
 - [ ] Add weight 70, then 69.5 on another date: the chart draws two points and both appear in the list.
 - [ ] BP tab: enter 120 and 80: the chart draws two lines (systolic and diastolic).
@@ -1783,8 +1783,8 @@ _Free. Needs: storage_
 
 ## 9. Security
 
-### 2FA Codes
-_Free. Needs: storage_
+### 2FA Codes (Pro)
+_Pro. Needs: storage_
 
 - [ ] Open 2FA Codes, create a master password, tap Add account, name it and enter secret GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ: a 6 digit code appears with a countdown bar that turns red in the last 5 s and then a new code appears.
 - [ ] Compare the code with a trusted authenticator app using the same secret: they match at the same moment.
@@ -1900,8 +1900,8 @@ _Free_
 - [ ] Type a HEX in a colour box such as #0f0 or ff8000: the colour picker updates. Typing an invalid value such as "zz" changes nothing.
 - [ ] Tap a palette swatch or Copy HEX: "Copied" appears. Settings persist after reopening the tool.
 
-### Pixel Art
-_Free. Needs: storage_
+### Pixel Art (Pro)
+_Pro. Needs: storage_
 
 - [ ] Draw with the pen by dragging a finger: continuous lines appear with no gaps even on fast strokes. Pick another palette colour and draw again.
 - [ ] Choose Fill and tap an empty area: the whole connected empty area fills. Tap Undo: the fill is reverted. Tap Undo with nothing left: "Nothing to undo" appears.
@@ -1909,8 +1909,8 @@ _Free. Needs: storage_
 - [ ] Tap Size: with a drawing present it asks for confirmation, then switches to a 32x32 grid. Toggle Grid off: grid lines disappear.
 - [ ] Tap Export PNG: a file (or the Android share sheet) is produced; open it and check it is crisp, not blurred. Leave and reopen the tool: the drawing is still there.
 
-### Signature Pad
-_Free_
+### Signature Pad (Pro)
+_Pro_
 
 - [ ] Draw a signature: strokes are smooth and follow the finger. Change the thickness and colour and draw again: the new strokes use the new settings.
 - [ ] Tap Undo: the last stroke disappears. Tap Clear: everything is erased.

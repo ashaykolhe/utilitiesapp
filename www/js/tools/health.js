@@ -540,7 +540,7 @@
   } });
 
   /* ================================================================== 7. Health log */
-  Tools.register({ id: 'healthlog', name: 'Health Log', icon: '🛌', cat: 'health', desc: 'Log weight, blood pressure, blood sugar or your own measures with dates, see a line chart and export the log as text.', keys: ['weight', 'blood pressure', 'sugar', 'glucose', 'diary', 'journal'], needs: ['storage'], render(el) {
+  Tools.register({ id: 'healthlog', pro: true, proKey: 'trackers', name: 'Health Log', icon: '🛌', cat: 'health', desc: 'Log weight, blood pressure, blood sugar or your own measures with dates, see a line chart and export the log as text.', keys: ['weight', 'blood pressure', 'sugar', 'glucose', 'diary', 'journal'], needs: ['storage'], render(el) {
     let entries = Store.get('hlog.entries', []), type = 'weight';
     const TYPES = { weight: ['Weight', 'kg', 'var(--accent)'], bp: ['Blood pressure', 'mmHg', 'var(--accent)'], sugar: ['Sugar', 'mg/dL', 'var(--accent)'], custom: ['Custom', '', 'var(--accent)'] };
     el.innerHTML = `<div style="${wrap}">${seg('ty', [['weight', 'Weight'], ['bp', 'BP'], ['sugar', 'Sugar'], ['custom', 'Custom']], 'weight')}
@@ -860,7 +860,7 @@
   } });
 
   /* ================================================================== 17. Habit streaks */
-  Tools.register({ id: 'habits', name: 'Habit Streaks', icon: '🚰', cat: 'health', desc: 'Track daily habits, tick them off each day and keep your streaks going. Stored on this device.', keys: ['habit', 'streak', 'routine', 'goal', 'daily'], needs: ['storage'], render(el) {
+  Tools.register({ id: 'habits', pro: true, proKey: 'trackers', name: 'Habit Streaks', icon: '🚰', cat: 'health', desc: 'Track daily habits, tick them off each day and keep your streaks going. Stored on this device.', keys: ['habit', 'streak', 'routine', 'goal', 'daily'], needs: ['storage'], render(el) {
     let list = Store.get('habit.list', []);
     el.innerHTML = `<div style="${wrap}"><div class="row"><input id="nm" type="text" maxlength="30" placeholder="New habit, e.g. Read 10 pages" aria-label="New habit name"><button class="btn" id="add" style="flex:0 0 auto">Add</button></div><div id="ls" class="list"></div>
       <div style="${NOTE}">A streak counts consecutive days ending today (or yesterday, if you have not ticked today yet).</div></div>`;

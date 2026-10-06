@@ -104,7 +104,7 @@
 ## 2FA Codes
 - id: totp
 - category: security
-- plan: free
+- plan: pro
 - needs: storage
 - what: An offline authenticator for two-step verification (TOTP, RFC 6238 with HMAC-SHA1, SHA-256 or SHA-512 through WebCrypto, 6 to 8 digits, 10 to 120 s periods). Accounts can be added from a base32 secret or an otpauth:// link. Secrets are stored encrypted under their own master password using the same AES-256-GCM vault scheme, with lockout, auto-lock and encrypted backup/import. Codes show a countdown and copy with a 30 s clipboard clear. The engine passes the RFC 6238 and RFC 4226 test vectors.
 - test:

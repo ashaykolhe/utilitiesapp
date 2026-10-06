@@ -86,7 +86,7 @@
 ## Health Log
 - id: healthlog
 - category: health
-- plan: free
+- plan: pro
 - needs: storage
 - what: Log weight, blood pressure, blood sugar or your own named measures with a date and note, see a line chart, and export the log as text (Share sheet on Android, download elsewhere). The log can also be exported as a CSV file for a spreadsheet.
 - test:
@@ -221,7 +221,7 @@
 ## Habit Streaks
 - id: habits
 - category: health
-- plan: free
+- plan: pro
 - needs: storage
 - what: Track daily habits with a one-tap "Mark done", current and best streaks and a 7 day dot row. Everything is stored on the device.
 - test:

@@ -41,7 +41,7 @@
 ## Blank Cam
 - id: blankcam
 - category: camera
-- plan: free
+- plan: pro
 - needs: camera, microphone
 - what: Records video from the front or rear camera while the whole screen is black so recording is discreet. A large dim Stop button ends the recording (automatic stop at 30 minutes), then the video can be previewed and saved or shared. The screen is kept awake while recording. If only the microphone is denied it records video without sound and says so. Leaving the tool mid-recording stops it and offers what was captured to the share sheet. A clear note warns that recording others without consent may be illegal.
 - test:
@@ -54,7 +54,7 @@
 ## Motion Cam
 - id: motioncam
 - category: camera
-- plan: pro (motion)
+- plan: pro
 - needs: camera
 - what: Watches the camera and detects movement by comparing small frames, ignoring small noise. When enough of the picture changes it beeps and vibrates, and keeps a snapshot with the time in a list for this session only (it is cleared when you leave the tool, so save entries you want). Sensitivity can be changed and the entries can be saved. The screen stays awake while watching.
 - test:
@@ -67,7 +67,7 @@
 ## Stop Motion
 - id: stopmotion
 - category: camera
-- plan: pro (motion)
+- plan: pro
 - needs: camera
 - what: Build stop-motion films: capture frames with a see-through onion-skin of the previous frame, delete or reorder frames, play them back at a chosen frames-per-second and export a WebM video recorded from a canvas.
 - test:
@@ -106,7 +106,7 @@
 ## Doc Scanner
 - id: docscan
 - category: camera
-- plan: free
+- plan: pro
 - needs: camera, storage
 - what: Take or pick a photo of a page, drag four corners over it, straighten it with a perspective correction, then choose colour, grey or black-and-white (adaptive threshold for uneven light), rotate and save as JPEG or PNG.
 - test:
@@ -145,7 +145,7 @@
 ## Time-lapse
 - id: timelapse
 - category: camera
-- plan: free
+- plan: pro
 - needs: camera
 - what: Captures a frame every 1 to 60 seconds and builds them into a WebM time-lapse video at 8, 12 or 24 fps. Keep the app open and the phone steady; up to 600 frames are kept in memory.
 - test:
@@ -158,7 +158,7 @@
 ## Collage
 - id: collage
 - category: camera
-- plan: free
+- plan: pro
 - needs: storage
 - what: Combine up to 9 pictures from the phone into one collage using layouts from two side by side up to 3 by 3, with spacing and background colour, a shuffle button, and save as JPEG.
 - test:
@@ -197,7 +197,7 @@
 ## Photo FX
 - id: photofx
 - category: camera
-- plan: free
+- plan: pro
 - needs: storage
 - what: Simple photo editor: look presets (grey, sepia, invert, vivid, cool, warm, soft), brightness, contrast and saturation sliders, rotate and flip, and save at full size as JPEG or PNG.
 - test:

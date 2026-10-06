@@ -590,7 +590,7 @@ Tools.register({ id: 'piano', name: 'Piano', icon: '🎹', cat: 'audio', desc: '
 } });
 
 /* ---------------------------------------------------------------- Spectrum Analyzer */
-Tools.register({ id: 'spectrum', name: 'Spectrum', icon: '📊', cat: 'audio', desc: 'Live frequency spectrum bars and waveform from the microphone, with the loudest frequency shown.', keys: ['analyzer', 'frequency', 'fft', 'waveform', 'oscilloscope', 'equalizer'], needs: ['microphone'], render(el) {
+Tools.register({ id: 'spectrum', pro: true, proKey: 'audio', name: 'Spectrum', icon: '📊', cat: 'audio', desc: 'Live frequency spectrum bars and waveform from the microphone, with the loudest frequency shown.', keys: ['analyzer', 'frequency', 'fft', 'waveform', 'oscilloscope', 'equalizer'], needs: ['microphone'], render(el) {
   const L = life();
   let ctx = null, an = null, running = false, pending = false;
   el.innerHTML = `<div class="card center"><div class="big" id="pk">--</div><div class="muted">loudest frequency (Hz)</div></div>
@@ -731,7 +731,7 @@ Tools.register({ id: 'sleepsounds', name: 'Sleep Sounds', icon: '😴', cat: 'au
 } });
 
 /* ---------------------------------------------------------------- Drum Pad */
-Tools.register({ id: 'drumpad', name: 'Drum Pad', icon: '🥁', cat: 'audio', desc: 'Eight synthesized drum pads (kick, snare, clap, hi-hats, tom, rim, cowbell) that respond to multi-touch.', keys: ['drums', 'beat', 'percussion', 'kick', 'snare', 'hihat'], needs: [], render(el) {
+Tools.register({ id: 'drumpad', pro: true, proKey: 'audio', name: 'Drum Pad', icon: '🥁', cat: 'audio', desc: 'Eight synthesized drum pads (kick, snare, clap, hi-hats, tom, rim, cowbell) that respond to multi-touch.', keys: ['drums', 'beat', 'percussion', 'kick', 'snare', 'hihat'], needs: [], render(el) {
   const L = life();
   const PADS = ['Kick', 'Snare', 'Clap', 'Hi-hat', 'Open hat', 'Tom', 'Rim', 'Cowbell'];
   let ctx = null, master = null, nb = null;
@@ -866,7 +866,7 @@ Tools.register({ id: 'binaural', name: 'Binaural Beats', icon: '🧠', cat: 'aud
 } });
 
 /* ---------------------------------------------------------------- Audio Player + EQ */
-Tools.register({ id: 'player', name: 'Audio Player', icon: '🎧', cat: 'audio', desc: 'Play audio files from your device with speed control, A-B loop and a five-band equalizer.', keys: ['music', 'mp3', 'speed', 'loop', 'equalizer', 'eq', 'bass', 'slow down', 'practice'], needs: ['storage'], render(el) {
+Tools.register({ id: 'player', pro: true, proKey: 'audio', name: 'Audio Player', icon: '🎧', cat: 'audio', desc: 'Play audio files from your device with speed control, A-B loop and a five-band equalizer.', keys: ['music', 'mp3', 'speed', 'loop', 'equalizer', 'eq', 'bass', 'slow down', 'practice'], needs: ['storage'], render(el) {
   const L = life();
   const BANDS = [60, 230, 910, 3600, 14000], PRESETS = { Flat: [0, 0, 0, 0, 0], 'Bass boost': [8, 5, 0, 0, 0], Vocal: [-3, 0, 4, 3, 0], 'Treble boost': [0, 0, 0, 5, 8], Loudness: [6, 2, -2, 2, 5] };
   let list = [], cur = -1, ctx = null, filters = [], A = null, B = null, seeking = false;
@@ -1176,7 +1176,7 @@ Tools.register({ id: 'vocalrange', name: 'Vocal Range', icon: '🎤', cat: 'audi
 } });
 
 /* ---------------------------------------------------------------- Tone Sequencer */
-Tools.register({ id: 'toneseq', name: 'Tone Sequencer', icon: '🎛️', cat: 'audio', desc: 'Compose a looping 16-step melody on a pentatonic grid with adjustable tempo and sound.', keys: ['sequencer', 'melody', 'loop', 'synth', 'compose', 'music maker', 'step'], needs: [], render(el) {
+Tools.register({ id: 'toneseq', pro: true, proKey: 'audio', name: 'Tone Sequencer', icon: '🎛️', cat: 'audio', desc: 'Compose a looping 16-step melody on a pentatonic grid with adjustable tempo and sound.', keys: ['sequencer', 'melody', 'loop', 'synth', 'compose', 'music maker', 'step'], needs: [], render(el) {
   const L = life();
   const ROWS = [72, 69, 67, 64, 62, 60, 57, 55], STEPS = 16;
   let grid = Store.get('toneseq.grid', null);

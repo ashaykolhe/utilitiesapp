@@ -1203,7 +1203,7 @@ Tools.register({ id: 'shopping', name: 'Shopping List', icon: '🛒', cat: 'dail
 } });
 
 /* ---------- Expense Tracker ---------- */
-Tools.register({ id: 'expenses', name: 'Expense Tracker', icon: '💸', cat: 'daily', desc: 'Log spending with categories and see the month total with a bar chart by category and by month.', keys: ['money', 'budget', 'spending', 'cost', 'finance', 'chart'], needs: ['storage'], render(el) {
+Tools.register({ id: 'expenses', pro: true, proKey: 'trackers', name: 'Expense Tracker', icon: '💸', cat: 'daily', desc: 'Log spending with categories and see the month total with a bar chart by category and by month.', keys: ['money', 'budget', 'spending', 'cost', 'finance', 'chart'], needs: ['storage'], render(el) {
   const EC = [['Food', '🍔', '#f59e0b'], ['Transport', '🚌', '#3b82f6'], ['Home', '🏠', '#22c55e'], ['Fun', '🎉', '#ec4899'], ['Health', '💊', '#ef4444'], ['Shopping', '🛍️', '#a855f7'], ['Bills', '🧾', '#06b6d4'], ['Other', '📦', '#84cc16']];
   let list = Store.get('daily.exp', []), cur = Store.get('daily.expcur', ''), vm = new Date(); vm.setDate(1);
   const save = () => Store.set('daily.exp', list);

@@ -11,9 +11,14 @@ const NP = PL.NativePurchases, PN = (window.Capacitor && Capacitor.registerPlugi
 /* Free limits. Tools ask proLimit(name); Pro removes every one of them. */
 const FREE = { pins: 4, reminders: 3, notes: 10, recordings: 3, routes: 1, locker: 3, vault: 5 };
 const PRO_FEATURES = [
-  { k: 'connect', i: '📡', t: 'Connect suite', s: 'File Transfer, Walkie Talkie, Wi-Fi Calls, CCTV, Music Group and Peer link' },
   { k: 'motion', i: '🎥', t: 'Motion cam and Stop motion animation' },
-  { k: 'locker', i: '🔐', t: 'Unlimited locked files and vault entries', s: 'Free: 3 files and 5 vault entries' },
+  { k: 'camera', i: '🎞️', t: 'Advanced camera tools', s: 'Doc Scanner, Time-lapse, Blank Cam, Photo FX, Collage and Colour Blind Simulator' },
+  { k: 'audio', i: '🎹', t: 'Pro audio tools', s: 'Audio Player with equalizer and A-B loop, Drum Pad, Tone Sequencer and Spectrum Analyzer' },
+  { k: 'trackers', i: '📒', t: 'Trackers and invoices', s: 'Expense Tracker, Billing (invoices), Health Log and Habit Streaks, with exports' },
+  { k: 'create', i: '🖌️', t: 'Creative studio', s: 'Pixel Art and Signature Pad' },
+  { k: 'study', i: '🎓', t: 'Study tools', s: 'Flashcards with spaced repetition and the Matrix Calculator' },
+  { k: 'sensors', i: '🧲', t: 'Advanced sensor tools', s: 'Sensor List with live readings of every sensor in your phone' },
+  { k: 'locker', i: '🔐', t: 'Unlimited locked files and vault entries, and 2FA codes', s: 'Free: 3 files and 5 vault entries, no 2FA codes' },
   { k: 'routes', i: '🛣️', t: 'Unlimited saved routes and GPX export', s: 'Free: 1 saved route' },
   { k: 'reminders', i: '🔔', t: 'Unlimited reminders', s: 'Free: 3 active reminders' },
   { k: 'notes', i: '📝', t: 'Unlimited notes', s: 'Free: 10 notes' },

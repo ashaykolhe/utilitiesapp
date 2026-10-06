@@ -350,7 +350,7 @@ Tools.register({ id: 'nightcam', name: 'Night Cam', icon: '🦉', cat: 'camera',
 } });
 
 /* ---------- 4. Blank Cam ---------- */
-Tools.register({ id: 'blankcam', name: 'Blank Cam', icon: '⚫', cat: 'camera', desc: 'Record video with the screen showing black so recording is discreet. A large stop button ends the recording (up to 30 minutes) and lets you save or share it. The screen stays awake while recording.', keys: ['spy', 'secret', 'discreet', 'video recorder', 'hidden'], needs: ['camera', 'microphone'], render(el) {
+Tools.register({ id: 'blankcam', pro: true, proKey: 'camera', name: 'Blank Cam', icon: '⚫', cat: 'camera', desc: 'Record video with the screen showing black so recording is discreet. A large stop button ends the recording (up to 30 minutes) and lets you save or share it. The screen stays awake while recording.', keys: ['spy', 'secret', 'discreet', 'video recorder', 'hidden'], needs: ['camera', 'microphone'], render(el) {
   el.innerHTML = '<div class="card"><b>Record with a black screen</b><div class="muted" style="margin-top:6px">Recording other people without their knowledge or consent may be illegal where you live. Use this only where it is lawful and fair to everyone involved.</div></div>' +
     '<label class="f">Camera<select id="fc"><option value="environment">Rear camera</option><option value="user">Front camera</option></select></label>' +
     '<label class="item" style="gap:10px"><input type="checkbox" id="au" checked> <span class="grow">Record sound</span></label>' +
@@ -429,7 +429,7 @@ Tools.register({ id: 'blankcam', name: 'Blank Cam', icon: '⚫', cat: 'camera', 
 } });
 
 /* ---------- 5. Motion Cam (Pro) ---------- */
-Tools.register({ id: 'motioncam', name: 'Motion Cam', icon: '🕵️', cat: 'camera', pro: true, proKey: 'motion', desc: 'Watches the camera for movement. When something moves it beeps, vibrates and keeps a snapshot with the time in a list for this session only (save the ones you want before leaving). The screen stays awake while watching.', keys: ['motion detector', 'security camera', 'intruder', 'surveillance'], needs: ['camera'], render(el) {
+Tools.register({ id: 'motioncam', pro: true, proKey: 'motion', name: 'Motion Cam', icon: '🕵️', cat: 'camera', pro: true, proKey: 'motion', desc: 'Watches the camera for movement. When something moves it beeps, vibrates and keeps a snapshot with the time in a list for this session only (save the ones you want before leaving). The screen stays awake while watching.', keys: ['motion detector', 'security camera', 'intruder', 'surveillance'], needs: ['camera'], render(el) {
   if (typeof isPro === 'function' && !isPro()) { el.innerHTML = '<div class="card center"><b>Pro feature</b><div class="muted">This tool is part of PocketKit Pro.</div></div>'; return; }
   el.innerHTML = VIEW('<div id="mot" style="position:absolute;left:8px;top:8px;line-height:1.2;font-size:12px;padding:3px 8px;border-radius:99px;background:rgba(0,0,0,.6);color:#fff">Idle</div>') +
     SLIDER('se', 'Sensitivity (1 low, 10 high)', 1, 10, 1, 5) +
@@ -489,7 +489,7 @@ Tools.register({ id: 'motioncam', name: 'Motion Cam', icon: '🕵️', cat: 'cam
 } });
 
 /* ---------- 6. Stop Motion (Pro) ---------- */
-Tools.register({ id: 'stopmotion', name: 'Stop Motion', icon: '🎬', cat: 'camera', pro: true, proKey: 'motion', desc: 'Make stop-motion films: capture frames with an onion-skin view of the previous frame, reorder or delete frames, preview at your chosen speed and export a WebM video.', keys: ['animation', 'frames', 'claymation', 'onion skin'], needs: ['camera'], render(el) {
+Tools.register({ id: 'stopmotion', pro: true, proKey: 'motion', name: 'Stop Motion', icon: '🎬', cat: 'camera', pro: true, proKey: 'motion', desc: 'Make stop-motion films: capture frames with an onion-skin view of the previous frame, reorder or delete frames, preview at your chosen speed and export a WebM video.', keys: ['animation', 'frames', 'claymation', 'onion skin'], needs: ['camera'], render(el) {
   if (typeof isPro === 'function' && !isPro()) { el.innerHTML = '<div class="card center"><b>Pro feature</b><div class="muted">This tool is part of PocketKit Pro.</div></div>'; return; }
   el.innerHTML = VIEW('<img id="onion" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;opacity:.4;pointer-events:none;display:none;border:0"><img id="pv" alt="Preview" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:none;border:0">') +
     '<div class="row"><button class="btn" id="cap">Capture frame</button><button class="btn alt" id="play">Play</button></div>' +
@@ -925,7 +925,7 @@ function dragPoint(wrap, handle, pt, onMove) {
 }
 const HANDLE = (id) => '<div id="' + id + '" style="position:absolute;width:32px;height:32px;margin:-16px 0 0 -16px;border-radius:50%;border:3px solid var(--accent);background:rgba(255,255,255,.35);box-sizing:border-box"></div>';
 
-Tools.register({ id: 'docscan', name: 'Doc Scanner', icon: '📄', cat: 'camera', desc: 'Photograph or pick a page, drag the four corners to straighten it, choose colour, grey or black-and-white, and save it as an image.', keys: ['document', 'scan', 'paper', 'receipt', 'crop', 'perspective'], needs: ['camera', 'storage'], render(el) {
+Tools.register({ id: 'docscan', pro: true, proKey: 'camera', name: 'Doc Scanner', icon: '📄', cat: 'camera', desc: 'Photograph or pick a page, drag the four corners to straighten it, choose colour, grey or black-and-white, and save it as an image.', keys: ['document', 'scan', 'paper', 'receipt', 'crop', 'perspective'], needs: ['camera', 'storage'], render(el) {
   el.innerHTML = '<div class="row"><button class="btn" id="take">Take photo</button><button class="btn alt" id="pick">Pick image</button></div><div class="muted center" id="msg" style="margin:6px 0">Take a photo of a page on a plain background.</div>' +
     '<div id="ed" style="display:none"><div id="wrap" style="position:relative;line-height:0;touch-action:pan-y;user-select:none"><canvas id="cv" style="display:block"></canvas><svg id="sv" viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"><polygon id="pg" fill="rgba(80,140,255,.2)" stroke="#4a8cff" stroke-width=".6" vector-effect="non-scaling-stroke"/></svg>' + HANDLE('h0') + HANDLE('h1') + HANDLE('h2') + HANDLE('h3') + '</div>' +
     '<button class="btn" id="cut" style="margin-top:8px">Straighten and crop</button></div>' +
@@ -1046,7 +1046,7 @@ Tools.register({ id: 'timercam', name: 'Timer Cam', icon: '⏲️', cat: 'camera
 } });
 
 /* ---------- 12. Time-lapse ---------- */
-Tools.register({ id: 'timelapse', name: 'Time-lapse', icon: '🎥', cat: 'camera', desc: 'Capture a frame every few seconds with the camera and turn them into a time-lapse WebM video. Keep the app open and the phone steady; the screen stays awake while capturing.', keys: ['interval', 'timelapse', 'video'], needs: ['camera'], render(el) {
+Tools.register({ id: 'timelapse', pro: true, proKey: 'camera', name: 'Time-lapse', icon: '🎥', cat: 'camera', desc: 'Capture a frame every few seconds with the camera and turn them into a time-lapse WebM video. Keep the app open and the phone steady; the screen stays awake while capturing.', keys: ['interval', 'timelapse', 'video'], needs: ['camera'], render(el) {
   el.innerHTML = VIEW() + '<div class="row"><label class="f">Every<select id="iv"><option value="1">1 s</option><option value="2">2 s</option><option value="5" selected>5 s</option><option value="10">10 s</option><option value="30">30 s</option><option value="60">60 s</option></select></label><label class="f">Video speed<select id="fp"><option value="8">8 fps</option><option value="12" selected>12 fps</option><option value="24">24 fps</option></select></label></div>' +
     '<div class="row"><button class="btn" id="go">Start capturing</button><button class="btn alt" id="mk">Make video</button></div><div class="muted center" id="st" style="margin:6px 0">0 frames</div><button class="btn danger" id="clr">Discard frames</button><div id="res"></div>';
   const v = $('#v', el), cam = makeCam(v, $('#msg', el)), MAXF = 600, wl = wakeLock(), ctl = { cancel: false }; let blobs = [], timer = null, gone = false, making = false, resUrl = null;
@@ -1114,7 +1114,7 @@ function batchTool(el, opts) {
 }
 
 /* ---------- 13. Photo Collage ---------- */
-Tools.register({ id: 'collage', name: 'Collage', icon: '🏞️', cat: 'camera', desc: 'Combine several pictures into one collage with a choice of grid layouts, spacing and background colour, then save it.', keys: ['grid', 'photo grid', 'combine', 'merge pictures'], needs: ['storage'], render(el) {
+Tools.register({ id: 'collage', pro: true, proKey: 'camera', name: 'Collage', icon: '🏞️', cat: 'camera', desc: 'Combine several pictures into one collage with a choice of grid layouts, spacing and background colour, then save it.', keys: ['grid', 'photo grid', 'combine', 'merge pictures'], needs: ['storage'], render(el) {
   const LAY = [['2 side by side', 2, 1], ['2 stacked', 1, 2], ['2 x 2', 2, 2], ['3 across', 3, 1], ['3 stacked', 1, 3], ['2 x 3', 2, 3], ['3 x 3', 3, 3]];
   el.innerHTML = '<button class="btn" id="pk">Pick pictures (up to 9)</button><canvas id="cv" style="margin-top:8px;display:none"></canvas>' +
     '<label class="f">Layout<select id="ly">' + LAY.map((l, i) => '<option value="' + i + '"' + (i === 2 ? ' selected' : '') + '>' + l[0] + '</option>').join('') + '</select></label>' +
@@ -1169,7 +1169,7 @@ Tools.register({ id: 'imgconvert', name: 'Img Convert', icon: '🔄', cat: 'came
 } });
 
 /* ---------- 16. Photo FX ---------- */
-Tools.register({ id: 'photofx', name: 'Photo FX', icon: '🖼️', cat: 'camera', desc: 'Edit a picture: grey, sepia, invert and colour looks, brightness, contrast and saturation sliders, rotate and flip, then save.', keys: ['filter', 'grayscale', 'black and white', 'sepia', 'edit photo', 'rotate'], needs: ['storage'], render(el) {
+Tools.register({ id: 'photofx', pro: true, proKey: 'camera', name: 'Photo FX', icon: '🖼️', cat: 'camera', desc: 'Edit a picture: grey, sepia, invert and colour looks, brightness, contrast and saturation sliders, rotate and flip, then save.', keys: ['filter', 'grayscale', 'black and white', 'sepia', 'edit photo', 'rotate'], needs: ['storage'], render(el) {
   const LOOKS = { none: '', grey: 'grayscale(1)', sepia: 'sepia(1)', invert: 'invert(1)', vivid: 'saturate(1.8) contrast(1.1)', cool: 'hue-rotate(20deg) saturate(1.2)', warm: 'sepia(.4) saturate(1.4)', soft: 'blur(2px)' };
   el.innerHTML = '<button class="btn" id="pk">Pick a picture</button><canvas id="cv" style="margin-top:8px;display:none"></canvas>' +
     '<label class="f">Look<select id="lk">' + Object.keys(LOOKS).map(k => '<option>' + k + '</option>').join('') + '</select></label>' +

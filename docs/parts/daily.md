@@ -175,7 +175,7 @@
 ## Expense Tracker
 - id: expenses
 - category: daily
-- plan: free
+- plan: pro
 - needs: storage
 - what: Logs spending with category, note and date. Shows the month total, a bar for each category and a six-month column chart, with month navigation and a currency symbol. Stored locally. All expenses can be exported as a CSV file (date, category, amount, note); notes that start with = + - or @ are quoted so a spreadsheet never runs them as a formula.
 - test:

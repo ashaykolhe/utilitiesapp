@@ -352,7 +352,7 @@ const fcParse = (text) => {
 };
 const fcExport = (decks) => decks.map((d) => '# ' + d.name + '\n' + d.cards.map((c) => c.q.replace(/\n/g, ' ') + ' :: ' + c.a.replace(/\n/g, ' ')).join('\n')).join('\n\n');
 // ==PURE-END==
-reg({ id: 'flashcards', name: 'Flashcards', icon: '📇', cat: 'text', desc: 'Make decks of flashcards and study them with Leitner-box spaced repetition, with due dates, stats and import or export as plain text.', keys: ['study', 'learn', 'spaced repetition', 'leitner', 'revision', 'memorise', 'quiz'], needs: ['storage'], render(el) {
+reg({ id: 'flashcards', pro: true, proKey: 'study', name: 'Flashcards', icon: '📇', cat: 'text', desc: 'Make decks of flashcards and study them with Leitner-box spaced repetition, with due dates, stats and import or export as plain text.', keys: ['study', 'learn', 'spaced repetition', 'leitner', 'revision', 'memorise', 'quiz'], needs: ['storage'], render(el) {
   let decks = ld('flashcards.decks', []);
   let view = 'home', deckId = null, tab = 'review', queue = [], shown = false, qi = 0;
   const today = () => dayNum(new Date());
@@ -604,7 +604,7 @@ const pxLine = (x0, y0, x1, y1) => {
   return pts;
 };
 // ==PURE-END==
-reg({ id: 'pixelart', name: 'Pixel Art', icon: '👾', cat: 'create', desc: 'Draw pixel art on a 16 by 16 or 32 by 32 grid with a colour palette, fill bucket, eraser and undo, then export a sharp enlarged PNG.', keys: ['sprite', 'draw', 'pixel', 'icon', 'retro', '8-bit', 'paint'], needs: ['storage'], render(el) {
+reg({ id: 'pixelart', pro: true, proKey: 'create', name: 'Pixel Art', icon: '👾', cat: 'create', desc: 'Draw pixel art on a 16 by 16 or 32 by 32 grid with a colour palette, fill bucket, eraser and undo, then export a sharp enlarged PNG.', keys: ['sprite', 'draw', 'pixel', 'icon', 'retro', '8-bit', 'paint'], needs: ['storage'], render(el) {
   const PAL = ['#000000', '#ffffff', '#7f7f7f', '#c3c3c3', '#e63946', '#f4845f', '#ffd166', '#f1fa3b', '#06d6a0', '#2a9d4a', '#118ab2', '#073b4c', '#7c5cff', '#d946ef', '#8b5a2b', '#ffc8a2'];
   const saved = ld('pixelart.state', null);
   let n = saved && (saved.n === 16 || saved.n === 32) ? saved.n : 16;
@@ -673,7 +673,7 @@ const sigBounds = (strokes, pad) => {
   return { x: Math.floor(x0 - pad), y: Math.floor(y0 - pad), w: Math.ceil(x1 - x0 + pad * 2), h: Math.ceil(y1 - y0 + pad * 2) };
 };
 // ==PURE-END==
-reg({ id: 'signature', name: 'Signature Pad', icon: '✒️', cat: 'create', desc: 'Sign with your finger on a smooth drawing pad and export the signature as a tightly cropped transparent PNG to save or share.', keys: ['sign', 'autograph', 'handwriting', 'transparent', 'png', 'pdf signature'], needs: [], render(el) {
+reg({ id: 'signature', pro: true, proKey: 'create', name: 'Signature Pad', icon: '✒️', cat: 'create', desc: 'Sign with your finger on a smooth drawing pad and export the signature as a tightly cropped transparent PNG to save or share.', keys: ['sign', 'autograph', 'handwriting', 'transparent', 'png', 'pdf signature'], needs: [], render(el) {
   let strokes = [], cur = null, colour = '#111111', width = 3;
   const W = 640, H = 300;
   el.innerHTML = `<div class="card" style="padding:10px"><canvas id="cv" width="${W}" height="${H}" style="background:#fff;border-radius:10px;touch-action:none" aria-label="Signature drawing area"></canvas><div class="muted center" style="font-size:12px;margin-top:6px">Sign above with your finger or mouse</div></div>
@@ -1184,7 +1184,7 @@ const mxInv = (A) => {
 };
 const mxParseCell = (s) => { s = String(s).trim(); if (!s) return 0; const m = /^(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)$/.exec(s); if (m) return +m[2] ? m[1] / m[2] : NaN; const n = Number(s.replace(',', '.')); return Number.isFinite(n) ? n : NaN; };
 // ==PURE-END==
-reg({ id: 'matrix', name: 'Matrix Calc', icon: '📑', desc: 'Add, subtract and multiply matrices up to 4 by 4, and find determinants, inverses and transposes, with fractions accepted in cells.', keys: ['matrix', 'determinant', 'inverse', 'linear algebra', 'multiply', 'transpose', 'maths'], needs: [], render(el) {
+reg({ id: 'matrix', pro: true, proKey: 'study', name: 'Matrix Calc', icon: '📑', desc: 'Add, subtract and multiply matrices up to 4 by 4, and find determinants, inverses and transposes, with fractions accepted in cells.', keys: ['matrix', 'determinant', 'inverse', 'linear algebra', 'multiply', 'transpose', 'maths'], needs: [], render(el) {
   const sz = ld('matrix.sz', { a: [2, 2], b: [2, 2] });
   const vals = { a: [['2', '1'], ['5', '3']], b: [['1', '0'], ['0', '1']] };
   const OPS = [['add', 'A + B'], ['sub', 'A − B'], ['mul', 'A × B'], ['det', 'det(A)'], ['inv', 'A⁻¹'], ['tr', 'Aᵀ'], ['bmul', 'B × A']];
@@ -1385,7 +1385,7 @@ const cbPixel = (r, g, b, type) => {
   return m.map((row) => toSrgb(row[0] * lr + row[1] * lg + row[2] * lb));
 };
 // ==PURE-END==
-reg({ id: 'cbsim', name: 'Colour Blind Sim', icon: '🕶️', cat: 'camera', desc: 'Choose a photo and see how it looks to people with protanopia, deuteranopia, tritanopia or total colour blindness, then save the simulated image.', keys: ['colour blindness', 'color blind', 'daltonism', 'accessibility', 'protanopia', 'deuteranopia', 'tritanopia', 'vision', 'simulator'], needs: ['storage'], render(el) {
+reg({ id: 'cbsim', pro: true, proKey: 'camera', name: 'Colour Blind Sim', icon: '🕶️', cat: 'camera', desc: 'Choose a photo and see how it looks to people with protanopia, deuteranopia, tritanopia or total colour blindness, then save the simulated image.', keys: ['colour blindness', 'color blind', 'daltonism', 'accessibility', 'protanopia', 'deuteranopia', 'tritanopia', 'vision', 'simulator'], needs: ['storage'], render(el) {
   let img = null, type = 'deutan';
   const TYPES = [['deutan', 'Deuteranopia', 'No green cones. The most common type (about 6% of men).'], ['protan', 'Protanopia', 'No red cones. Reds look dark and muddy.'], ['tritan', 'Tritanopia', 'No blue cones. Blues and yellows are confused. Rare.'], ['achro', 'Achromatopsia', 'No colour vision at all: a grey-scale view.']];
   el.innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px"><button class="btn" id="pk" style="min-height:52px">Choose a photo</button>
