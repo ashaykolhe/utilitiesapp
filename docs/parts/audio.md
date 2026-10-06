@@ -24,6 +24,7 @@
   4. Tick Sweep, set To 2000 and 5 seconds, press Play: the frequency glides up and down repeatedly and the readout moves.
   5. Set volume above 70% and press Play at 5000 Hz: a confirmation about hearing damage appears; Cancel keeps it stopped.
   6. Leave the tool while playing: sound fades out without a click.
+  7. Enter 99999 in Frequency: a message shows and the value is limited to 20000. Clear the field and leave it: it returns to 440.
 
 ## Tuner
 - id: tuner
@@ -156,6 +157,7 @@
   3. During playback press Set A, then later Set B: the section A to B loops. Clear removes the loop.
   4. Tap the "Bass boost" preset: bass is louder and the 60 Hz slider shows +8. Move a band slider manually.
   5. With several files, let one end: the next one starts. Pick a non-audio file: a message says no audio files were chosen. Leaving stops playback.
+  6. Choose a non-audio file: it is ignored with a message. The playlist holds at most 100 tracks.
 
 ## Stereo Test
 - id: stereotest

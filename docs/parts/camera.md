@@ -245,4 +245,5 @@
   3. Place the points on the card long edge, enter 85.6 with unit mm, tap Set scale. Expected: the big number now shows about 85.60 mm.
   4. Move the points to another object. Expected: the length is shown in mm.
   5. Tap Clear scale. Expected: it goes back to pixels. Entering no length shows a message.
+  6. Known length: -5 is refused, 99999999999 is limited to 1,000,000,000. Choose a non-image file or one over 60 MB in any picture tool: a message says why it was refused.
 

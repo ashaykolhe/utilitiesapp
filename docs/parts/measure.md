@@ -48,6 +48,7 @@
   3. Switch to feet: the units on the labels and result change.
   4. Mark a base angle that points upward (positive): no result appears (needs a downward base angle or a distance).
   5. Switch to feet: the eye height converts (1.6 m becomes 5.25 ft). Aim almost straight up (over 85 degrees): the result shows "--" instead of a huge number.
+  6. Type 50 in Eye height: a message shows and the value is limited to 10. Type -5 in Distance: the minus sign is refused.
 
 ## Distance Finder
 - id: distancefinder
@@ -61,6 +62,7 @@
   3. Aim at or above the horizon: the result shows "--".
   4. Switch units to feet and check the label changes.
   5. Switch to feet: the eye height converts. Aim almost straight down (over 85 degrees): "--" is shown.
+  6. Type 500 in Eye height: the value is limited to 10 with a short "Adjusted" message.
 
 ## Speed Calc
 - id: speedcalc
@@ -73,6 +75,7 @@
   2. Distance tab: 60 km/h for 30 minutes gives 30 km.
   3. Time tab: 100 km at 50 km/h gives 2 h 0 min 0 s.
   4. Empty or zero fields show "--" and a hint, never an error.
+  5. Enter -5 in Distance (a minus sign is refused) and 99999999999 (a message shows and the value is limited). Result stays a number or "--", never NaN.
 
 ## G Meter
 - id: gmeter
@@ -147,6 +150,7 @@
   1. Stick 1 m with shadow 0.8 m, tree shadow 12 m: result 15.00 m.
   2. Switch to feet: the unit label changes.
   3. Set the stick shadow to 0: result shows "--".
+  4. Enter 5000 in Stick height: a message shows and the value is limited to 1000. Enter 0 in a shadow: the result shows "--".
 
 ## Stride & Pace
 - id: pacecalc
@@ -159,6 +163,7 @@
   2. Steps 10000 with step length 0.71: about 7.14 km.
   3. Running pace: 5 km in 30 minutes gives 6:00 per km and 10.0 km/h.
   4. Zero steps or empty fields show "--".
+  5. Enter 3.5 in Steps taken: a "Whole numbers only" message shows. Step length above 3 m is limited to 3.
 
 ## Unit Price
 - id: unitprice
@@ -170,6 +175,7 @@
   1. Product A: 2.00 for 500 g; Product B: 3.00 for 1 kg. A shows 0.400 per 100 g, B 0.300; B is outlined green as best value.
   2. Change B's unit to ml: the message says mixed units cannot be compared.
   3. Clear everything: "Fill in at least two products".
+  4. Enter -1 as a price (refused) and 99999999999 (limited to 1,000,000,000). Leave Amount at 0: that product shows "--".
 
 ## Reaction Test
 - id: reaction

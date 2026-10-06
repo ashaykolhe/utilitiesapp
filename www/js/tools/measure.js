@@ -126,6 +126,7 @@
   /* ------------------------------------------------------------------ shared UI helpers */
   const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const num = (el, sel) => { const e = $(sel, el); const v = e ? parseFloat(String(e.value).replace(',', '.')) : NaN; return isFinite(v) ? v : NaN; };
+  const big = v => Math.abs(v) < 1e12;
   const f1 = (v, d) => (v == null || !isFinite(v)) ? '--' : v.toFixed(d == null ? 1 : d);
   const MUTED = 'font-size:13px;color:var(--muted)';
   const LBL = 'font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600';
@@ -400,7 +401,7 @@
       <div class="row" style="${MUTED};text-align:center"><div>Top: <b id="vt" style="color:var(--text)">--</b></div><div>Base: <b id="vb" style="color:var(--text)">--</b></div></div>
       <div class="card list">
         ${seg('un', [['m', 'metres'], ['ft', 'feet']], 'm')}
-        <div class="row">${field('eye', 'Eye height (<span class="u">m</span>)', 'value="1.6" min="0" step="0.05"')}${field('dst', 'Distance (<span class="u">m</span>), optional', 'min="0" step="0.5"')}</div>
+        <div class="row">${field('eye', 'Eye height (<span class="u">m</span>)', 'value="1.6" min="0" max="10" step="0.05"')}${field('dst', 'Distance (<span class="u">m</span>), optional', 'min="0" max="100000" step="0.5"')}</div>
         <div class="center" style="padding:8px 0"><div style="${LBL}">Height</div><div class="big" id="res" style="margin:2px 0" aria-live="polite">--</div><div id="sub" style="${MUTED}"></div></div>
       </div>
       <div style="${NOTE}">Stand on level ground. Mark the top, then the base of the object. With a base mark the distance is worked out from your eye height. Without it, enter the distance. Tilt errors of a degree or two matter.</div>
@@ -427,7 +428,7 @@
     el.innerHTML = `<div style="${wrap}">
       <div class="card center" style="padding:14px">${clinoSVG('cl')}<div class="big" id="deg" style="margin:4px 0 0">0.0°</div><div style="${MUTED}">Aim the top edge at the object's base</div><div id="msg" style="${MUTED};min-height:18px"></div></div>
       <div class="card list">${seg('un', [['m', 'metres'], ['ft', 'feet']], 'm')}
-        ${field('eye', 'Eye height (<span class="u">m</span>)', 'value="1.6" min="0" step="0.05"')}
+        ${field('eye', 'Eye height (<span class="u">m</span>)', 'value="1.6" min="0" max="10" step="0.05"')}
         <div class="center" style="padding:8px 0"><div style="${LBL}">Distance</div><div class="big" id="res" style="margin:2px 0">--</div><div id="sub" style="${MUTED}">distance = eye height ÷ tan(angle down)</div></div>
         <div class="row"><button class="btn" id="hold">Hold angle</button><button class="btn alt" id="rel">Live</button></div></div>
       <div style="${NOTE}">Point at the spot where the object meets the ground, so the phone tilts downward. Works best between 5 and 50 times your eye height.</div></div>`;
@@ -452,9 +453,9 @@
     el.innerHTML = `<div style="${wrap}">
       ${seg('md', [['speed', 'Speed'], ['dist', 'Distance'], ['time', 'Time']], 'speed')}
       <div class="card list">
-        <div id="gd" class="row"><label class="f">Distance<input id="d" type="number" inputmode="decimal" min="0" value="100"></label><label class="f">Unit<select id="du">${du}</select></label></div>
-        <div id="gs" class="row" style="display:none"><label class="f">Speed<input id="s" type="number" inputmode="decimal" min="0" value="60"></label><label class="f">Unit<select id="su">${su}</select></label></div>
-        <div id="gt"><div style="${MUTED};margin-bottom:4px">Time</div><div class="row">${field('th', 'hours', 'min="0" value="1"')}${field('tm', 'minutes', 'min="0" value="0"')}${field('ts', 'seconds', 'min="0" value="0"')}</div></div>
+        <div id="gd" class="row"><label class="f">Distance<input id="d" type="number" inputmode="decimal" min="0" max="1000000000" value="100"></label><label class="f">Unit<select id="du">${du}</select></label></div>
+        <div id="gs" class="row" style="display:none"><label class="f">Speed<input id="s" type="number" inputmode="decimal" min="0" max="10000000" value="60"></label><label class="f">Unit<select id="su">${su}</select></label></div>
+        <div id="gt"><div style="${MUTED};margin-bottom:4px">Time</div><div class="row">${field('th', 'hours', 'min="0" max="100000" value="1"')}${field('tm', 'minutes', 'min="0" max="6000000" value="0"')}${field('ts', 'seconds', 'min="0" max="360000000" value="0"')}</div></div>
       </div>
       <div class="card center"><div id="rl" style="${LBL}">Speed</div><div class="big" id="res" style="margin:4px 0;font-size:44px" aria-live="polite">--</div><div id="sub" style="${MUTED};line-height:1.7"></div></div></div>`;
     $('#du', el).value = 'km'; $('#su', el).value = 'kmh'; $('#d', el).value = '100';
@@ -465,15 +466,15 @@
       const out = $('#res', el), sub = $('#sub', el);
       const spLines = v => Object.keys(SPEED).map(k => `${(v / SPEED[k]).toFixed(2)} ${SPEED_NAMES[k]}`).join('  ·  ');
       if (mode === 'speed') {
-        const v = speedOf(D, T); $('#rl', el).textContent = 'Speed';
+        let v = speedOf(D, T); $('#rl', el).textContent = 'Speed'; if (v && !big(v)) v = null;
         out.textContent = v ? (v / SPEED[$('#su', el).value]).toFixed(2) + ' ' + SPEED_NAMES[$('#su', el).value] : '--';
-        sub.textContent = v ? spLines(v) + `  ·  pace ${hms(1000 / v)} per km` : 'Enter a distance and a time';
+        sub.textContent = v ? spLines(v) + `  ·  pace ${hms(1000 / v)} per km` : 'Enter a distance and a time (values may be too large)';
       } else if (mode === 'dist') {
-        const d = distOf(V, T); $('#rl', el).textContent = 'Distance';
+        let d = distOf(V, T); $('#rl', el).textContent = 'Distance'; if (d && !big(d)) d = null;
         out.textContent = d ? (d / DIST[$('#du', el).value]).toFixed(2) + ' ' + $('#du', el).value : '--';
         sub.textContent = d ? Object.keys(DIST).map(k => `${(d / DIST[k]).toFixed(2)} ${k}`).join('  ·  ') : 'Enter a speed and a time';
       } else {
-        const t = timeOf(D, V); $('#rl', el).textContent = 'Time';
+        let t = timeOf(D, V); $('#rl', el).textContent = 'Time'; if (t && !big(t)) t = null;
         out.textContent = t ? hms(t) : '--'; sub.textContent = t ? `${(t / 3600).toFixed(3)} hours` : 'Enter a distance and a speed';
       }
     }
@@ -671,15 +672,15 @@
   /* ================================================================== 12. Shadow height */
   Tools.register({ id: 'shadowheight', name: 'Shadow Height', icon: '🌲', cat: 'measure', desc: 'Find the height of a tree, pole or building from its shadow compared with a stick of known height.', keys: ['tree', 'sun', 'shadow', 'tall'], needs: [], render(el) {
     el.innerHTML = `<div style="${wrap}"><div class="card list">${seg('un', [['m', 'metres'], ['ft', 'feet']], 'm')}
-      <div class="row">${field('rh', 'Stick height', 'value="1" min="0" step="0.01"')}${field('rs', 'Stick shadow', 'value="0.8" min="0" step="0.01"')}</div>
-      ${field('os', 'Object shadow', 'value="12" min="0" step="0.01"')}</div>
+      <div class="row">${field('rh', 'Stick height', 'value="1" min="0" max="1000" step="0.01"')}${field('rs', 'Stick shadow', 'value="0.8" min="0" max="1000" step="0.01"')}</div>
+      ${field('os', 'Object shadow', 'value="12" min="0" max="10000" step="0.01"')}</div>
       <div class="card center"><svg viewBox="0 0 300 110" style="width:100%;max-width:320px"><line x1="0" y1="100" x2="300" y2="100" stroke="var(--line)" stroke-width="2"/>
         <circle cx="262" cy="22" r="14" fill="#f59e0b"/><line x1="250" y1="30" x2="40" y2="100" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4 4" opacity=".6"/>
         <rect x="150" y="30" width="10" height="70" fill="var(--accent)" rx="3"/><rect x="150" y="97" width="-1" height="3" fill="none"/><line x1="155" y1="100" x2="50" y2="100" stroke="var(--muted)" stroke-width="5"/></svg>
         <div style="${LBL}">Object height</div><div class="big" id="res" style="margin:2px 0">--</div><div id="sub" style="${MUTED}">height = stick × object shadow ÷ stick shadow</div></div>
       <div style="${NOTE}">Measure both shadows at the same moment, on level ground, with the stick standing straight up.</div></div>`;
     let unit = 'm';
-    const calc = () => { const h = shadowHeight(num(el, '#rh'), num(el, '#rs'), num(el, '#os')); $('#res', el).textContent = h ? h.toFixed(2) + ' ' + unit : '--'; };
+    const calc = () => { const h = shadowHeight(num(el, '#rh'), num(el, '#rs'), num(el, '#os')); $('#res', el).textContent = h && big(h) ? h.toFixed(2) + ' ' + unit : '--'; };
     segBind(el, 'un', v => { unit = v; calc(); }); el.addEventListener('input', calc); calc();
   } });
 
@@ -687,20 +688,20 @@
   Tools.register({ id: 'pacecalc', name: 'Stride & Pace', icon: '👟', cat: 'measure', desc: 'Work out your step length from a known distance, estimate distance from steps, and calculate running pace.', keys: ['step length', 'pace', 'running', 'walk', 'stride'], needs: ['storage'], render(el) {
     el.innerHTML = `<div style="${wrap}">
       <div class="card list"><div style="font-weight:700">Step length</div><div style="${MUTED}">Walk a known distance and count your steps.</div>
-        <div class="row">${field('sd', 'Distance (m)', 'value="20" min="0"')}${field('sn', 'Steps taken', 'min="0" placeholder="e.g. 28"')}</div>
+        <div class="row">${field('sd', 'Distance (m)', 'value="20" min="0" max="100000"')}${field('sn', 'Steps taken', 'min="0" max="10000000" step="1" placeholder="e.g. 28"')}</div>
         <div class="center"><div class="mid" id="sl">--</div><div style="${MUTED}">metres per step</div></div><button class="btn alt" id="sv">Save as my step length</button></div>
       <div class="card list"><div style="font-weight:700">Steps to distance</div>
-        <div class="row">${field('st', 'Steps', 'min="0" value="10000"')}${field('sl2', 'Step length (m)', 'min="0" step="0.01"')}</div>
+        <div class="row">${field('st', 'Steps', 'min="0" max="100000000" step="1" value="10000"')}${field('sl2', 'Step length (m)', 'min="0" max="3" step="0.01"')}</div>
         <div class="center"><div class="mid" id="sdist">--</div></div></div>
       <div class="card list"><div style="font-weight:700">Running pace</div>
-        <div class="row">${field('pd', 'Distance (km)', 'value="5" min="0" step="0.1"')}${field('pm', 'Minutes', 'value="30" min="0"')}</div>
+        <div class="row">${field('pd', 'Distance (km)', 'value="5" min="0" max="1000" step="0.1"')}${field('pm', 'Minutes', 'value="30" min="0" max="100000"')}</div>
         <div class="row"><div class="center"><div class="mid" id="pp">--</div><small class="muted">per km</small></div><div class="center"><div class="mid" id="pk">--</div><small class="muted">km/h</small></div></div></div></div>`;
     const saved = Store.get('pace.step', 0); if (saved) $('#sl2', el).value = saved;
     const mmss = m => { if (m == null) return '--'; const t = Math.round(m * 60); return Math.floor(t / 60) + ':' + pad(t % 60, 2); };
     function calc() {
-      const L = stepLength(num(el, '#sd'), num(el, '#sn')); $('#sl', el).textContent = L ? L.toFixed(2) + ' m' : '--';
-      const sl = num(el, '#sl2'), st = num(el, '#st'); $('#sdist', el).textContent = sl > 0 && st > 0 ? (st * sl / 1000).toFixed(2) + ' km  (' + Math.round(st * sl) + ' m)' : '--';
-      const p = paceMinPerKm(num(el, '#pd'), num(el, '#pm')); $('#pp', el).textContent = mmss(p); $('#pk', el).textContent = p ? (60 / p).toFixed(1) : '--';
+      const L = stepLength(num(el, '#sd'), num(el, '#sn')); $('#sl', el).textContent = L && big(L) ? L.toFixed(2) + ' m' : '--';
+      const sl = num(el, '#sl2'), st = num(el, '#st'); $('#sdist', el).textContent = sl > 0 && st > 0 && big(st * sl) ? (st * sl / 1000).toFixed(2) + ' km  (' + Math.round(st * sl) + ' m)' : '--';
+      const p = paceMinPerKm(num(el, '#pd'), num(el, '#pm')); $('#pp', el).textContent = p && big(p) ? mmss(p) : '--'; $('#pk', el).textContent = p && big(p) ? (60 / p).toFixed(1) : '--';
     }
     $('#sv', el).onclick = () => { const L = stepLength(num(el, '#sd'), num(el, '#sn')); if (!L) return toast('Enter distance and steps'); Store.set('pace.step', +L.toFixed(3)); $('#sl2', el).value = L.toFixed(2); calc(); toast('Saved'); };
     el.addEventListener('input', calc); calc();
@@ -709,7 +710,7 @@
   /* ================================================================== 14. Unit price */
   Tools.register({ id: 'unitprice', name: 'Unit Price', icon: '🏷️', cat: 'measure', desc: 'Compare shop prices per 100 g, 100 ml or per piece to find the best value.', keys: ['shopping', 'compare', 'price per', 'cheaper'], needs: [], render(el) {
     const units = [['g', 'g'], ['kg', 'kg'], ['mg', 'mg'], ['oz', 'oz'], ['lb', 'lb'], ['ml', 'ml'], ['l', 'L'], ['floz', 'fl oz'], ['pc', 'pcs']];
-    const row = i => `<div class="card list" id="r${i}"><div style="font-weight:700">Product ${'ABC'[i]}</div><div class="row">${field('p' + i, 'Price', 'min="0" step="0.01"')}${field('q' + i, 'Amount', 'min="0"')}<label class="f">Unit<select id="u${i}">${units.map(u => `<option value="${u[0]}">${u[1]}</option>`).join('')}</select></label></div>
+    const row = i => `<div class="card list" id="r${i}"><div style="font-weight:700">Product ${'ABC'[i]}</div><div class="row">${field('p' + i, 'Price', 'min="0" max="1000000000" step="0.01"')}${field('q' + i, 'Amount', 'min="0" max="1000000000"')}<label class="f">Unit<select id="u${i}">${units.map(u => `<option value="${u[0]}">${u[1]}</option>`).join('')}</select></label></div>
       <div id="o${i}" class="center" style="min-height:26px;font-weight:700">--</div></div>`;
     el.innerHTML = `<div style="${wrap}">${row(0)}${row(1)}${row(2)}<div id="best" class="card center" style="font-weight:600">Fill in at least two products</div></div>`;
     function calc() {
@@ -721,6 +722,7 @@
       if (ok.some(o => o.x.dim !== ok[0].x.dim)) { best.textContent = 'Mixed units (weight, volume, pieces) cannot be compared'; return; }
       const b = ok.reduce((a, c) => c.x.perBase < a.x.perBase ? c : a), w = ok.reduce((a, c) => c.x.perBase > a.x.perBase ? c : a);
       $('#r' + b.i, el).style.outline = '2px solid var(--ok)'; $('#r' + b.i, el).style.outlineOffset = '-2px';
+      if (!isFinite(b.x.perBase) || !isFinite(w.x.perBase) || !(w.x.perBase > 0)) { best.textContent = 'Those values cannot be compared'; return; }
       best.textContent = b.x.perBase === w.x.perBase ? 'Same price per unit' : `Best value: product ${'ABC'[b.i]}, ${((1 - b.x.perBase / w.x.perBase) * 100).toFixed(0)}% cheaper than the dearest`;
     }
     el.addEventListener('input', calc); el.addEventListener('change', calc);
@@ -739,7 +741,7 @@
       if (state === 'idle') { state = 'wait'; set('Wait for green...', 'var(--danger)'); to = setTimeout(() => { state = 'go'; t = performance.now(); set('TAP NOW', 'var(--ok)'); }, 1200 + Math.random() * 2800); }
       else if (state === 'wait') { clearTimeout(to); state = 'idle'; set('Too soon! Tap to try again', 'var(--accent)', 'var(--accent-t)'); }
       else {
-        const ms = Math.round(performance.now() - t); state = 'idle'; runs.push(ms);
+        const ms = Math.round(performance.now() - t); state = 'idle'; runs.push(ms); if (runs.length > 200) runs.shift();
         $('#la', el).textContent = ms + ' ms'; $('#av', el).textContent = Math.round(runs.reduce((a, b) => a + b, 0) / runs.length) + ' ms';
         if (!best || ms < best) { best = ms; Store.set('reaction.best', best); $('#be', el).textContent = best + ' ms'; }
         set(ms + ' ms. Tap to go again', 'var(--accent)', 'var(--accent-t)');

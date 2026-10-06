@@ -467,7 +467,7 @@
   Tools.register({ id: 'sleepcalc', name: 'Sleep Calculator', icon: '🗃️', cat: 'health', desc: 'Suggests bedtimes or wake-up times that fit 90 minute sleep cycles, with 15 minutes allowed to fall asleep.', keys: ['bedtime', 'wake up', 'cycles', 'alarm', 'rest'], needs: ['storage'], render(el) {
     let mode = 'wake'; const fmtT = m => { const d = new Date(2000, 0, 1, Math.floor(m / 60), m % 60); return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
     el.innerHTML = `<div style="${wrap}">${seg('md', [['wake', 'I need to wake at'], ['bed', 'I go to bed at']], 'wake')}
-      <div class="card list"><label class="f"><span id="lb">Wake-up time</span><input id="tm" type="time" value="07:00" style="font-size:28px;text-align:center;font-weight:700"></label><button class="btn alt" id="nw" style="display:none">Use the current time</button></div>
+      <div class="card list"><label class="f"><span id="lb">Wake-up time</span><input id="tm" type="time" maxlength="5" value="07:00" style="font-size:28px;text-align:center;font-weight:700"></label><button class="btn alt" id="nw" style="display:none">Use the current time</button></div>
       <div id="out" class="list"></div>
       <div style="${NOTE}">An average cycle is about 90 minutes and most adults need 5 to 6 cycles (7.5 to 9 hours). ${MED}</div></div>`;
     function calc() {
@@ -487,7 +487,7 @@
     const TYPES = { weight: ['Weight', 'kg', 'var(--accent)'], bp: ['Blood pressure', 'mmHg', 'var(--accent)'], sugar: ['Sugar', 'mg/dL', 'var(--accent)'], custom: ['Custom', '', 'var(--accent)'] };
     el.innerHTML = `<div style="${wrap}">${seg('ty', [['weight', 'Weight'], ['bp', 'BP'], ['sugar', 'Sugar'], ['custom', 'Custom']], 'weight')}
       <div class="card list"><div id="cus" class="row" style="display:none"><label class="f">Name<input id="nm" type="text" maxlength="20" placeholder="e.g. Temperature"></label><label class="f">Unit<input id="un" type="text" maxlength="8" placeholder="e.g. °C"></label></div>
-        <div class="row" id="vals"></div><div class="row"><label class="f">Date<input id="dt" type="date"></label><label class="f">Note<input id="nt" type="text" maxlength="60" placeholder="optional"></label></div>
+        <div class="row" id="vals"></div><div class="row"><label class="f">Date<input id="dt" type="date" min="1900-01-01" max="${dkey()}"></label><label class="f">Note<input id="nt" type="text" maxlength="60" placeholder="optional"></label></div>
         <button class="btn" id="add">Add entry</button></div>
       <div class="card"><canvas id="cv" style="${CANVAS}"></canvas><div id="lg" style="${MUTED};margin-top:8px"></div></div>
       <div id="ls" class="list"></div>
@@ -499,7 +499,7 @@
     const unitOf = e => e.type === 'custom' ? (e.unit || '') : TYPES[e.type][1];
     const valStr = e => e.type === 'bp' ? `${e.v}/${e.v2}` : String(e.v);
     function vals() {
-      $('#vals', el).innerHTML = type === 'bp' ? field('v', 'Systolic', 'min="40" max="300"') + field('v2', 'Diastolic', 'min="20" max="200"') : field('v', type === 'weight' ? 'Weight (kg)' : type === 'sugar' ? 'Sugar (mg/dL)' : 'Value', 'step="any"');
+      $('#vals', el).innerHTML = type === 'bp' ? field('v', 'Systolic', 'min="40" max="300"') + field('v2', 'Diastolic', 'min="20" max="200"') : field('v', type === 'weight' ? 'Weight (kg)' : type === 'sugar' ? 'Sugar (mg/dL)' : 'Value', type === 'weight' ? 'min="20" max="500" step="0.1"' : type === 'sugar' ? 'min="10" max="1500" step="0.1"' : 'min="0" max="1000000" step="any"');
       $('#cus', el).style.display = type === 'custom' ? '' : 'none';
     }
     function paint() {
@@ -513,6 +513,7 @@
     const text = () => 'PocketKit health log\n' + entries.slice().sort((a, b) => a.date < b.date ? -1 : 1).map(e => `${e.date}  ${e.type === 'custom' ? e.name : TYPES[e.type][0]}: ${valStr(e)} ${unitOf(e)}${e.note ? '  (' + e.note + ')' : ''}`).join('\n');
     $('#add', el).onclick = () => {
       const v = num(el, '#v'), v2 = num(el, '#v2'), date = $('#dt', el).value || dkey();
+      if (!parseD(date) || date < '1900-01-01' || date > dkey()) { toast('Pick a date between 1900 and today'); return; }
       if (!isFinite(v) || (type === 'bp' && !isFinite(v2))) { toast('Enter a value'); return; }
       const R = type === 'weight' ? [20, 500] : type === 'sugar' ? [10, 1500] : type === 'bp' ? [40, 300] : [0, 1e6];
       if (!(v > 0) || v < R[0] || v > R[1] || (type === 'bp' && !(v2 >= 20 && v2 <= 200))) { toast('That value looks out of range'); return; }
@@ -634,7 +635,7 @@
   /* ================================================================== 11. Waist to hip */
   Tools.register({ id: 'whr', name: 'Waist-Hip Ratio', icon: '🧵', cat: 'health', desc: 'Waist-to-hip ratio with the WHO cut-offs (0.90 men, 0.85 women), a quick check of where body fat is carried.', keys: ['waist', 'hip', 'ratio', 'whr'], needs: [], render(el) {
     let sex = 'm';
-    el.innerHTML = `<div style="${wrap}"><div class="card list">${seg('sx', [['m', 'Male'], ['f', 'Female']], 'm')}<div class="row">${field('wa', 'Waist (any unit)', 'min="0" step="0.1"')}${field('hi', 'Hip (same unit)', 'min="0" step="0.1"')}</div></div>
+    el.innerHTML = `<div style="${wrap}"><div class="card list">${seg('sx', [['m', 'Male'], ['f', 'Female']], 'm')}<div class="row">${field('wa', 'Waist (any unit)', 'min="0" max="500" step="0.1"')}${field('hi', 'Hip (same unit)', 'min="0" max="500" step="0.1"')}</div></div>
       <div class="card center"><div style="${LBL}">Ratio</div><div class="big" id="r" style="margin:2px 0">--</div><div id="rk" style="font-size:19px;font-weight:700"></div></div>
       <div style="${NOTE}">Measure waist at the narrowest point and hips at the widest, both over thin clothes. ${MED}</div></div>`;
     function calc() { let r = whrOf(num(el, '#wa'), num(el, '#hi')); if (r && (r < 0.3 || r > 2)) r = null; $('#r', el).textContent = r ? r.toFixed(2) : '--'; const k = r ? whrRisk(sex, r) : null; $('#rk', el).textContent = k ? k.label : ''; if (k) $('#rk', el).style.color = k.col; }
@@ -643,7 +644,7 @@
 
   /* ================================================================== 12. Due date */
   Tools.register({ id: 'duedate', name: 'Due Date', icon: '🤰', cat: 'health', desc: 'Estimated pregnancy due date from the last period, with weeks, trimester and days to go.', keys: ['pregnancy', 'baby', 'edd', 'trimester', 'gestation'], needs: ['storage'], render(el) {
-    el.innerHTML = `<div style="${wrap}"><div class="card list"><div class="row"><label class="f">First day of last period<input id="lm" type="date"></label>${field('cy', 'Cycle length (days)', 'min="20" max="45" value="28"')}</div></div>
+    el.innerHTML = `<div style="${wrap}"><div class="card list"><div class="row"><label class="f">First day of last period<input id="lm" type="date" min="${dkey(addDays(new Date(), -400))}" max="${dkey()}"></label>${field('cy', 'Cycle length (days)', 'min="20" max="45" value="28"')}</div></div>
       <div class="card center"><div style="${LBL}">Estimated due date</div><div class="big" id="edd" style="margin:4px 0;font-size:32px">--</div><div id="wk" style="font-weight:700;font-size:18px"></div><div id="tr" style="${MUTED}"></div>
         <div class="progress" style="margin-top:12px"><i id="pg" style="width:0;transition:width .5s"></i></div><div id="lf" style="${MUTED};margin-top:8px"></div></div>
       <div style="${NOTE}">Only about 5 in 100 babies arrive on the due date. Confirm dates with your midwife or doctor. ${MED}</div></div>`;
@@ -651,7 +652,7 @@
     function calc() {
       const l = parseD($('#lm', el).value); Store.set('due.lmp', $('#lm', el).value || '');
       if (!l) { $('#edd', el).textContent = '--'; return; }
-      const d = dueDate(l, num(el, '#cy') || 28);
+      const d = dueDate(l, clamp(Math.round(num(el, '#cy')) || 28, 20, 45));
       $('#edd', el).textContent = d.edd.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' });
       if (d.days < 0) { $('#wk', el).textContent = 'Date is in the future'; $('#tr', el).textContent = ''; $('#lf', el).textContent = ''; $('#pg', el).style.width = '0'; return; }
       $('#wk', el).textContent = `${d.weeks} weeks ${d.rem} days`; $('#tr', el).textContent = `Trimester ${d.tri}`;
@@ -665,7 +666,7 @@
     let starts = Store.get('period.starts', []);
     el.innerHTML = `<div style="${wrap}"><div class="card center"><div style="${LBL}">Next period</div><div class="big" id="nx" style="margin:4px 0;font-size:34px">--</div><div id="in" style="font-weight:700"></div></div>
       <div class="row">${stat('cd', 'Cycle day')}${stat('cl', 'Cycle length')}</div>
-      <div class="card list"><div class="row"><label class="f">Period started on<input id="dt" type="date"></label><button class="btn" id="add" style="flex:0 0 auto">Add</button></div></div>
+      <div class="card list"><div class="row"><label class="f">Period started on<input id="dt" type="date" min="${dkey(addDays(new Date(), -3650))}" max="${dkey()}"></label><button class="btn" id="add" style="flex:0 0 auto">Add</button></div></div>
       <div id="fw" class="card" style="${MUTED}"></div><div id="ls" class="list"></div>
       <div style="${NOTE}">Predictions are averages and are not reliable for contraception. Data never leaves this device. ${MED}</div></div>`;
     $('#dt', el).value = dkey();
@@ -681,7 +682,7 @@
       }
       $('#ls', el).innerHTML = starts.slice().sort().reverse().slice(0, 12).map(s => `<div class="item"><span class="grow">${esc(s)}</span><button class="btn alt del" data-d="${esc(s)}" aria-label="Delete ${esc(s)}" style="padding:8px 12px">✕</button></div>`).join('');
     }
-    $('#add', el).onclick = () => { const v = $('#dt', el).value; if (!parseD(v)) return; if (!starts.includes(v)) { starts.push(v); starts.sort(); starts = starts.slice(-60); Store.set('period.starts', starts); } paint(); };
+    $('#add', el).onclick = () => { const v = $('#dt', el).value; if (!parseD(v)) { toast('Pick a valid date'); return; } if (v > dkey() || v < dkey(addDays(new Date(), -3650))) { toast('Pick a date within the last 10 years, not in the future'); return; } if (!starts.includes(v)) { starts.push(v); starts.sort(); starts = starts.slice(-60); Store.set('period.starts', starts); } paint(); };
     $('#ls', el).onclick = e => { const b = e.target.closest('.del'); if (!b) return; starts = starts.filter(s => s !== b.dataset.d); Store.set('period.starts', starts); paint(); };
     paint();
   } });

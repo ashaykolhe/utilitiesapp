@@ -48,9 +48,10 @@
       <button class="btn alt" id="rs">Reset trip</button>`;
     let st = { last: null, hist: [], d: 0 }, max = 0;
     const stop = gps(el, p => {
-      const c = p.coords, v = trackFix(st, c, p.timestamp || Date.now());
-      max = Math.max(max, v);
-      $('#sp', el).textContent = Math.round(v); $('#mx', el).textContent = Math.round(max);
+      const c = p.coords; if (!c || !isFinite(c.latitude) || !isFinite(c.longitude)) return;
+      const v = trackFix(st, c, p.timestamp || Date.now());
+      max = Math.max(max, isFinite(v) ? v : 0);
+      $('#sp', el).textContent = isFinite(v) ? Math.round(v) : '--'; $('#mx', el).textContent = Math.round(max);
       $('#di', el).textContent = (st.d / 1000).toFixed(2);
       $('#msg', el).textContent = c.accuracy >= 30 ? 'Weak GPS signal (±' + Math.round(c.accuracy) + ' m); distance paused' : '';
     });
@@ -61,11 +62,11 @@
     el.innerHTML = `<div class="card center"><div class="big" id="al" aria-live="polite">--</div><div class="muted">GPS altitude (approximate), metres</div><div class="muted" id="ac2"></div><div class="muted" id="msg">Waiting for GPS...</div></div>
       <div class="card list"><div class="item"><span class="grow">Latitude</span><b id="la">--</b></div><div class="item"><span class="grow">Longitude</span><b id="lo">--</b></div><div class="item"><span class="grow">Position accuracy</span><b id="ac">--</b></div></div>`;
     return gps(el, p => {
-      const c = p.coords;
-      $('#al', el).textContent = c.altitude != null ? Math.round(c.altitude) : 'n/a';
+      const c = p.coords; if (!c || !isFinite(c.latitude) || !isFinite(c.longitude)) return;
+      $('#al', el).textContent = c.altitude != null && isFinite(c.altitude) ? Math.round(c.altitude) : 'n/a';
       $('#ac2', el).textContent = c.altitude != null && c.altitudeAccuracy != null ? '±' + Math.round(c.altitudeAccuracy) + ' m' : '';
       $('#la', el).textContent = c.latitude.toFixed(5); $('#lo', el).textContent = c.longitude.toFixed(5);
-      $('#ac', el).textContent = '±' + Math.round(c.accuracy) + ' m'; $('#msg', el).textContent = c.altitude == null ? 'This device did not report an altitude.' : '';
+      $('#ac', el).textContent = isFinite(c.accuracy) ? '±' + Math.round(c.accuracy) + ' m' : '--'; $('#msg', el).textContent = c.altitude == null || !isFinite(c.altitude) ? 'This device did not report an altitude.' : '';
     });
   } });
 

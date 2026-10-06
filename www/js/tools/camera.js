@@ -150,7 +150,16 @@ function copyText(t) {
 
 function pickFiles(multi, cb, capture, accept) {
   const i = document.createElement('input'); i.type = 'file'; i.accept = accept || 'image/*'; i.multiple = !!multi; if (capture) i.setAttribute('capture', capture);
-  i.onchange = () => { const f = [...i.files]; if (f.length) cb(f); };
+  i.onchange = () => {
+    let f = [...i.files]; if (!f.length) return;
+    if (!accept || /^image\//.test(accept)) { // default: pictures only, up to 60 MB each
+      const notImg = f.filter(x => x.type && !/^image\//.test(x.type)), big = f.filter(x => x.size > 60 * 1048576);
+      f = f.filter(x => !(x.type && !/^image\//.test(x.type)) && x.size <= 60 * 1048576);
+      if (!f.length) { toast(notImg.length ? 'That is not a picture. Choose a JPG, PNG or WebP image.' : 'That picture is too large (limit 60 MB).'); return; }
+      if (notImg.length || big.length) toast((notImg.length + big.length) + ' file(s) skipped: not a picture or over 60 MB');
+    }
+    cb(f);
+  };
   i.click();
 }
 
@@ -1268,13 +1277,14 @@ Tools.register({ id: 'pixelruler', name: 'Pixel Ruler', icon: '🎚️', cat: 'c
   el.innerHTML = '<div class="row"><button class="btn" id="take">Take photo</button><button class="btn alt" id="pick">Pick picture</button></div>' +
     '<div id="wrap" style="position:relative;line-height:0;margin-top:8px;display:none;touch-action:pan-y;user-select:none"><img id="im" alt="Photo to measure" style="display:block;width:100%;border:0"><svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"><line id="ln" stroke="#ffd400" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>' + HANDLE('a') + HANDLE('b') + '</div>' +
     '<div class="card center"><div class="big" id="out">-</div><div class="muted" id="px">Pick a photo, then drag the two circles.</div></div>' +
-    '<div class="card"><b>Calibrate</b><div class="muted">Place the two points on an object whose length you know (a coin, a ruler, a card) and enter it. All later measurements use that scale.</div><div class="row" style="margin-top:8px"><label class="f">Known length<input id="kl" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 85.6"></label><label class="f">Unit<input id="ku" maxlength="6" value="mm"></label></div><div class="row"><button class="btn" id="cal">Set scale</button><button class="btn alt" id="rs">Clear scale</button></div></div>';
+    '<div class="card"><b>Calibrate</b><div class="muted">Place the two points on an object whose length you know (a coin, a ruler, a card) and enter it. All later measurements use that scale.</div><div class="row" style="margin-top:8px"><label class="f">Known length<input id="kl" type="number" inputmode="decimal" min="0" max="1000000000" step="any" placeholder="e.g. 85.6"></label><label class="f">Unit<input id="ku" maxlength="6" value="mm"></label></div><div class="row"><button class="btn" id="cal">Set scale</button><button class="btn alt" id="rs">Clear scale</button></div></div>';
   const A = { x: .3, y: .5 }, B = { x: .7, y: .5 }; let url = null, nat = null, scale = null;
   const upd = () => {
     $('#ln', el).setAttribute('x1', A.x * 100); $('#ln', el).setAttribute('y1', A.y * 100); $('#ln', el).setAttribute('x2', B.x * 100); $('#ln', el).setAttribute('y2', B.y * 100);
     if (!nat) return; const px = Math.hypot((A.x - B.x) * nat.w, (A.y - B.y) * nat.h);
     $('#px', el).textContent = px.toFixed(1) + ' px' + (scale ? '' : ' (not calibrated)');
-    $('#out', el).textContent = scale ? (px * scale.k).toFixed(2) + ' ' + scale.u : px.toFixed(0) + ' px';
+    const real = scale ? px * scale.k : px;
+    $('#out', el).textContent = !isFinite(real) || real > 1e12 ? '--' : scale ? real.toFixed(2) + ' ' + scale.u : px.toFixed(0) + ' px';
   };
   dragPoint($('#wrap', el), $('#a', el), A, upd); dragPoint($('#wrap', el), $('#b', el), B, upd);
   function load(f) {
@@ -1284,7 +1294,7 @@ Tools.register({ id: 'pixelruler', name: 'Pixel Ruler', icon: '🎚️', cat: 'c
   }
   $('#take', el).onclick = () => pickFiles(false, load, 'environment'); $('#pick', el).onclick = () => pickFiles(false, load);
   $('#cal', el).onclick = () => {
-    const len = parseFloat($('#kl', el).value); if (!nat || !(len > 0)) { toast('Pick a photo and enter a length above 0'); return; }
+    const len = Valid.num($('#kl', el).value); if (!nat || !(len > 0) || len > 1e9) { toast('Pick a photo and enter a length above 0 (up to 1,000,000,000)'); return; }
     const px = Math.hypot((A.x - B.x) * nat.w, (A.y - B.y) * nat.h); if (px < 1) { toast('Move the two points apart first'); return; }
     scale = { k: len / px, u: ($('#ku', el).value.trim() || 'units').slice(0, 6) }; upd();
   };

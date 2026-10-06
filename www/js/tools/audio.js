@@ -246,11 +246,11 @@ Tools.register({ id: 'tonegen', name: 'Tone Generator', icon: '〰️', cat: 'au
   let ctx = null, osc = null, gain = null, playing = false, freq = 440, t0 = 0;
   el.innerHTML = `<div class="card center"><div class="big"><span id="hzv">440</span> Hz</div><div class="muted" id="nt"></div>
     <input id="sl" type="range" min="0" max="1000" aria-label="Frequency slider" style="width:100%">
-    <label class="f">Frequency (Hz)<input id="num" type="number" min="20" max="20000" step="1" value="440"></label></div>
+    <label class="f">Frequency (Hz)<input id="num" type="number" inputmode="decimal" min="20" max="20000" step="1" value="440"></label></div>
     <label class="f">Waveform<select id="wf"><option value="sine">Sine</option><option value="square">Square</option><option value="triangle">Triangle</option><option value="sawtooth">Sawtooth</option></select></label>
     <label class="f">Volume <span id="vv">25</span>%<input id="vol" type="range" min="1" max="100" value="25" style="width:100%"></label>
     <div class="card"><label class="row" style="justify-content:flex-start"><input id="sw" type="checkbox" style="flex:none;width:auto"> <span>Sweep to a second frequency</span></label>
-    <div class="row"><label class="f">To (Hz)<input id="to" type="number" min="20" max="20000" value="2000"></label><label class="f">Seconds<select id="dur"><option>3</option><option selected>5</option><option>10</option><option>20</option></select></label></div></div>
+    <div class="row"><label class="f">To (Hz)<input id="to" type="number" inputmode="decimal" min="20" max="20000" step="1" value="2000"></label><label class="f">Seconds<select id="dur"><option>3</option><option selected>5</option><option>10</option><option>20</option></select></label></div></div>
     <button class="btn" id="go" style="width:100%">Play</button>
     <p class="muted center" style="font-size:13px">Warning: loud or very high tones can hurt your ears and damage speakers. Start at low volume and never use headphones at high volume.</p>`;
   const sl = $('#sl', el), num = $('#num', el);
@@ -260,7 +260,7 @@ Tools.register({ id: 'tonegen', name: 'Tone Generator', icon: '〰️', cat: 'au
     if (!fromSweep) { sl.value = logSliderInv(freq, 20, 20000); if (osc) osc.frequency.setTargetAtTime(freq, ctx.currentTime, 0.01); }
   }
   sl.oninput = () => { const f = Math.round(logSlider(+sl.value, 20, 20000)); num.value = f; t0 = performance.now(); show(f); };
-  num.onchange = () => { num.value = clamp(+num.value, 20, 20000); t0 = performance.now(); show(+num.value); };
+  num.onchange = () => { num.value = clamp(Valid.num(num.value) === null ? 440 : Valid.num(num.value), 20, 20000); t0 = performance.now(); show(+num.value); };
   $('#wf', el).onchange = e => { if (osc) osc.type = e.target.value; };
   // Level is capped at 0.5 amplitude and passes through a compressor, so even 100% cannot be painfully loud.
   const level = v => Math.pow(v / 100, 2) * 0.5;
@@ -908,7 +908,9 @@ Tools.register({ id: 'player', name: 'Audio Player', icon: '🎧', cat: 'audio',
   $('#file', el).onchange = e => {
     const fs = [...e.target.files].filter(f => f.type.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|opus|flac|webm)$/i.test(f.name));
     if (!fs.length) { setText(el, '#msg', 'No audio files were chosen.'); return; }
-    const first = list.length; fs.forEach(f => list.push({ name: f.name, url: URL.createObjectURL(f) }));
+    const room = 100 - list.length; if (room <= 0) { setText(el, '#msg', 'The playlist is full (100 tracks). Remove some first.'); return; }
+    if (fs.length > room) setText(el, '#msg', 'Only the first ' + room + ' files were added (playlist limit 100).');
+    const first = list.length; fs.slice(0, room).forEach(f => list.push({ name: String(f.name).slice(0, 120), url: URL.createObjectURL(f) }));
     drawList(); if (cur < 0) load(first, false);
   };
   $('#pl', el).onclick = () => { if (cur < 0) { $('#file', el).click(); return; } au.paused ? go() : au.pause(); };

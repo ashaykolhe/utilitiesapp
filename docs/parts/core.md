@@ -92,6 +92,7 @@
   3. Tap Reset trip. Max and distance go back to 0.
   4. Deny the permission. A message says location permission was denied.
   5. Walk slowly for 100 m: distance reads about 0.10 km and speed about 4 to 6 km/h. Stand still for two minutes: the distance stays put. With a weak signal (accuracy 30 m or worse) "Weak GPS signal" shows and distance pauses.
+  6. With an odd GPS reading (no position) the numbers show "--" or stay put, never NaN.
 
 ## Altitude
 - id: altitude
@@ -159,6 +160,7 @@
   1. Tap Start listening, allow the microphone and speak a sentence. The words appear.
   2. Tap Copy and paste elsewhere. The text is pasted.
   3. On a phone without speech recognition a message says it is not available.
+  4. Dictate for a long time: the text stops growing at 20,000 characters instead of freezing the app.
 
 ## Paint
 - id: paint

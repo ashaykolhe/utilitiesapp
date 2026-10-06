@@ -20,7 +20,7 @@ Tools.register({ id: 'tts', name: 'Text to Speech', icon: '🔊', cat: 'audio', 
 
 Tools.register({ id: 'stt', name: 'Speech to Text', icon: '🎙️', cat: 'audio', desc: 'Speak and see your words as text, then copy them. Needs a device or WebView with speech recognition.', needs: ['microphone'], render(el) {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  el.innerHTML = `<div class="muted center" id="msg" style="margin-bottom:6px"></div><label class="f">Recognised text<textarea id="t" rows="8" aria-label="Recognised text" placeholder="Your words appear here"></textarea></label>
+  el.innerHTML = `<div class="muted center" id="msg" style="margin-bottom:6px"></div><label class="f">Recognised text<textarea id="t" rows="8" maxlength="20000" aria-label="Recognised text" placeholder="Your words appear here"></textarea></label>
     <div class="row"><button class="btn" id="go">Start listening</button><button class="btn alt" id="cp">Copy</button></div>`;
   const say = (t) => { const m = $('#msg', el); if (m) m.textContent = t; };
   const reset = () => { rec = null; const g = $('#go', el); if (g) g.textContent = 'Start listening'; };
@@ -32,7 +32,7 @@ Tools.register({ id: 'stt', name: 'Speech to Text', icon: '🎙️', cat: 'audio
     say('');
     try {
       const r = new SR(); r.continuous = true; r.interimResults = false; r.lang = navigator.language || 'en-US';
-      r.onresult = e => { const t = $('#t', el); if (!t) return; for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) t.value += e.results[i][0].transcript + ' '; };
+      r.onresult = e => { const t = $('#t', el); if (!t) return; for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) t.value = (t.value + e.results[i][0].transcript + ' ').slice(0, 20000); };
       r.onend = reset;
       r.onerror = e => { say(ERR[e.error] || ('Speech recognition error: ' + e.error)); };
       rec = r; r.start(); $('#go', el).textContent = 'Stop';

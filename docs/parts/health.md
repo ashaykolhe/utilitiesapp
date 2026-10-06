@@ -76,6 +76,7 @@
   2. Switch to "I go to bed at" 23:00: the first suggestion is 8:15 AM (6 cycles = 9 hours, plus 15 minutes to fall asleep).
   3. Tap "Use the current time": the field fills with now.
   4. Clear the time field: the list empties without error.
+  5. Clear the time field: the list empties and nothing breaks.
 
 ## Health Log
 - id: healthlog
@@ -90,6 +91,7 @@
   4. Tap the cross on an entry and confirm: it is removed. Tap "Export as text" and "Copy text": the text contains all entries with dates.
   5. Add with an empty value: "Enter a value" toast.
   6. Try to add a weight of 0, -5 or 9999: "That value looks out of range" shows and nothing is saved.
+  7. Weight: enter 5 (message and out-of-range toast on Add; limit 20 to 500). Pick a date in the future or before 1900: the picker stops it, and Add refuses a typed one.
 
 ## Heart Rate
 - id: heartrate
@@ -138,6 +140,7 @@
   2. Male, waist 105, hip 100: ratio 1.05, "Above the WHO cut-off (increased risk)" in red.
   3. Empty or zero fields: "--".
   4. Men above 0.90 and women above 0.85 show "Above the WHO cut-off"; at or below shows "At or below the WHO cut-off". Absurd ratios (under 0.3 or over 2) show "--".
+  5. Enter 9999 in Waist: a message shows and the value is limited to 500. Hip 0 shows "--".
 
 ## Due Date
 - id: duedate
@@ -151,6 +154,7 @@
   3. Pick a future date: "Date is in the future".
   4. Reopen: the date is remembered.
   5. Pick a last-period date that is across a daylight saving change from today: the weeks and days count is still whole (no off-by-one day).
+  6. The date picker allows only the last 400 days up to today. Cycle length 99 is limited to 45.
 
 ## Cycle Tracker
 - id: period
@@ -164,6 +168,7 @@
   3. Delete a date with the cross: the list and prediction update.
   4. Adding the same date twice does not duplicate it.
   5. Across a daylight saving change the "in N days" and cycle day numbers stay whole and consistent.
+  6. The date picker stops at today and at 10 years back. Typing a future date and tapping Add shows a message and adds nothing.
 
 ## Fasting Timer
 - id: fasting
