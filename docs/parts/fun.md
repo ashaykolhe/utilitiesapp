@@ -75,6 +75,7 @@
   1. Tap +1 on Player 1 three times: score 3 with a crown. Tap -1: score 2.
   2. Set the custom amount to 10 and tap + custom: score increases by 10. Rename a player by typing in the name field.
   3. Add player adds a card; the cross removes one. Reset scores zeroes all. Reopen the tool: players and scores remain.
+  4. Scores stay within +-999,999,999; the custom amount is limited to 1..9999.
 
 ## Magic 8-Ball
 - id: eightball

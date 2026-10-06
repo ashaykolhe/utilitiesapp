@@ -2,13 +2,15 @@
 - id: timer
 - category: daily
 - plan: free
-- needs: none
-- what: Count down from any minutes and seconds with start, pause and reset. A tone and vibration play when time is up.
+- needs: notifications
+- what: Count down from 0 to 999 minutes and 0 to 59 seconds with start, pause and reset. A tone and vibration play when time is up, and on Android a notification is scheduled for the end time so it alerts with the screen off (it can be a few minutes late when the phone is idle). A line says so when notifications are blocked.
 - test:
   1. Open Timer, set 0 min 5 sec, tap Start. The display counts down and a tone plays at 00:00 with a "Time is up" message.
   2. Start 1 min, tap Pause after 5 s, then Resume. It continues from where it stopped.
   3. Tap Reset. The display shows the entered time again.
-  4. Leave the tool while running and come back. The timer is stopped (no sound plays later).
+  4. Start 2 min, leave the tool and come back: it is still counting. Tap Reset: the notification is cancelled.
+  5. Type 5000 minutes or -3: the field limits to 0..999 (message under the box); with 0 min 0 sec Start does nothing.
+  6. Deny notifications in Android settings: a red line says the alert only sounds while PocketKit is open.
 
 ## Stopwatch
 - id: stopwatch
@@ -26,22 +28,24 @@
 - category: daily
 - plan: free with limit: 3 active reminders (Pro: unlimited)
 - needs: notifications
-- what: Set reminders with a date and time. On Android a notification is scheduled so it appears even when the app is closed.
+- what: Set reminders with a date and time (text up to 80 characters, time within the next 5 years, at most 200 saved; finished ones are trimmed to the newest 20). On Android a notification is scheduled so it appears even when the app is closed; it can be a few minutes late on an idle phone. A line says so when notifications are blocked.
 - test:
   1. Add a reminder for 2 minutes from now. Allow notifications when asked. Close the app. A notification appears at the time.
   2. Add reminders until there are 3 active ones, then add a fourth. The Pro sheet opens.
   3. Delete a reminder with the cross. It disappears and no notification arrives for it.
-  4. Try a time in the past. A message says to enter a future time.
+  4. Try a time in the past. A message says to enter a future time. The date picker does not offer past dates or dates beyond 5 years.
+  5. Deny notifications: the reminder is saved, a toast and a red line say notifications are blocked.
 
 ## Calculator
 - id: calculator
 - category: calculate
 - plan: free
 - needs: none
-- what: A simple calculator with add, subtract, multiply, divide, percent, backspace and clear.
+- what: A simple calculator with add, subtract, multiply, divide, percent, backspace and clear. Leading zeros are fine (05+3), repeated operators collapse (2××3 is 2×3), percent after + or - is a share of the left value, and expressions are limited to 60 characters.
 - test:
   1. Enter 12 + 30 × 2 and press =. The result is 72.
-  2. Press 50 % . The expression shows 0.5.
+  2. Press 50 % . The expression shows 0.5. Enter 50 + 10 % and press =: the result is 55.
+  3b. Enter 05 + 3 =: 8. Press = then a digit: a new expression starts.
   3. Enter 1 ÷ 0 and press =. A message says the expression is invalid.
   4. Use backspace and clear.
 
@@ -50,12 +54,12 @@
 - category: calculate
 - plan: free
 - needs: none
-- what: Convert length, weight, volume, area, speed, data, time and temperature between common units.
+- what: Convert length, weight, volume, area, speed, data, time and temperature between common units. The value, units and category all have labels; the value is limited to +-1 trillion.
 - test:
   1. Length: 1 mile to km gives 1.609344.
   2. Temperature: 100 C to F gives 212.
   3. Data: 1 GB to MB gives 1024.
-  4. Clear the number box. The result shows a dash.
+  4. Clear the number box. The result shows a dash. Type 1e30 or letters: the field refuses it or shows a limit message.
 
 ## Compass
 - id: compass

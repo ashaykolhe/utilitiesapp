@@ -89,6 +89,7 @@
   3. Add an alarm with Mon to Fri selected: the list shows the days and the next date.
   4. Toggle an alarm off: it greys out and no notification fires. Toggle it on: it is rescheduled. Delete removes it.
   5. Deny notification permission: a message asks you to allow notifications.
+  6. At most 50 alarms: adding the 51st shows a toast.
 
 ## Signal Light
 - id: signallight
@@ -115,6 +116,7 @@
   3. Add a task due yesterday: it shows "Overdue" in red and sorts first.
   4. Type part of a task name in Search: the list narrows.
   5. Tap Clear completed: ticked tasks disappear. Adding an empty task shows a toast.
+  6. The list holds 500 tasks; when full the oldest completed task is dropped (with a toast), and open tasks are never dropped.
 
 ## Battery & Network
 - id: devstatus
@@ -179,7 +181,7 @@
   2. The "Last 6 months" chart shows a bar for the current month. Set the currency to "EUR": amounts show it.
   3. Add an expense dated last month: the view jumps to that month; use the arrows to return.
   4. Delete an entry: totals and charts update.
-  5. Add with an empty or zero amount: a toast asks for an amount.
+  5. Add with an empty or zero amount: a toast asks for an amount. The amount is limited to 0.01 to 1,000,000,000 and the list to 5000 entries.
 
 ## Tip of the Day
 - id: tipday

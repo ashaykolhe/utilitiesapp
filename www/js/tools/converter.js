@@ -9,9 +9,9 @@ const UNITS = {
   Time: { sec: 1, min: 60, hour: 3600, day: 86400, week: 604800 }
 };
 Tools.register({ id: 'converter', name: 'Unit Converter', icon: '🔁', cat: 'calculate', desc: 'Convert length, weight, volume, area, speed, data, time and temperature.', needs: [], render(el) {
-  el.innerHTML = `<select id="t">${Object.keys(UNITS).concat('Temperature').map(k => `<option>${k}</option>`).join('')}</select>
-    <div class="card list"><input id="v" type="number" value="1" inputmode="decimal"><select id="a"></select>
-    <div class="center muted">=</div><div class="mid" id="o"></div><select id="b"></select></div>`;
+  el.innerHTML = `<label class="f" for="t">Category</label><select id="t">${Object.keys(UNITS).concat('Temperature').map(k => `<option>${k}</option>`).join('')}</select>
+    <div class="card list"><label class="f" for="v">Value</label><input id="v" type="number" value="1" min="-1000000000000" max="1000000000000" step="any" inputmode="decimal"><label class="f" for="a">From</label><select id="a"></select>
+    <div class="center muted">=</div><div class="mid" id="o" role="status" aria-live="polite"></div><label class="f" for="b">To</label><select id="b"></select></div>`;
   const temp = { C: 1, F: 1, K: 1 };
   const fill = () => {
     const names = Object.keys($('#t', el).value === 'Temperature' ? temp : UNITS[$('#t', el).value]);
@@ -22,9 +22,9 @@ Tools.register({ id: 'converter', name: 'Unit Converter', icon: '🔁', cat: 'ca
   const fromC = (c, u) => u === 'C' ? c : u === 'F' ? c * 9 / 5 + 32 : c + 273.15;
   function calc() {
     const type = $('#t', el).value, v = parseFloat($('#v', el).value), a = $('#a', el).value, b = $('#b', el).value;
-    if (isNaN(v)) { $('#o', el).textContent = '—'; return; }
+    if (!Number.isFinite(v)) { $('#o', el).textContent = '—'; return; }
     const r = type === 'Temperature' ? fromC(toC(v, a), b) : v * UNITS[type][a] / UNITS[type][b];
-    $('#o', el).textContent = +r.toPrecision(10) + ' ' + b;
+    $('#o', el).textContent = Number.isFinite(r) ? +r.toPrecision(10) + ' ' + b : '—';
   }
   $('#t', el).onchange = fill; ['v', 'a', 'b'].forEach(i => { $('#' + i, el).oninput = calc; });
   fill();

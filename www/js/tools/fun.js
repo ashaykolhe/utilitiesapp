@@ -365,27 +365,32 @@ const fmtT = (s) => Math.floor(s / 60) + ':' + pad(Math.floor(s % 60));
 
 /* Tracks every timer / frame / listener a tool starts so one stop() cleans up. */
 function tracker() {
-  const to = new Set(), iv = new Set(), raf = new Set(), ls = [];
+  /* Timeouts, intervals and animation frames have separate id pools, so the same number can mean two different things.
+     Every call therefore returns its own handle, and this map remembers which kind (and real id) a handle stands for. */
+  const live = new Map(), ls = [];
+  let seq = 0;
+  const kill = (kind, id) => { if (kind === 'raf') cancelAnimationFrame(id); else if (kind === 'iv') clearInterval(id); else clearTimeout(id); };
   return {
-    to(fn, ms) { const t = setTimeout(() => { to.delete(t); fn(); }, ms); to.add(t); return t; },
-    iv(fn, ms) { const t = setInterval(fn, ms); iv.add(t); return t; },
-    raf(fn) { const t = requestAnimationFrame((ts) => { raf.delete(t); fn(ts); }); raf.add(t); return t; },
-    clear(t) { clearTimeout(t); clearInterval(t); cancelAnimationFrame(t); to.delete(t); iv.delete(t); raf.delete(t); },
+    to(fn, ms) { const h = ++seq, id = setTimeout(() => { live.delete(h); fn(); }, ms); live.set(h, ['to', id]); return h; },
+    iv(fn, ms) { const h = ++seq; live.set(h, ['iv', setInterval(fn, ms)]); return h; },
+    raf(fn) { const h = ++seq, id = requestAnimationFrame((ts) => { live.delete(h); fn(ts); }); live.set(h, ['raf', id]); return h; },
+    clear(h) { const e = live.get(h); if (e) { kill(e[0], e[1]); live.delete(h); } },
     on(target, ev, fn, opt) { target.addEventListener(ev, fn, opt); ls.push([target, ev, fn, opt]); },
     stop() {
-      to.forEach(clearTimeout); iv.forEach(clearInterval); raf.forEach(cancelAnimationFrame);
-      to.clear(); iv.clear(); raf.clear();
+      live.forEach(([kind, id]) => kill(kind, id)); live.clear();
       ls.forEach(([t, e, f, o]) => t.removeEventListener(e, f, o)); ls.length = 0;
     }
   };
 }
+/* ctx.roundRect needs WebView 99+; older ones get a plain rectangle. */
+function rrect(c, x, y, w, h, r) { if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h); }
 
 const CSS = `
 .fn{user-select:none;-webkit-user-select:none;padding-bottom:8px}
 .fn *{-webkit-tap-highlight-color:transparent}
 .fn button{touch-action:manipulation}
-.fn .seg{display:flex;gap:6px;background:var(--surface2);padding:4px;border-radius:14px;margin:8px 0}
-.fn .seg button{flex:1;min-height:40px;border:0;border-radius:11px;background:transparent;color:var(--muted);font-weight:600;font-size:14px;transition:background .2s,color .2s,transform .2s}
+.fn .seg{display:flex;flex-wrap:wrap;gap:6px;background:var(--surface2);padding:4px;border-radius:14px;margin:8px 0}
+.fn .seg button{flex:1;min-height:44px;min-width:44px;border:0;border-radius:11px;background:transparent;color:var(--muted);font-weight:600;font-size:14px;transition:background .2s,color .2s,transform .2s}
 .fn .seg button.on{background:var(--accent);color:var(--accent-t);transform:scale(1.04);box-shadow:var(--shadow)}
 .fn .stats{display:flex;justify-content:space-around;text-align:center;margin:8px 0;gap:6px}
 .fn .stats b{display:block;font-size:22px;font-variant-numeric:tabular-nums;transition:transform .2s}
@@ -413,12 +418,12 @@ function mount(el, html) {
   return $('.fn', el);
 }
 const seg = (id, items, cur) => '<div class="seg" id="' + id + '">' + items.map(([v, l]) =>
-  '<button data-v="' + v + '" class="' + (String(v) === String(cur) ? 'on' : '') + '">' + l + '</button>').join('') + '</div>';
+  '<button data-v="' + v + '" aria-pressed="' + (String(v) === String(cur)) + '" class="' + (String(v) === String(cur) ? 'on' : '') + '">' + l + '</button>').join('') + '</div>';
 function onSeg(root, id, cb) {
   const s = $('#' + id, root);
   s.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
-    $$('button', s).forEach(x => x.classList.toggle('on', x === b));
+    $$('button', s).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
     cb(b.dataset.v);
   });
 }
@@ -552,7 +557,7 @@ reg('wheel', 'Spin Wheel', '🎡', 'A colourful wheel of your own options: add o
     let opts = Store.get('fun.wheel.opts', ['Pizza', 'Burgers', 'Sushi', 'Tacos', 'Pasta']);
     let removeAfter = Store.get('fun.wheel.rm', false), rot = 0, busy = false, win = -1;
     const root = mount(el, `
-      <canvas id="cv" class="cv" width="640" height="640" style="max-width:360px;background:transparent;border:0"></canvas>
+      <canvas id="cv" class="cv" width="640" height="640" role="button" tabindex="0" aria-label="Spin the wheel" style="max-width:360px;background:transparent;border:0"></canvas>
       <div class="msg" id="res" style="font-size:22px">Add some options and spin</div>
       <button class="btn big-btn" id="spin">Spin</button>
       <div class="gap"></div>
@@ -590,14 +595,16 @@ reg('wheel', 'Spin Wheel', '🎡', 'A colourful wheel of your own options: add o
       ctx.fillStyle = cssv(root, '--danger'); ctx.fill(); ctx.lineWidth = 4; ctx.strokeStyle = '#fff'; ctx.stroke();
     }
     function chips() {
-      $('#chips', root).innerHTML = opts.map((o, i) => '<span class="chip pop" style="background:' + col(i) + ';color:#fff">' + esc(o) +
-        ' <button data-i="' + i + '" aria-label="Remove ' + esc(o) + '" style="border:0;background:transparent;color:#fff;font-size:16px;padding:0 0 0 6px">✕</button></span>').join('');
+      $('#chips', root).innerHTML = opts.map((o, i) => '<span class="chip pop" style="display:inline-flex;align-items:center;padding:0 0 0 12px;background:' + col(i) + ';color:#fff">' + esc(o) +
+        '<button data-i="' + i + '" aria-label="Remove ' + esc(o) + '" style="border:0;background:transparent;color:#fff;font-size:16px;padding:0;min-width:44px;min-height:44px">✕</button></span>').join('');
+      cv.setAttribute('aria-label', opts.length ? 'Spin the wheel. Options: ' + opts.join(', ') : 'Spin the wheel. Add some options first');
     }
     function save() { Store.set('fun.wheel.opts', opts); }
     function add() {
       const inp = $('#new', root), v = inp.value.trim().slice(0, 24);
       if (!v) return;
       if (opts.length >= 30) { toast('Up to 30 options'); return; }
+      if (busy) { toast('Wait for the spin to finish'); return; }
       opts.push(v); inp.value = ''; win = -1; save(); chips(); draw();
     }
     function spin() {
@@ -621,9 +628,12 @@ reg('wheel', 'Spin Wheel', '🎡', 'A colourful wheel of your own options: add o
       T.raf(step);
     }
     function finish(i) {
-      win = i; draw(); busy = false; buzz(60);
-      const r = $('#res', root); r.textContent = '🎉 ' + opts[i]; bump(r);
-      if (removeAfter) T.to(() => { opts.splice(i, 1); win = -1; save(); chips(); draw(); }, 1600);
+      win = i; draw(); buzz(60);
+      const val = opts[i], r = $('#res', root); r.textContent = '🎉 ' + val; bump(r);
+      if (removeAfter) {
+        /* Stay busy until the winner is gone, and remove it by value: spinning or deleting in this window used to remove the wrong option. */
+        T.to(() => { const k = opts.indexOf(val); if (k >= 0) opts.splice(k, 1); win = -1; save(); chips(); draw(); busy = false; }, 1600);
+      } else busy = false;
     }
     $('#spin', root).onclick = spin;
     $('#add', root).onclick = add;
@@ -635,6 +645,7 @@ reg('wheel', 'Spin Wheel', '🎡', 'A colourful wheel of your own options: add o
     };
     $('#rs', root).onclick = () => { if (busy) return; opts = ['Pizza', 'Burgers', 'Sushi', 'Tacos', 'Pasta']; win = -1; save(); chips(); draw(); };
     cv.onclick = spin;
+    cv.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); spin(); } };
     chips(); draw();
     return () => T.stop();
   });
@@ -786,16 +797,17 @@ reg('memory', 'Memory Match', '🃏', 'Flip cards to find all the matching pairs
       T.stop(); const [c, r] = SIZES[size], n = c * r / 2;
       cards = shuffle(EMO.slice(0, n).concat(EMO.slice(0, n))); open = []; locked = false; matched = 0; moves = 0; t0 = 0; secs = 0;
       const g = $('#grid', root); g.style.gridTemplateColumns = 'repeat(' + c + ',1fr)';
-      g.innerHTML = cards.map((e, i) => '<button class="mc" data-i="' + i + '" aria-label="Card ' + (i + 1) + '"><div class="in"><div class="f back">?</div><div class="f front">' + e + '</div></div></button>').join('');
+      g.innerHTML = cards.map((e, i) => '<button class="mc" data-i="' + i + '" aria-label="Card ' + (i + 1) + ', face down"><div class="in"><div class="f back">?</div><div class="f front">' + e + '</div></div></button>').join('');
       $('#mv', root).textContent = 0; $('#tm', root).textContent = '0:00'; $('#bs', root).textContent = best(); $('#msg', root).textContent = '';
     }
+    const cardLab = (btn, i, state) => btn.setAttribute('aria-label', 'Card ' + (i + 1) + ', ' + (state === 'down' ? 'face down' : cards[i] + (state === 'ok' ? ', matched' : '')));
     function flipDone() {
       const [a, b] = open, A = $('.mc[data-i="' + a + '"]', root), B = $('.mc[data-i="' + b + '"]', root);
       if (cards[a] === cards[b]) {
-        A.classList.add('ok'); B.classList.add('ok'); matched++; open = []; locked = false; buzz(25);
+        A.classList.add('ok'); B.classList.add('ok'); cardLab(A, a, 'ok'); cardLab(B, b, 'ok'); matched++; open = []; locked = false; buzz(25);
         if (matched === cards.length / 2) win();
       } else {
-        T.to(() => { A.classList.remove('up'); B.classList.remove('up'); open = []; locked = false; }, 700);
+        T.to(() => { A.classList.remove('up'); B.classList.remove('up'); cardLab(A, a, 'down'); cardLab(B, b, 'down'); open = []; locked = false; }, 700);
       }
     }
     function win() {
@@ -811,7 +823,7 @@ reg('memory', 'Memory Match', '🃏', 'Flip cards to find all the matching pairs
       const i = +bt.dataset.i;
       if (bt.classList.contains('up')) return;
       if (!t0) { t0 = Date.now(); tick = T.iv(() => { secs = Math.floor((Date.now() - t0) / 1000); $('#tm', root).textContent = fmtT(secs); }, 250); }
-      bt.classList.add('up'); open.push(i);
+      bt.classList.add('up'); cardLab(bt, i, 'up'); open.push(i);
       if (open.length === 2) { moves++; $('#mv', root).textContent = moves; locked = true; T.to(flipDone, 450); }
     };
     onSeg(root, 'sz', v => { size = v; Store.set('fun.memory.size', size); setup(); });
@@ -825,10 +837,13 @@ reg('memory', 'Memory Match', '🃏', 'Flip cards to find all the matching pairs
    ===================================================================== */
 reg('scoreboard', 'Scoreboard', '🏆', 'Keep score for any game: add players, rename them and tap +1, -1 or a custom amount. Saved automatically.',
   ['score', 'points', 'players', 'tally', 'keeper'], function (el) {
-    let players = Store.get('fun.scoreboard.players', null) || [{ n: 'Player 1', s: 0 }, { n: 'Player 2', s: 0 }];
+    let players = Store.get('fun.scoreboard.players', null);
+    /* Stored data is checked: an unreadable list falls back to the default, scores stay finite and inside +-999999999. */
+    players = Array.isArray(players) ? players.slice(0, 12).filter(p => p && typeof p === 'object').map(p => ({ n: String(p.n == null ? '' : p.n).slice(0, 20), s: clamp(Math.round(+p.s) || 0, -999999999, 999999999) })) : null;
+    if (!players || !players.length) players = [{ n: 'Player 1', s: 0 }, { n: 'Player 2', s: 0 }];
     let step = Store.get('fun.scoreboard.step', 5);
     const root = mount(el, `
-      <div class="row" style="margin-bottom:8px"><label class="f muted" style="flex:1">Custom amount<input type="number" id="step" value="${step}" inputmode="numeric" min="1" max="9999"></label></div>
+      <div class="row" style="margin-bottom:8px"><label class="f muted" style="flex:1">Custom amount<input type="number" id="step" value="${step}" inputmode="numeric" min="1" max="9999" step="1"></label></div>
       <div id="list" style="display:grid;gap:10px"></div>
       <div class="gap"></div>
       <div class="row"><button class="btn" id="add">+ Add player</button><button class="btn alt" id="rst">Reset scores</button></div>
@@ -866,11 +881,12 @@ reg('scoreboard', 'Scoreboard', '🏆', 'Keep score for any game: add players, r
       if (b.dataset.x != null) { players.splice(+b.dataset.x, 1); save(); build(); return; }
       if (b.dataset.d) {
         const [i, d] = b.dataset.d.split(':'), v = d === 'c' ? amount() : d === '-c' ? -amount() : +d;
-        players[+i].s += v; save(); upd(); buzz(8);
+        if (!players[+i]) return;
+        players[+i].s = clamp(players[+i].s + v, -999999999, 999999999); save(); upd(); buzz(8);
       }
     });
     $('#list', root).addEventListener('input', (e) => {
-      const i = e.target.dataset.n; if (i == null) return;
+      const i = e.target.dataset.n; if (i == null || !players[+i]) return;
       players[+i].n = e.target.value.slice(0, 20); save();
     });
     $('#step', root).onchange = () => { step = amount(); $('#step', root).value = step; Store.set('fun.scoreboard.step', step); };
@@ -1042,7 +1058,7 @@ reg('g2048', '2048', '🟧', 'Swipe to slide and merge tiles up to 2048. Smooth 
       }, 130);
     }
     let sx = 0, sy = 0, down = false;
-    root.addEventListener('pointerdown', (e) => { if (e.target.closest('button,input')) return; down = true; sx = e.clientX; sy = e.clientY; });
+    bd.addEventListener('pointerdown', (e) => { down = true; sx = e.clientX; sy = e.clientY; });
     T.on(window, 'pointerup', (e) => {
       if (!down) return; down = false;
       const dx = e.clientX - sx, dy = e.clientY - sy;
@@ -1053,7 +1069,6 @@ reg('g2048', '2048', '🟧', 'Swipe to slide and merge tiles up to 2048. Smooth 
       const d = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 }[e.key];
       if (d != null) { e.preventDefault(); go(d); }
     });
-    root.style.touchAction = 'none';
     $('#new', root).onclick = newGame;
     newGame();
     return () => T.stop();
@@ -1077,14 +1092,19 @@ reg('minesweeper', 'Minesweeper', '💣', 'Classic mine hunting with three sizes
       <div class="row"><button class="btn alt" id="mode">⛏️ Dig mode</button><button class="btn" id="new">New game</button></div>`);
     const gridEl = $('#grid', root);
     function bestStr() { const b = hsGet('mines.best', {})[lv]; return b ? fmtT(b) : '–'; }
+    const cellLabel = (i) => {
+      const s = st[i], base = 'Row ' + (((i / w) | 0) + 1) + ', column ' + (i % w + 1) + ', ';
+      return base + (s === 2 ? 'flag' : s === 1 ? (g && g.mine[i] ? 'mine' : (g && g.adj[i]) || 'empty') : 'hidden');
+    };
     function setup() {
       T.stop(); [w, h, m] = LV[lv]; g = null; st = new Array(w * h).fill(0); over = false; t0 = 0; secs = 0; left = m; opened = 0;
       gridEl.style.gridTemplateColumns = 'repeat(' + w + ',1fr)';
-      gridEl.innerHTML = st.map((_, i) => '<button data-i="' + i + '" aria-label="Cell" style="aspect-ratio:1;padding:0;border:0;border-radius:8px;font-weight:800;font-size:17px;background:linear-gradient(145deg,var(--accent),#a78bfa);color:#fff;box-shadow:var(--shadow);transition:background .2s,transform .15s"></button>').join('');
+      gridEl.innerHTML = st.map((_, i) => '<button data-i="' + i + '" aria-label="' + cellLabel(i) + '" style="aspect-ratio:1;padding:0;border:0;border-radius:8px;font-weight:800;font-size:17px;background:linear-gradient(145deg,var(--accent),#a78bfa);color:#fff;box-shadow:var(--shadow);transition:background .2s,transform .15s"></button>').join('');
       $('#ml', root).textContent = left; $('#tm', root).textContent = '0:00'; $('#bs', root).textContent = bestStr(); $('#msg', root).textContent = 'Tap a cell to start';
     }
     function paint(i) {
       const b = gridEl.children[i], s = st[i];
+      b.setAttribute('aria-label', cellLabel(i));
       if (s === 1) {
         b.style.background = g.mine[i] ? 'var(--danger)' : 'var(--surface2)'; b.style.boxShadow = 'none'; b.style.color = COL[g.adj[i]] || '#888';
         b.textContent = g.mine[i] ? '💣' : (g.adj[i] || ''); b.style.transform = 'scale(1)';
@@ -1169,7 +1189,7 @@ reg('snake', 'Snake', '🐲', 'Guide a growing snake to the apples with swipes o
       if (apple) { ctx.font = (S - 6) + 'px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('🍎', apple.x * S + S / 2, apple.y * S + S / 2 + 2); }
       snake.forEach((s, i) => {
         ctx.fillStyle = 'hsl(' + (150 - i * 3) + ',70%,' + (i ? 45 : 40) + '%)';
-        const p = i ? 3 : 1; ctx.beginPath(); ctx.roundRect(s.x * S + p, s.y * S + p, S - 2 * p, S - 2 * p, 12); ctx.fill();
+        const p = i ? 3 : 1; ctx.beginPath(); rrect(ctx, s.x * S + p, s.y * S + p, S - 2 * p, S - 2 * p, 12); ctx.fill();
       });
       const hd = snake[0], d = V[dir], ex = d[1] ? 9 : 0, ey = d[0] ? 9 : 0;
       ctx.fillStyle = '#fff';
@@ -1509,7 +1529,7 @@ reg('numguess', 'Number Guess', '🔮', 'The phone picks a secret number. Guess 
         <div style="position:relative;height:16px;border-radius:9px;background:var(--surface2);overflow:hidden;margin-top:6px"><i id="rng" style="position:absolute;top:0;bottom:0;background:linear-gradient(90deg,var(--accent),#ff6bd6);border-radius:9px;transition:left .4s,right .4s"></i></div>
         <div class="row muted" style="font-size:13px;margin-top:4px"><span id="lo"></span><span style="text-align:right" id="hi"></span></div></div>
       <div class="msg" id="msg" style="font-size:22px;min-height:40px"></div>
-      <div class="row"><input type="number" id="in" inputmode="numeric" placeholder="Your guess" aria-label="Your guess"><button class="btn" id="go" style="flex:0 0 110px">Guess</button></div>
+      <div class="row"><input type="number" id="in" inputmode="numeric" min="1" max="${max}" step="1" placeholder="Your guess" aria-label="Your guess"><button class="btn" id="go" style="flex:0 0 110px">Guess</button></div>
       <div class="gap"></div>
       <div id="hist" style="display:flex;flex-wrap:wrap;gap:6px"></div>
       <div class="gap"></div><button class="btn alt big-btn" id="new">New number</button>`);
@@ -1521,7 +1541,7 @@ reg('numguess', 'Number Guess', '🔮', 'The phone picks a secret number. Guess 
       $('#hist', root).innerHTML = hist.map(x => '<span class="chip">' + x.v + ' ' + (x.d > 0 ? '⬇️' : x.d < 0 ? '⬆️' : '✅') + '</span>').join('');
     }
     function setup() {
-      secret = 1 + rnd(max); lo = 1; hi = max; tries = 0; done = false; hist = [];
+      secret = 1 + rnd(max); lo = 1; hi = max; tries = 0; $('#in', root).max = max; done = false; hist = [];
       $('#in', root).value = ''; $('#msg', root).textContent = 'I am thinking of a number from 1 to ' + max; $('#bs', root).textContent = best(); view();
     }
     function guess() {
@@ -1571,6 +1591,12 @@ reg('mathsprint', 'Math Sprint', '➕', 'Answer as many arithmetic questions as 
       $('#bs', root).textContent = best(); $('#q', root).textContent = 'Time!';
       const m = $('#msg', root); m.textContent = '🎉 ' + score + ' correct' + (isB && score ? ' (new best!)' : ''); bump(m); $('#go', root).textContent = 'Play again'; buzz(100);
     }
+    /* Throws the running round away without saving anything (used when the level is switched mid-round). */
+    function abort() {
+      run = false; T.stop(); score = 0; wrongN = 0;
+      $('#bar', root).style.width = '100%'; $('#q', root).textContent = 'Ready?'; $('#ans', root).textContent = ''; $('#msg', root).textContent = '';
+      $('#sc', root).textContent = 0; $('#wr', root).textContent = 0; $('#go', root).textContent = 'Start (30 s)';
+    }
     function key(k) {
       if (!run) return;
       if (k === '⌫') typed = typed.slice(0, -1); else if (k === 'C') typed = ''; else if (typed.length < 4) typed += k;
@@ -1589,7 +1615,7 @@ reg('mathsprint', 'Math Sprint', '➕', 'Answer as many arithmetic questions as 
     }
     $('#keys', root).onpointerdown = (e) => { const b = e.target.closest('button'); if (b) { e.preventDefault(); key(b.dataset.k); } };
     T.on(window, 'keydown', (e) => { if (/^[0-9]$/.test(e.key)) key(e.key); else if (e.key === 'Backspace') key('⌫'); });
-    onSeg(root, 'lv', v => { lvl = v; Store.set('fun.math.lvl', lvl); if (run) end(); $('#bs', root).textContent = best(); });
+    onSeg(root, 'lv', v => { if (run) abort(); lvl = v; Store.set('fun.math.lvl', lvl); $('#bs', root).textContent = best(); });
     $('#go', root).onclick = start;
     $('#bs', root).textContent = best();
     return () => T.stop();
@@ -1663,6 +1689,7 @@ reg('wyr', 'Would You Rather', '🤔', 'Two tough but silly choices at a time. P
       $('#' + win, root).style.transform = 'scale(1.04)'; $('#' + lose, root).style.opacity = .35; $('#' + lose, root).style.transform = 'scale(.96)'; buzz(15);
     }
     $('#a', root).onclick = () => choose('a', 'b'); $('#b', root).onclick = () => choose('b', 'a');
+    ['a', 'b'].forEach(id => { $('#' + id, root).onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.currentTarget.click(); } }; });
     $('#next', root).onclick = () => { k++; show(); };
     show();
   });
@@ -1676,7 +1703,7 @@ reg('lucky', 'Lucky Numbers', '🍀', 'Pick random lottery-style numbers: 6 of 4
     let mode = Store.get('fun.lucky.mode', 'l649'), kk = Store.get('fun.lucky.k', 3), nn = Store.get('fun.lucky.n', 10);
     const root = mount(el, `
       ${seg('md', [['l649', '6 of 49'], ['euro', '5/50 + 2'], ['cust', 'Custom']], mode)}
-      <div id="cu" class="row" style="margin:8px 0"><label class="f muted">Pick<input type="number" id="k" value="${kk}" min="1" max="20" inputmode="numeric"></label><label class="f muted">From 1 to<input type="number" id="n" value="${nn}" min="2" max="1000" inputmode="numeric"></label></div>
+      <div id="cu" class="row" style="margin:8px 0"><label class="f muted">Pick<input type="number" id="k" value="${kk}" min="1" max="20" step="1" inputmode="numeric"></label><label class="f muted">From 1 to<input type="number" id="n" value="${nn}" min="2" max="1000" step="1" inputmode="numeric"></label></div>
       <div id="balls" style="display:flex;flex-wrap:wrap;gap:12px;justify-content:center;padding:22px 0;min-height:130px;align-content:center"></div>
       <div id="stars" style="display:flex;gap:12px;justify-content:center;min-height:56px"></div>
       <div class="gap"></div><button class="btn big-btn" id="go">🍀 Draw</button>
@@ -1761,6 +1788,7 @@ reg('whackamole', 'Whack-a-Mole', '🔨', 'Tap the moles as they pop up before t
   ['whack', 'mole', 'tap', 'arcade', 'reflex'], function (el) {
     const T = tracker(), DUR = 30000;
     let run = false, score = 0, t0 = 0, active = new Set(), best = hsGet('whack.best', 0), sp = 0;
+    const tok = new Array(9).fill(0); // one token per hole: a timer from an earlier mole must not touch a newer one
     const root = mount(el, `
       <div class="card"><div class="stats">${stat('sc', 'Score', 0)}${stat('tm', 'Time', 30)}${stat('bs', 'Best', best)}</div></div>
       <div class="gap"></div>
@@ -1770,33 +1798,35 @@ reg('whackamole', 'Whack-a-Mole', '🔨', 'Tap the moles as they pop up before t
       <div class="msg" id="msg">Tap Start, then whack the moles</div>
       <button class="btn big-btn" id="go">Start</button>`);
     const holes = $$('#grid button', root);
-    function hide(i, hit) {
+    function hide(i) {
       active.delete(i); const m = $('.mole', holes[i]);
-      m.style.transform = 'translateY(110%)'; if (hit) m.textContent = '🐹';
+      m.style.transform = 'translateY(110%)'; m.textContent = '🐹';
     }
     function spawn() {
       if (!run) return;
       const free = [...Array(9).keys()].filter(i => !active.has(i));
       if (free.length) {
-        const i = pick(free); active.add(i); const m = $('.mole', holes[i]); m.textContent = '🐹'; m.style.transform = 'translateY(0)';
+        const i = pick(free), my = ++tok[i]; active.add(i); const m = $('.mole', holes[i]); m.textContent = '🐹'; m.style.transform = 'translateY(0)';
         const life = Math.max(550, 1100 - score * 12);
-        T.to(() => { if (active.has(i)) hide(i); }, life);
+        T.to(() => { if (tok[i] === my && active.has(i)) hide(i); }, life);
       }
       T.to(spawn, Math.max(380, 850 - score * 10) * (0.7 + Math.random() * 0.6));
     }
     function end() {
-      run = false; T.stop(); active.forEach(i => hide(i)); active.clear();
+      run = false; T.stop(); holes.forEach((_, i) => hide(i)); active.clear();
       if (score > best) { best = score; hsSet('whack.best', best); $('#bs', root).textContent = best; }
       $('#tm', root).textContent = 0; const m = $('#msg', root); m.textContent = '🎉 Time! You whacked ' + score; bump(m); $('#go', root).textContent = 'Play again'; buzz(100);
     }
     $('#grid', root).onpointerdown = (e) => {
       const b = e.target.closest('button'); if (!b || !run) return;
       const i = +b.dataset.i; if (!active.has(i)) return;
+      active.delete(i); // gone at once, so a second tap on the same mole cannot score again
+      const my = tok[i];
       score++; $('#sc', root).textContent = score; bump($('#sc', root)); buzz(20);
-      const m = $('.mole', b); m.textContent = '💥'; T.to(() => hide(i, true), 120);
+      const m = $('.mole', b); m.textContent = '💥'; T.to(() => { if (tok[i] === my) hide(i); }, 120);
     };
     $('#go', root).onclick = () => {
-      T.stop(); active.clear(); holes.forEach((_, i) => hide(i)); score = 0; run = true; t0 = Date.now();
+      T.stop(); active.clear(); holes.forEach((_, i) => { tok[i]++; hide(i); }); score = 0; run = true; t0 = Date.now();
       $('#sc', root).textContent = 0; $('#msg', root).textContent = 'Go go go!';
       T.iv(() => { const left = DUR - (Date.now() - t0); $('#tm', root).textContent = Math.max(0, Math.ceil(left / 1000)); if (left <= 0) end(); }, 100);
       T.to(spawn, 400);
@@ -1813,9 +1843,19 @@ reg('flappy', 'Flappy Tap', '🐦', 'Tap to flap through the gaps between the pi
     let state = 'idle', y, vy, pipes, score, best = hsGet('flappy.best', 0), last = 0, dist, t = 0, deadAt = 0, raf = 0;
     const root = mount(el, `
       <div class="card"><div class="stats">${stat('sc', 'Score', 0)}${stat('bs', 'Best', best)}</div></div>
-      <canvas id="cv" class="cv" width="${W}" height="${H}" style="max-width:360px;touch-action:none"></canvas>
+      <canvas id="cv" class="cv" width="${W}" height="${H}" style="max-width:360px;touch-action:none" aria-label="Flappy Tap game, tap to flap"></canvas>
       <div class="msg muted">Tap the game to flap</div>`);
     const cv = $('#cv', root), ctx = cv.getContext('2d');
+    /* Size from the room that is really there (min of 520px and the viewport minus the header), then give the backing store one pixel per device pixel. */
+    function fit() {
+      const cw = root.clientWidth || W, ah = Math.max(220, Math.min(H, (window.innerHeight || H) - 220));
+      let w = ah * W / H, hh = ah;
+      if (w > cw) { w = cw; hh = w * H / W; }
+      w = Math.min(w, W);
+      const dpr = Math.min(3, window.devicePixelRatio || 1);
+      cv.style.width = Math.round(w) + 'px'; cv.style.height = Math.round(hh) + 'px';
+      cv.width = Math.round(w * dpr); cv.height = Math.round(hh * dpr);
+    }
     function reset() { y = H / 2 - 20; vy = 0; pipes = []; score = 0; dist = 0; $('#sc', root).textContent = 0; for (let i = 0; i < 3; i++) addPipe(W + 100 + i * 210); }
     function addPipe(x) { pipes.push({ x, gy: 90 + Math.random() * (H - 180 - G - 60), passed: false }); }
     function flap() {
@@ -1841,14 +1881,15 @@ reg('flappy', 'Flappy Tap', '🐦', 'Tap to flap through the gaps between the pi
       if (y + R > H - 40 || y - R < -30) die();
     }
     function draw() {
+      ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
       const sky = ctx.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#5fb7ff'); sky.addColorStop(1, '#c9ecff');
       ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
       ctx.fillStyle = 'rgba(255,255,255,.8)';
       [[(60 - dist * .2) % 420, 90], [(230 - dist * .2) % 420, 150], [(380 - dist * .2) % 420, 60]].forEach(([x, cy]) => { const cx = x < -60 ? x + 420 : x; ctx.beginPath(); ctx.arc(cx, cy, 22, 0, 7); ctx.arc(cx + 24, cy + 6, 18, 0, 7); ctx.arc(cx - 22, cy + 8, 16, 0, 7); ctx.fill(); });
       pipes.forEach(p => {
         ctx.fillStyle = '#22c55e'; ctx.strokeStyle = '#14803c'; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.roundRect(p.x, -10, PW, p.gy + 10, [0, 0, 10, 10]); ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.roundRect(p.x, p.gy + G, PW, H, [10, 10, 0, 0]); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); rrect(ctx, p.x, -10, PW, p.gy + 10, [0, 0, 10, 10]); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); rrect(ctx, p.x, p.gy + G, PW, H, [10, 10, 0, 0]); ctx.fill(); ctx.stroke();
       });
       ctx.fillStyle = '#d9b36b'; ctx.fillRect(0, H - 40, W, 40); ctx.fillStyle = '#7cc04b'; ctx.fillRect(0, H - 40, W, 10);
       ctx.save(); ctx.translate(BX, y); ctx.rotate(clamp(vy / 900, -.5, 1.1)); ctx.font = '34px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.scale(-1, 1); ctx.fillText('🐦', 0, 2); ctx.restore();
@@ -1862,7 +1903,8 @@ reg('flappy', 'Flappy Tap', '🐦', 'Tap to flap through the gaps between the pi
     }
     cv.addEventListener('pointerdown', (e) => { e.preventDefault(); flap(); });
     T.on(window, 'keydown', (e) => { if (e.key === ' ' || e.key === 'ArrowUp') { e.preventDefault(); flap(); } });
-    reset(); raf = T.raf(frame);
+    T.on(window, 'resize', fit);
+    fit(); reset(); raf = T.raf(frame);
     return () => T.stop();
   });
 
@@ -2193,7 +2235,7 @@ reg('scramble', 'Word Scramble', '🔡', 'Unscramble the jumbled letters by tapp
     };
     $('#hint', root).onclick = () => { $('#cat', root).textContent = cat; };
     $('#clr', root).onclick = () => { if (!locked) { ans = []; paint(); } };
-    $('#skip', root).onclick = () => { st.streak = 0; stats(); $('#msg', root).textContent = 'It was ' + word; locked = true; T.to(next, 1000); };
+    $('#skip', root).onclick = () => { if (locked) return; st.streak = 0; stats(); $('#msg', root).textContent = 'It was ' + word; locked = true; T.to(next, 1000); };
     next();
     return () => T.stop();
   });

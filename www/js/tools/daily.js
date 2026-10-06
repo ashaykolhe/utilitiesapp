@@ -100,10 +100,13 @@ function isoWeek(d) {
   return Math.ceil(((t - Date.UTC(t.getUTCFullYear(), 0, 1)) / 86400000 + 1) / 7);
 }
 const daysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
+const isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+/* 29 Feb is celebrated on 28 Feb in years that are not leap years (a plain Date would roll over to 1 March). */
+function bdayDate(y, month, day) { if (month === 2 && day === 29 && !isLeap(y)) day = 28; return new Date(y, month - 1, day); }
 function daysUntil(month, day, from) {
   const today = new Date(from.getFullYear(), from.getMonth(), from.getDate());
-  let t = new Date(today.getFullYear(), month - 1, day);
-  if (t < today) t = new Date(today.getFullYear() + 1, month - 1, day);
+  let t = bdayDate(today.getFullYear(), month, day);
+  if (t < today) t = bdayDate(today.getFullYear() + 1, month, day);
   return { days: Math.round((t - today) / 86400000), date: t };
 }
 function dayOfYear(d) { return Math.round((new Date(d.getFullYear(), d.getMonth(), d.getDate()) - new Date(d.getFullYear(), 0, 0)) / 86400000); }
@@ -196,42 +199,73 @@ const dayKey = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(
 /* Pill buttons that behave like a segmented control. */
 function segHtml(items, cur, o) {
   o = o || {};
-  return `<div class="row" data-seg style="${o.row || 'gap:6px'}">` + items.map(([k, l]) => `<button class="btn ${k === cur ? '' : 'alt'}" data-k="${k}" style="${o.btn || 'padding:10px 4px;font-size:14px'}">${l}</button>`).join('') + '</div>';
+  return `<div class="row" data-seg style="${o.row || 'gap:6px'}">` + items.map(([k, l]) => `<button class="btn ${k === cur ? '' : 'alt'}" data-k="${k}" aria-pressed="${k === cur}" style="${o.btn || 'padding:10px 4px;font-size:14px'}">${l}</button>`).join('') + '</div>';
 }
 function bindSeg(root, onPick) {
   root.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-k]'); if (!b || !root.contains(b)) return;
-    $$('button[data-k]', root).forEach(x => x.classList.toggle('alt', x !== b));
+    $$('button[data-k]', root).forEach(x => { x.classList.toggle('alt', x !== b); x.setAttribute('aria-pressed', String(x === b)); });
     onPick(b.dataset.k);
   });
 }
 
-async function notifyAt(id, title, body, at) {
+/* Notification ids: every tool owns a block so they can never overwrite each other.
+   timer 710001 (timer.js) | parking 730001-2 | pomodoro 740001 | alarms 10,000,000+ (old alarms keep 750000+n*10+k)
+   quick timers 20,000,000+ (old: 760000+) | birthdays 30,000,000+ (old: 770000+) | reminders 100,000,000+ (reminders.js). */
+const NOTE_BLOCK = { alarm: 10000000, qt: 20000000, bday: 30000000 };
+const noteId = (kind, n) => NOTE_BLOCK[kind] + (n % 900000) * 10;
+/* Resolves true only when Android really accepted the notification; false when blocked or failed or there is no plugin. */
+async function notifySchedule(id, title, body, schedule) {
   const ln = LN(); if (!ln) return false;
   try {
     const p = await ln.requestPermissions();
     if (p.display !== 'granted') return false;
-    await ln.schedule({ notifications: [{ id, title, body, schedule: { at: new Date(at), allowWhileIdle: true } }] });
+    await ln.schedule({ notifications: [{ id, title, body, schedule: Object.assign({ allowWhileIdle: true }, schedule) }] });
     return true;
   } catch (e) { return false; }
+}
+const notifyAt = (id, title, body, at) => notifySchedule(id, title, body, { at: new Date(at) });
+/* The alert can only be trusted when this is true; a browser (no plugin) still alerts while the page is open, so it is not "blocked". */
+const alertsOk = (ok) => ok || !LN();
+const BLOCKED_TXT = 'Notifications are blocked: the alert only sounds while PocketKit is open. Allow them in Android settings.';
+const blockedHtml = () => `<div class="card nblocked" hidden role="status" style="font-size:13px;line-height:1.5;color:var(--danger);border-color:var(--danger)">${BLOCKED_TXT}</div>`;
+function setBlocked(root, on) { const n = $('.nblocked', root); if (n) n.hidden = !on; }
+/* Shows the persistent line when notifications were already denied before the user did anything. */
+async function notesDenied() {
+  const ln = LN(); if (!ln || !ln.checkPermissions) return false;
+  try { return (await ln.checkPermissions()).display === 'denied'; } catch (e) { return false; }
+}
+const probeBlocked = (root) => notesDenied().then(d => { if (d) setBlocked(root, true); });
+/* Gives a tool its own child root so listeners never sit on the shared container. */
+function rootOf(el) {
+  const r = document.createElement('div'); r.style.cssText = 'display:flex;flex-direction:column;gap:12px';
+  while (el.firstChild) r.appendChild(el.firstChild);
+  el.appendChild(r); return r;
 }
 async function cancelNotes(ids) { const ln = LN(); if (ln) try { await ln.cancel({ notifications: ids.map(id => ({ id })) }); } catch (e) {} }
 function askWebNote() { if (!LN() && window.Notification && Notification.permission === 'default') try { Notification.requestPermission(); } catch (e) {} }
 function webNote(title, body) { try { if (!LN() && window.Notification && Notification.permission === 'granted') new Notification(title, { body }); } catch (e) {} }
-const notesLine = () => LN() ? 'Notifications are scheduled with Android, so they still arrive when the app is closed.' : 'This browser cannot schedule notifications while closed, so alerts only fire while PocketKit is open.';
+const notesLine = () => LN() ? 'Notifications are scheduled with Android, so they still arrive when the app is closed. They can be a few minutes late when the phone is idle or battery saver is on.' : 'This browser cannot schedule notifications while closed, so alerts only fire while PocketKit is open.';
 
 function keepAwake() {
-  let lock = null, want = false;
+  let lock = null, want = false, pending = false;
+  const free = () => { const l = lock; lock = null; if (l) l.release().catch(() => {}); };
   const get = async () => {
-    if (!want || document.hidden || !navigator.wakeLock) return;
-    try { lock = await navigator.wakeLock.request('screen'); } catch (e) { lock = null; }
+    if (!want || document.hidden || !navigator.wakeLock || pending) return;
+    pending = true;
+    try {
+      const l = await navigator.wakeLock.request('screen');
+      /* off() or dispose() may have run while the request was pending: then the new lock must not survive. */
+      if (!want) l.release().catch(() => {}); else { free(); lock = l; }
+    } catch (e) { /* denied or unsupported */ }
+    pending = false;
   };
   const vis = () => { if (!document.hidden) get(); };
   document.addEventListener('visibilitychange', vis);
   return {
     supported: !!navigator.wakeLock,
     on() { want = true; get(); },
-    off() { want = false; if (lock) lock.release().catch(() => {}); lock = null; },
+    off() { want = false; free(); },
     dispose() { this.off(); document.removeEventListener('visibilitychange', vis); }
   };
 }
@@ -299,6 +333,18 @@ async function idbDo(mode, fn) {
   return new Promise((res, rej) => {
     const tx = db.transaction('routes', mode), req = fn(tx.objectStore('routes'));
     tx.oncomplete = () => { db.close(); res(req ? req.result : undefined); }; tx.onerror = () => { db.close(); rej(tx.error); };
+  });
+}
+
+/* Saves a route only if fewer than `limit` routes exist, checked inside the same readwrite transaction (so a double tap cannot slip two in). */
+async function idbSaveLimited(rt, limit) {
+  const db = await idbOpen();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('routes', 'readwrite'), st = tx.objectStore('routes');
+    let full = false;
+    const c = st.count();
+    c.onsuccess = () => { if (c.result >= limit) full = true; else st.put(rt); };
+    tx.oncomplete = () => { db.close(); res(!full); }; tx.onerror = () => { db.close(); rej(tx.error); }; tx.onabort = () => { db.close(); rej(tx.error); };
   });
 }
 
@@ -384,7 +430,12 @@ Tools.register({ id: 'routerec', name: 'Route Recorder', icon: '🥾', cat: 'nav
   const R = { pts: [], dist: 0, max: 0, start: 0, end: 0, running: false, msg: 'Press Start to begin recording.' };
   let awake = true;
   const draft = Store.get('daily.routedraft', null);
-  if (draft && draft.pts && draft.pts.length > 1) Object.assign(R, draft, { running: false, msg: 'An unsaved recording was recovered. Save or discard it.' });
+  if (draft && draft.pts && draft.pts.length > 1) {
+    Object.assign(R, draft, { running: false, msg: 'An unsaved recording was recovered. Save or discard it.' });
+    /* A draft written while recording has no end time yet: use the last point, otherwise the duration would be hugely negative. */
+    if (!R.end) R.end = R.pts[R.pts.length - 1].t || R.start;
+  }
+  let saving = false;
 
   function drawRoute(cv, pts, live) {
     const dpr = Math.min(2, window.devicePixelRatio || 1), W = cv.clientWidth || 340, Hh = cv.clientHeight || 280;
@@ -408,7 +459,7 @@ Tools.register({ id: 'routerec', name: 'Route Recorder', icon: '🥾', cat: 'nav
     dot(0, '#16a34a'); if (pts.length > 1) dot(pts.length - 1, live ? accent : '#e5484d');
   }
   const stats = (r) => {
-    const dur = (r.end || Date.now()) - r.start, avg = dur > 0 ? r.dist / (dur / 1000) * 3.6 : 0;
+    const dur = Math.max(0, (r.end || Date.now()) - r.start), avg = dur > 0 ? r.dist / (dur / 1000) * 3.6 : 0;
     return [[fmtDist(r.dist), 'Distance'], [fmtDur(dur), 'Duration'], [avg.toFixed(1) + ' km/h', 'Average speed'], [(r.max * 3.6).toFixed(1) + ' km/h', 'Max speed']];
   };
   const statGrid = (r) => `<div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:14px 8px;text-align:center">${stats(r).map(([v, l]) => `<div><div style="font-size:24px;font-weight:700;font-variant-numeric:tabular-nums">${v}</div><small class="muted">${l}</small></div>`).join('')}</div>`;
@@ -425,6 +476,7 @@ Tools.register({ id: 'routerec', name: 'Route Recorder', icon: '🥾', cat: 'nav
       const v = p.spd != null && p.spd >= 0 ? p.spd : d / Math.max(1, (p.t - last.t) / 1000);
       if (v < 70) R.max = Math.max(R.max, v);
     }
+    if (R.pts.length >= 20000) { R.msg = 'Recording is full (20000 points). Stop and save it.'; refreshRec(); return; }
     R.pts.push({ lat: p.lat, lon: p.lon, t: p.t });
     if (R.pts.length % 10 === 0) persistDraft();
     refreshRec();
@@ -465,15 +517,17 @@ Tools.register({ id: 'routerec', name: 'Route Recorder', icon: '🥾', cat: 'nav
     on('#nw', () => { Object.assign(R, { pts: [], dist: 0, max: 0, start: 0, end: 0, msg: 'Press Start to begin recording.' }); Store.set('daily.routedraft', null); startRec(); });
     on('#ds', () => { Object.assign(R, { pts: [], dist: 0, max: 0, start: 0, end: 0, msg: 'Press Start to begin recording.' }); Store.set('daily.routedraft', null); drawRec(); });
     on('#sv', async () => {
+      if (saving) return;
+      saving = true;
       try {
-        const all = await idbDo('readonly', s => s.getAllKeys());
-        if (all.length >= proLimit('routes') && needPro('routes')) return;
-        const rt = { id: uid(), name: ($('#rn', el).value.trim() || 'Route').slice(0, 40), at: R.start, dur: R.end - R.start, dist: R.dist, max: R.max, pts: R.pts };
-        await idbDo('readwrite', s => s.put(rt));
+        const rt = { id: uid(), name: ($('#rn', el).value.trim() || 'Route').slice(0, 40), at: R.start, dur: Math.max(0, R.end - R.start), dist: R.dist, max: R.max, pts: R.pts };
+        const saved = await idbSaveLimited(rt, proLimit('routes'));
+        if (!saved) { needPro('routes'); return; }
         Store.set('daily.routedraft', null);
         Object.assign(R, { pts: [], dist: 0, max: 0, start: 0, end: 0, msg: 'Saved. Press Start for another recording.' });
-        toast('Route saved'); drawRec();
+        toast('Route saved'); if (alive) drawRec();
       } catch (e) { toast('Could not save the route'); }
+      finally { saving = false; }
     });
     const aw = $('#aw', el); if (aw) aw.onchange = () => { awake = aw.checked; if (R.running) awake ? wake.on() : wake.off(); };
   }
@@ -526,16 +580,21 @@ Tools.register({ id: 'pincode', name: 'My PIN Code', icon: '📍', cat: 'navigat
   const cur = () => pos && { lat: pos.lat, lon: pos.lon };
   const geo = (p, n) => `geo:${p.lat.toFixed(6)},${p.lon.toFixed(6)}?q=${p.lat.toFixed(6)},${p.lon.toFixed(6)}${n ? '(' + encodeURIComponent(n) + ')' : ''}`;
   const coords = (p) => p.lat.toFixed(6) + ', ' + p.lon.toFixed(6);
+  /* The list is built only when the saved places change. Position and compass updates only touch text and the arrow rotation,
+     so a tap on Copy or the delete button is never lost to a re-render. */
   function drawPlaces() {
-    $('#pl', el).innerHTML = places.map(pl => {
-      let info = plusCode(pl.lat, pl.lon), arrow = '';
-      if (pos) {
-        const d = hav(pos, pl), b = bearing(pos, pl), rot = heading != null ? b - heading : b;
-        info = `<b>${fmtDist(d)}</b> ${compassName(b)} · ${plusCode(pl.lat, pl.lon)}`;
-        arrow = `<span style="display:inline-block;font-size:26px;transition:transform .3s;transform:rotate(${rot}deg)" aria-hidden="true">⬆️</span>`;
-      }
-      return `<div class="item" style="gap:12px;padding:12px 14px"><span style="width:34px;text-align:center">${arrow || '📍'}</span><span class="grow"><b>${esc(pl.name)}</b><br><small class="muted">${info}</small></span><button class="btn alt" data-cp="${pl.id}" aria-label="Copy" style="padding:8px 10px">Copy</button><button class="btn alt" data-rm="${pl.id}" aria-label="Delete ${esc(pl.name)}" style="padding:8px 12px">✕</button></div>`;
-    }).join('') || empty('📌', 'No saved places yet.<br>Name a spot above and tap Save here.');
+    $('#pl', el).innerHTML = places.map(pl => `<div class="item" style="gap:12px;padding:12px 14px"><span style="width:34px;text-align:center"><span data-ar="${pl.id}" style="display:none;font-size:26px;transition:transform .3s" aria-hidden="true">⬆️</span><span data-pin="${pl.id}">📍</span></span><span class="grow"><b>${esc(pl.name)}</b><br><small class="muted" data-info="${pl.id}">${plusCode(pl.lat, pl.lon)}</small></span><button class="btn alt" data-cp="${pl.id}" aria-label="Copy ${esc(pl.name)}" style="padding:8px 10px;min-width:44px">Copy</button><button class="btn alt" data-rm="${pl.id}" aria-label="Delete ${esc(pl.name)}" style="padding:8px 12px;min-width:44px">✕</button></div>`).join('') || empty('📌', 'No saved places yet.<br>Name a spot above and tap Save here.');
+    updatePlaces();
+  }
+  function updatePlaces() {
+    if (!pos) return;
+    places.forEach(pl => {
+      const d = hav(pos, pl), b = bearing(pos, pl), rot = heading != null ? b - heading : b;
+      const info = $(`[data-info="${pl.id}"]`, el), ar = $(`[data-ar="${pl.id}"]`, el), pin = $(`[data-pin="${pl.id}"]`, el);
+      if (info) info.innerHTML = `<b>${fmtDist(d)}</b> ${compassName(b)} · ${plusCode(pl.lat, pl.lon)}`;
+      if (ar) { ar.style.display = 'inline-block'; ar.style.transform = `rotate(${rot}deg)`; }
+      if (pin) pin.style.display = 'none';
+    });
   }
   function show() {
     if (!pos) return;
@@ -543,10 +602,11 @@ Tools.register({ id: 'pincode', name: 'My PIN Code', icon: '📍', cat: 'navigat
     $('#la', el).textContent = pos.lat.toFixed(6); $('#lo', el).textContent = pos.lon.toFixed(6);
     $('#ac', el).textContent = '±' + Math.round(pos.acc) + ' m'; $('#al', el).textContent = pos.alt != null ? Math.round(pos.alt) + ' m' : 'n/a';
     $('#st', el).textContent = pos.acc < 20 ? 'Good GPS fix' : 'Rough fix, go outside for better accuracy';
-    drawPlaces();
+    updatePlaces();
   }
   const stopG = watchGps(p => { pos = p; show(); }, e => { $('#st', el).textContent = gpsMsg(e); });
-  const stopH = watchHeading(hd => { heading = hd; if (pos && alive) drawPlaces(); });
+  let lastH = 0;
+  const stopH = watchHeading(hd => { heading = hd; const now = Date.now(); if (pos && alive && now - lastH >= 150) { lastH = now; updatePlaces(); } });
   const need = () => { if (!pos) { toast('Still waiting for GPS'); return null; } return pos; };
   $('#c1', el).onclick = () => need() && copyText(coords(pos));
   $('#c2', el).onclick = () => need() && copyText(plusCode(pos.lat, pos.lon));
@@ -556,6 +616,7 @@ Tools.register({ id: 'pincode', name: 'My PIN Code', icon: '📍', cat: 'navigat
   $('#ps', el).onclick = () => {
     if (!need()) return;
     const name = $('#pn', el).value.trim().slice(0, 30); if (!name) { toast('Give the place a name'); return; }
+    if (places.length >= 50) { toast('Up to 50 saved places. Delete one first.'); return; }
     places.unshift({ id: uid(), name, lat: pos.lat, lon: pos.lon, at: Date.now() }); Store.set('daily.places', places);
     $('#pn', el).value = ''; drawPlaces(); toast('Saved ' + name);
   };
@@ -570,12 +631,13 @@ Tools.register({ id: 'pincode', name: 'My PIN Code', icon: '📍', cat: 'navigat
 
 /* ---------- 9. Parking Saver ---------- */
 Tools.register({ id: 'parking', name: 'Parking Saver', icon: '🅿️', cat: 'navigate', desc: 'Remember where you parked, with a meter countdown alert and the way back.', keys: ['car', 'meter', 'park', 'find my car', 'garage'], needs: ['location', 'notifications', 'storage'], render(el) {
-  let spot = Store.get('daily.parking', null), pos = null, heading = null, alive = true, iv = null;
+  let spot = Store.get('daily.parking', null), pos = null, heading = null, alive = true, iv = null, noteBlocked = false;
   const IDS = [730001, 730002];
   const root = document.createElement('div'); root.className = 'list'; root.style.gap = '12px'; el.appendChild(root);
   const stopG = watchGps(p => { pos = p; refresh(); }, e => { const m = $('#gm', el); if (m) m.textContent = gpsMsg(e); });
   const stopH = watchHeading(hd => { heading = hd; refresh(); });
   askWebNote();
+  notesDenied().then(d => { if (d) { noteBlocked = true; setBlocked(root, true); } });
   const ago = (t) => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min ago'; };
   function refresh() {
     if (!alive || !spot) return;
@@ -601,15 +663,22 @@ Tools.register({ id: 'parking', name: 'Parking Saver', icon: '🅿️', cat: 'na
         <label class="f">or custom minutes<input id="cm" type="number" min="1" max="1440" inputmode="numeric" placeholder="e.g. 45"></label>
         <button class="btn" id="sv" style="padding:16px;font-size:17px">Save my parking spot</button>
         <div id="gm" class="muted center" style="font-size:13px">${pos ? 'GPS ready' : 'Waiting for GPS...'}</div>
-        ${note(notesLine() + ' The meter alert comes with a 5 minute warning.')}`;
+        ${note(notesLine() + ' The meter alert comes with a 5 minute warning.')}${blockedHtml()}`;
+      setBlocked(root, noteBlocked);
       let mins = 0; bindSeg($('#mins', root), k => { mins = +k; $('#cm', root).value = ''; });
       $('#sv', root).onclick = async () => {
         const go = async (p) => {
           const cm = clamp(Math.floor(+$('#cm', root).value || mins), 0, 1440);
           spot = { lat: p.lat, lon: p.lon, acc: p.acc, at: Date.now(), note: $('#nt', root).value.trim().slice(0, 60), exp: cm ? Date.now() + cm * 60000 : 0, warned: false };
           Store.set('daily.parking', spot);
-          if (spot.exp) { await notifyAt(IDS[1], 'Parking meter', 'Your meter expires in 5 minutes', spot.exp - 5 * 60000 > Date.now() ? spot.exp - 5 * 60000 : spot.exp - 1000); await notifyAt(IDS[0], 'Parking meter expired', spot.note || 'Time to move your car', spot.exp); }
-          toast('Parking spot saved'); draw();
+          let okN = true;
+          if (spot.exp) {
+            const a = await notifyAt(IDS[1], 'Parking meter', 'Your meter expires in 5 minutes', spot.exp - 5 * 60000 > Date.now() ? spot.exp - 5 * 60000 : spot.exp - 1000);
+            const b = await notifyAt(IDS[0], 'Parking meter expired', spot.note || 'Time to move your car', spot.exp);
+            okN = alertsOk(a) && alertsOk(b);
+            if (!okN) noteBlocked = true;
+          }
+          toast(okN ? 'Parking spot saved' : 'Spot saved, but the meter alert is blocked'); if (alive) draw();
         };
         if (pos) return go(pos);
         toast('Getting a GPS fix...');
@@ -626,7 +695,8 @@ Tools.register({ id: 'parking', name: 'Parking Saver', icon: '🅿️', cat: 'na
       ${spot.exp ? `<div class="card center"><div class="muted" style="font-size:12px;letter-spacing:.08em;text-transform:uppercase">Meter</div><div id="mt" style="font-size:32px;font-weight:800;font-variant-numeric:tabular-nums">--</div><small class="muted">expires at ${new Date(spot.exp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small></div>` : ''}
       <div class="row"><a class="btn alt linkbtn" href="${geo(spot)}">Open in map app</a><button class="btn alt" id="cp">Copy spot</button></div>
       <button class="btn danger" id="clr">I found my car (clear)</button>
-      ${note('Accuracy at save time was about ±' + Math.round(spot.acc || 0) + ' m. Inside a garage the GPS can be weak, so a note about the level helps.')}`;
+      ${note('Accuracy at save time was about ±' + Math.round(spot.acc || 0) + ' m. Inside a garage the GPS can be weak, so a note about the level helps.')}${blockedHtml()}`;
+    setBlocked(root, noteBlocked && !!spot.exp);
     $('#cp', root).onclick = () => copyText(`${spot.lat.toFixed(6)}, ${spot.lon.toFixed(6)} (${plusCode(spot.lat, spot.lon)})`);
     $('#clr', root).onclick = async () => { spot = null; Store.set('daily.parking', null); await cancelNotes(IDS); draw(); };
     refresh();
@@ -642,30 +712,39 @@ Tools.register({ id: 'worldclock', name: 'World Clock', icon: '🌍', cat: 'dail
   let list = Store.get('daily.clocks', defaults), h24 = Store.get('daily.clock24', false);
   const localName = (Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local').replace(/_/g, ' ');
   el.innerHTML = `<div class="card" style="${GRAD};text-align:center;padding:18px"><div class="muted" style="font-size:12px;letter-spacing:.08em;text-transform:uppercase">Your time · ${esc(localName)}</div><div id="me" style="font-size:44px;font-weight:800;font-variant-numeric:tabular-nums"></div><div id="md" class="muted"></div></div>
-    <div class="row"><input id="cs" type="text" list="cl" placeholder="Search a city to add" aria-label="City" autocomplete="off"><button class="btn" id="add" style="flex:0 0 auto">Add</button></div>
+    <div class="row"><input id="cs" type="text" list="cl" placeholder="Search a city to add" aria-label="City" maxlength="40" autocomplete="off"><button class="btn" id="add" style="flex:0 0 auto">Add</button></div>
     <datalist id="cl">${CITIES.map(c => `<option value="${esc(c[0])}"></option>`).join('')}</datalist>
     <label class="item" style="min-height:48px"><span class="grow">24-hour clock</span><input type="checkbox" id="f24" ${h24 ? 'checked' : ''} style="width:22px;height:22px"></label>
     <div class="list" id="ls"></div>`;
   const save = () => Store.set('daily.clocks', list);
   const fm = (tz, o) => new Intl.DateTimeFormat([], Object.assign({ timeZone: tz }, o));
-  function draw() {
+  /* The list is built only when cities or the clock format change; the clock itself only rewrites text, so taps are never lost. */
+  const setText = (n, t) => { if (n && n.textContent !== t) n.textContent = t; };
+  function tick() {
     const now = new Date(), me = tzOffsetMin(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', now);
-    $('#me', el).textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: !h24 });
-    $('#md', el).textContent = now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
-    $('#ls', el).innerHTML = list.map((c, i) => {
+    setText($('#me', el), now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: !h24 }));
+    setText($('#md', el), now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }));
+    $$('[data-row]', el).forEach(row => {
+      const c = list[+row.dataset.row]; if (!c) return;
       let off = 0, t = '--', d = '', hr = 12;
       try {
         off = tzOffsetMin(c.z, now); t = fm(c.z, { hour: '2-digit', minute: '2-digit', hour12: !h24 }).format(now);
         d = fm(c.z, { weekday: 'short', day: 'numeric', month: 'short' }).format(now);
         hr = +fm(c.z, { hour: 'numeric', hourCycle: 'h23' }).format(now) % 24;
       } catch (e) {}
-      const day = hr >= 6 && hr < 18;
-      return `<div class="item" style="gap:12px;padding:14px"><span style="font-size:28px" title="${day ? 'Daytime' : 'Night'}">${day ? '☀️' : '🌙'}</span>
-        <span class="grow"><b>${esc(c.n)}</b><br><small class="muted">${d} · ${offLabel(off)} · ${diffLabel(off - me)}</small></span>
-        <span style="font-size:24px;font-weight:700;font-variant-numeric:tabular-nums">${t}</span>
-        <span style="display:flex;flex-direction:column;gap:2px"><button class="btn alt" data-up="${i}" aria-label="Move up" style="padding:2px 8px;font-size:12px;min-height:22px">▲</button><button class="btn alt" data-dn="${i}" aria-label="Move down" style="padding:2px 8px;font-size:12px;min-height:22px">▼</button></span>
-        <button class="btn alt" data-rm="${i}" aria-label="Remove ${esc(c.n)}" style="padding:10px 12px">✕</button></div>`;
-    }).join('') || empty('🌍', 'No cities yet. Search above and tap Add.');
+      const day = hr >= 6 && hr < 18, sun = $('[data-sun]', row);
+      setText(sun, day ? '☀️' : '🌙'); sun.title = day ? 'Daytime' : 'Night';
+      setText($('[data-sub]', row), `${d} · ${offLabel(off)} · ${diffLabel(off - me)}`);
+      setText($('[data-time]', row), t);
+    });
+  }
+  const BTN = 'padding:0;min-width:44px;min-height:44px;font-size:14px';
+  function draw() {
+    $('#ls', el).innerHTML = list.map((c, i) => `<div class="item" data-row="${i}" style="flex-wrap:wrap;gap:6px 10px;padding:12px 14px"><span data-sun style="font-size:28px"></span>
+        <span class="grow" style="min-width:110px"><b>${esc(c.n)}</b><br><small class="muted" data-sub></small></span>
+        <span data-time style="font-size:24px;font-weight:700;font-variant-numeric:tabular-nums"></span>
+        <span style="flex:1 0 100%;display:flex;gap:6px;justify-content:flex-end"><button class="btn alt" data-up="${i}" aria-label="Move ${esc(c.n)} up" style="${BTN}">▲</button><button class="btn alt" data-dn="${i}" aria-label="Move ${esc(c.n)} down" style="${BTN}">▼</button><button class="btn alt" data-rm="${i}" aria-label="Remove ${esc(c.n)}" style="${BTN}">✕</button></span></div>`).join('') || empty('🌍', 'No cities yet. Search above and tap Add.');
+    tick();
   }
   $('#add', el).onclick = () => {
     const q = $('#cs', el).value.trim().toLowerCase(), c = CITIES.find(x => x[0].toLowerCase() === q) || CITIES.find(x => x[0].toLowerCase().includes(q));
@@ -680,7 +759,7 @@ Tools.register({ id: 'worldclock', name: 'World Clock', icon: '🌍', cat: 'dail
     if (d.rm != null) list.splice(+d.rm, 1); else if (d.up != null) mv(+d.up, +d.up - 1); else if (d.dn != null) mv(+d.dn, +d.dn + 1);
     save(); draw();
   };
-  draw(); const iv = setInterval(draw, 1000);
+  draw(); const iv = setInterval(tick, 1000);
   return () => clearInterval(iv);
 } });
 
@@ -705,7 +784,7 @@ Tools.register({ id: 'pomodoro', name: 'Pomodoro', icon: '🍅', cat: 'daily', d
     <button class="btn alt" id="cf">Adjust lengths</button><div id="cfp" hidden class="card list" style="gap:10px">
       ${['focus', 'short', 'long'].map(k => `<label class="f">${MODES[k][0]} (minutes)<input type="number" min="1" max="180" inputmode="numeric" data-m="${k}" value="${S.mins[k]}"></label>`).join('')}
       <label class="item" style="min-height:48px"><span class="grow">Start the next period automatically</span><input type="checkbox" id="au" ${S.auto ? 'checked' : ''} style="width:22px;height:22px"></label></div>
-    ${sub('Every 4th focus session earns a long break. ' + notesLine() + ' The timer uses the clock, so it stays accurate even if the screen was off.')}`;
+    ${sub('Every 4th focus session earns a long break. ' + notesLine() + ' The timer uses the clock, so it stays accurate even if the screen was off.')}${blockedHtml()}`;
   function draw() {
     const r = remain();
     $('#tm', el).textContent = fmtDur(r); $('#ml', el).textContent = MODES[S.mode][1] + ' ' + MODES[S.mode][0];
@@ -723,7 +802,11 @@ Tools.register({ id: 'pomodoro', name: 'Pomodoro', icon: '🍅', cat: 'daily', d
   }
   function start() {
     S.endAt = Date.now() + S.left; save(); askWebNote();
-    notifyAt(NID, MODES[S.mode][0] + ' finished', S.mode === 'focus' ? 'Nice work, time for a break.' : 'Break over, back to focus.', S.endAt);
+    const my = S.endAt;
+    notifyAt(NID, MODES[S.mode][0] + ' finished', S.mode === 'focus' ? 'Nice work, time for a break.' : 'Break over, back to focus.', my).then(ok => {
+      if (S.endAt !== my) { cancelNotes([NID]); return; } // paused or reset while the permission prompt was open
+      if (alive) setBlocked(el, !alertsOk(ok));
+    });
     draw();
   }
   function pause() { S.left = remain(); S.endAt = 0; save(); cancelNotes([NID]); draw(); }
@@ -748,6 +831,7 @@ Tools.register({ id: 'pomodoro', name: 'Pomodoro', icon: '🍅', cat: 'daily', d
     if (m) { S.mins[m] = clamp(Math.floor(+e.target.value) || S.mins[m], 1, 180); if (!S.endAt && m === S.mode) S.left = dur(m); save(); draw(); }
     if (e.target.id === 'au') { S.auto = e.target.checked; save(); }
   };
+  probeBlocked(el);
   iv = setInterval(() => { if (S.endAt && Date.now() >= S.endAt) finish(); else draw(); }, 250);
   if (S.endAt && Date.now() >= S.endAt) { S.endAt = Date.now(); S.left = 0; }
   draw();
@@ -758,28 +842,29 @@ Tools.register({ id: 'pomodoro', name: 'Pomodoro', icon: '🍅', cat: 'daily', d
 Tools.register({ id: 'alarmclock', name: 'Alarm Clock', icon: '⏰', cat: 'daily', desc: 'Alarms with a label and weekday repeat, scheduled as Android notifications so they ring with the app closed.', keys: ['wake', 'wake up', 'morning', 'repeat', 'clock'], needs: ['notifications', 'storage'], render(el) {
   let alarms = Store.get('daily.alarms', []), seq = Store.get('daily.alarmseq', 1), draftDays = [1, 2, 3, 4, 5], timers = [];
   const DN = ['S', 'M', 'T', 'W', 'T', 'F', 'S'], DF = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const idsOf = (a) => [0, 1, 2, 3, 4, 5, 6, 7].map(k => 750000 + a.n * 10 + k);
+  const baseOf = (a) => a.nb != null ? a.nb : 750000 + a.n * 10; // alarms made before the id blocks keep their old ids
+  const idsOf = (a) => [0, 1, 2, 3, 4, 5, 6, 7].map(k => baseOf(a) + k);
   const save = () => Store.set('daily.alarms', alarms);
   el.innerHTML = `<div class="card" style="${GRAD};padding:16px">
-      <div style="display:flex;gap:12px;align-items:center"><input id="tm" type="time" value="07:00" aria-label="Alarm time" style="font-size:36px;font-weight:800;text-align:center;padding:10px;width:auto;flex:1"></div>
+      <div style="display:flex;gap:12px;align-items:center"><input id="tm" type="time" min="00:00" max="23:59" maxlength="5" required value="07:00" aria-label="Alarm time" style="font-size:36px;font-weight:800;text-align:center;padding:10px;width:auto;flex:1"></div>
       <input id="lb" type="text" maxlength="40" placeholder="Label (optional)" aria-label="Label" style="margin-top:10px">
       <div style="${H2};margin-top:12px">Repeat (none selected = once)</div>
-      <div class="row" id="dy" style="gap:5px;margin-top:6px">${DN.map((d, i) => `<button class="btn ${draftDays.includes(i) ? '' : 'alt'}" data-d="${i}" aria-label="${DF[i]}" style="padding:10px 0;border-radius:50%;aspect-ratio:1;font-size:14px">${d}</button>`).join('')}</div>
+      <div id="dy" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:6px">${DN.map((d, i) => `<button class="btn ${draftDays.includes(i) ? '' : 'alt'}" data-d="${i}" aria-label="${DF[i]}" aria-pressed="${draftDays.includes(i)}" style="padding:0;min-height:44px;border-radius:14px;font-size:14px">${d}</button>`).join('')}</div>
       <button class="btn" id="add" style="width:100%;margin-top:14px">Add alarm</button></div>
-    <div class="list" id="ls"></div>
-    ${note('<b>How alarms work.</b> ' + (LN() ? 'Each alarm is an Android notification set to the exact time, so it can ring with the app closed. It uses your notification sound, so it is not a true alarm: silent mode, Do Not Disturb or battery saver can mute it. Do not rely on it for anything critical.' : 'This is a browser, which cannot ring while closed. Alarms only sound while PocketKit stays open. On Android the app schedules real notifications.'))}`;
+    ${blockedHtml()}<div class="list" id="ls"></div>
+    ${note('<b>How alarms work.</b> ' + (LN() ? 'Each alarm is an Android notification, so it can ring with the app closed. Android may deliver it a few minutes late when the phone is idle or battery saver is on. It uses your notification sound, so it is not a true alarm: silent mode, Do Not Disturb or battery saver can mute it. Do not rely on it for anything critical.' : 'This is a browser, which cannot ring while closed. Alarms only sound while PocketKit stays open. On Android the app schedules real notifications.'))}`;
   const lab = (a) => `${pad(a.h)}:${pad(a.m)}`;
   async function schedule(a) {
     await cancelNotes(idsOf(a));
     if (!a.on || !LN()) return true;
     const ln = LN();
     try {
-      const p = await ln.requestPermissions(); if (p.display !== 'granted') { toast('Allow notifications to hear the alarm'); return false; }
+      const p = await ln.requestPermissions(); if (p.display !== 'granted') return false;
       const base = { title: a.label || 'Alarm', body: lab(a) + ' alarm', allowWhileIdle: true };
-      const ns = a.days.length ? a.days.map(d => Object.assign({ id: 750000 + a.n * 10 + d }, base, { schedule: { on: { weekday: d + 1, hour: a.h, minute: a.m }, allowWhileIdle: true } }))
-        : [Object.assign({ id: 750000 + a.n * 10 + 7 }, base, { schedule: { at: nextAlarm(a, new Date()), allowWhileIdle: true } })];
+      const ns = a.days.length ? a.days.map(d => Object.assign({ id: baseOf(a) + d }, base, { schedule: { on: { weekday: d + 1, hour: a.h, minute: a.m }, allowWhileIdle: true } }))
+        : [Object.assign({ id: baseOf(a) + 7 }, base, { schedule: { at: nextAlarm(a, new Date()), allowWhileIdle: true } })];
       await ln.schedule({ notifications: ns }); return true;
-    } catch (e) { toast('Could not schedule the alarm'); return false; }
+    } catch (e) { return false; }
   }
   function arm() { // in-app fallback while the page is open
     timers.forEach(clearTimeout); timers = [];
@@ -801,35 +886,39 @@ Tools.register({ id: 'alarmclock', name: 'Alarm Clock', icon: '⏰', cat: 'daily
       const nx = a.on ? nextAlarm(a, new Date()) : null;
       const rep = a.days.length === 7 ? 'Every day' : a.days.length ? a.days.map(d => DF[d]).join(' ') : 'Once';
       return `<div class="item" style="gap:12px;padding:14px;${a.on ? '' : 'opacity:.6'}"><span class="grow"><span style="font-size:32px;font-weight:800;font-variant-numeric:tabular-nums">${lab(a)}</span><br><small class="muted">${esc(a.label || 'Alarm')} · ${rep}${nx ? ' · next ' + nx.toLocaleDateString([], { weekday: 'short', day: 'numeric' }) : ''}</small></span>
-        <input type="checkbox" data-t="${a.n}" ${a.on ? 'checked' : ''} aria-label="Enable alarm ${lab(a)}" style="width:44px;height:26px"><button class="btn alt" data-x="${a.n}" aria-label="Delete alarm ${lab(a)}" style="padding:10px 12px">✕</button></div>`;
+        <label style="display:grid;place-items:center;min-width:44px;min-height:44px"><input type="checkbox" data-t="${a.n}" ${a.on ? 'checked' : ''} aria-label="Enable alarm ${lab(a)}" style="width:26px;height:26px"></label><button class="btn alt" data-x="${a.n}" aria-label="Delete alarm ${lab(a)}" style="padding:10px 12px;min-width:44px">✕</button></div>`;
     }).join('') || empty('⏰', 'No alarms yet.');
   }
   $('#dy', el).onclick = (e) => {
     const b = e.target.closest('[data-d]'); if (!b) return; const d = +b.dataset.d;
-    draftDays = draftDays.includes(d) ? draftDays.filter(x => x !== d) : [...draftDays, d]; b.classList.toggle('alt', !draftDays.includes(d));
+    draftDays = draftDays.includes(d) ? draftDays.filter(x => x !== d) : [...draftDays, d]; b.classList.toggle('alt', !draftDays.includes(d)); b.setAttribute('aria-pressed', String(draftDays.includes(d)));
   };
   $('#add', el).onclick = async () => {
     const v = $('#tm', el).value.split(':'); if (v.length < 2) { toast('Pick a time'); return; }
-    const a = { n: seq++, set: 0, h: clamp(+v[0] || 0, 0, 23), m: clamp(+v[1] || 0, 0, 59), label: $('#lb', el).value.trim().slice(0, 40), days: draftDays.slice().sort(), on: true };
+    if (alarms.length >= 50) { toast('Up to 50 alarms. Delete one first.'); return; }
+    const a = { n: seq, nb: noteId('alarm', seq++), set: 0, h: clamp(+v[0] || 0, 0, 23), m: clamp(+v[1] || 0, 0, 59), label: $('#lb', el).value.trim().slice(0, 40), days: draftDays.slice().sort(), on: true };
     Store.set('daily.alarmseq', seq); alarms.push(a); save(); $('#lb', el).value = '';
     if (!a.days.length) a.set = nextAlarm(a, new Date()).getTime();
-    askWebNote(); await schedule(a); draw(); arm();
-    toast('Alarm set for ' + nextAlarm(a, new Date()).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' }));
+    askWebNote(); const ok = await schedule(a); draw(); arm();
+    setBlocked(el, !alertsOk(ok));
+    const when = nextAlarm(a, new Date()).toLocaleString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    toast(alertsOk(ok) ? 'Alarm set for ' + when : 'Alarm saved for ' + when + ', but notifications are blocked');
   };
   $('#ls', el).onclick = async (e) => {
     const t = e.target.closest('[data-t]'), x = e.target.closest('[data-x]');
-    if (t) { const a = alarms.find(z => z.n === +t.dataset.t); a.on = t.checked; if (a.on && !a.days.length) a.set = nextAlarm(a, new Date()).getTime(); save(); await schedule(a); draw(); arm(); }
+    if (t) { const a = alarms.find(z => z.n === +t.dataset.t); a.on = t.checked; if (a.on && !a.days.length) a.set = nextAlarm(a, new Date()).getTime(); save(); const ok = await schedule(a); if (a.on) setBlocked(el, !alertsOk(ok)); draw(); arm(); }
     if (x) { const a = alarms.find(z => z.n === +x.dataset.x); alarms = alarms.filter(z => z !== a); save(); await cancelNotes(idsOf(a)); draw(); arm(); }
   };
   // one-off alarms whose time has passed while closed are switched off
   alarms.forEach(a => { if (a.on && !a.days.length && a.set && a.set < Date.now()) a.on = false; });
+  probeBlocked(el);
   draw(); arm();
   return () => timers.forEach(clearTimeout);
 } });
 
 /* ---------- 7. Signal Light ---------- */
 Tools.register({ id: 'signallight', name: 'Signal Light', icon: '🚨', cat: 'daily', desc: 'Flash SOS, a strobe or your own Morse message with the screen and the torch, with a speed control.', keys: ['sos', 'morse', 'strobe', 'emergency', 'flash', 'beacon'], needs: ['camera'], render(el) {
-  let mode = 'sos', speed = 5, text = 'HELP', ov = null, run = 0, torch = null, useTorch = true, warned = false;
+  let mode = 'sos', speed = 5, text = 'HELP', ov = null, run = 0, torch = null, useTorch = true, warned = false, starting = false, alive = true;
   const wake = keepAwake();
   el.innerHTML = `<div id="tabs">${segHtml([['sos', 'SOS'], ['morse', 'Morse'], ['strobe', 'Strobe']], mode)}</div>
     <div class="card" style="${GRAD};text-align:center;padding:22px 14px"><div id="ic" style="font-size:56px">🆘</div><div id="ds" class="muted" style="margin-top:6px"></div></div>
@@ -851,11 +940,17 @@ Tools.register({ id: 'signallight', name: 'Signal Light', icon: '🚨', cat: 'da
     const t = morseTimeline(mode === 'sos' ? 'SOS' : text, unit()); if (t.length) t.push([false, unit() * 7]); return t;
   }
   async function begin() {
+    if (starting || ov) return; // a second tap while the torch is opening must not build a second overlay
     const tl = timeline(); if (!tl.length) { toast('Type a message with letters or numbers'); return; }
-    if (useTorch) torch = await torchOpen();
+    starting = true; const my = ++run;
+    const tch = useTorch ? await torchOpen() : null;
+    starting = false;
+    /* Back or a stop may have happened while the camera was opening: close the torch and build nothing. */
+    if (!alive || my !== run) { if (tch) tch.close(); return; }
+    torch = tch;
     ov = h('<div style="position:fixed;inset:0;z-index:60;background:#000;display:grid;place-items:center;color:#888;font-size:14px" role="button" aria-label="Tap to stop"><span style="opacity:.5;pointer-events:none">Tap to stop</span></div>');
     document.body.appendChild(ov); wake.on();
-    ov.onclick = end; const my = ++run; let i = 0;
+    ov.onclick = end; let i = 0;
     const step = () => {
       if (my !== run || !ov) return;
       const [on, ms] = tl[i % tl.length]; i++;
@@ -873,7 +968,7 @@ Tools.register({ id: 'signallight', name: 'Signal Light', icon: '🚨', cat: 'da
   $('#go', el).onclick = () => { if (mode === 'strobe' && !warned) { $('#wn', el).hidden = false; $('#wn', el).scrollIntoView({ block: 'nearest' }); return; } begin(); };
   $('#wok', el).onclick = () => { warned = true; $('#wn', el).hidden = true; begin(); };
   draw();
-  return () => { end(); wake.dispose(); };
+  return () => { alive = false; end(); wake.dispose(); };
 } });
 
 /* ---------- 8. To-do List ---------- */
@@ -882,9 +977,9 @@ Tools.register({ id: 'todo', name: 'To-do List', icon: '✅', cat: 'daily', desc
   let items = Store.get('daily.todo', []), filter = 'all', q = '';
   const save = () => Store.set('daily.todo', items);
   el.innerHTML = `<div class="card list" style="gap:10px"><input id="tx" type="text" maxlength="100" placeholder="What needs doing?" aria-label="New task">
-      <div class="row"><input id="du" type="date" aria-label="Due date"><select id="ct" aria-label="Category">${CATS_T.map(c => `<option>${c}</option>`).join('')}</select></div>
+      <div class="row"><input id="du" type="date" aria-label="Due date" min="2000-01-01" max="2100-12-31"><select id="ct" aria-label="Category">${CATS_T.map(c => `<option>${c}</option>`).join('')}</select></div>
       <button class="btn" id="add">Add task</button></div>
-    <input id="se" type="search" placeholder="Search tasks" aria-label="Search tasks">
+    <input id="se" type="search" maxlength="60" placeholder="Search tasks" aria-label="Search tasks">
     <div id="fl"></div><div class="list" id="ls"></div><button class="btn alt" id="cl">Clear completed</button>`;
   const today = dayKey(new Date());
   function draw() {
@@ -894,23 +989,28 @@ Tools.register({ id: 'todo', name: 'To-do List', icon: '✅', cat: 'daily', desc
     v.sort((a, b) => a.done - b.done || (a.due || '9') .localeCompare(b.due || '9') || b.at - a.at);
     $('#ls', el).innerHTML = (open ? `<div class="muted" style="font-size:13px;margin:0 4px">${open} open task${open > 1 ? 's' : ''}</div>` : '') + (v.map(t => {
       const over = t.due && !t.done && t.due < today;
-      return `<div class="item" style="gap:12px;padding:12px 14px"><input type="checkbox" data-c="${t.id}" ${t.done ? 'checked' : ''} aria-label="Done: ${esc(t.text)}" style="width:26px;height:26px;flex:none">
+      return `<div class="item" style="gap:8px;padding:6px 14px 6px 4px"><label style="display:grid;place-items:center;min-width:44px;min-height:44px;flex:none"><input type="checkbox" data-c="${t.id}" ${t.done ? 'checked' : ''} aria-label="Done: ${esc(t.text)}" style="width:26px;height:26px"></label>
         <span class="grow" style="${t.done ? 'opacity:.5;text-decoration:line-through' : ''}">${esc(t.text)}<br><small class="${over ? '' : 'muted'}" style="${over ? 'color:var(--danger);font-weight:600' : ''}">${esc(t.cat)}${t.due ? ' · ' + (t.due === today ? 'Today' : (over ? 'Overdue ' : '') + new Date(t.due + 'T00:00').toLocaleDateString([], { day: 'numeric', month: 'short' })) : ''}</small></span>
-        <button class="btn alt" data-x="${t.id}" aria-label="Delete task" style="padding:10px 12px">✕</button></div>`;
+        <button class="btn alt" data-x="${t.id}" aria-label="Delete task: ${esc(t.text)}" style="padding:10px 12px;min-width:44px">✕</button></div>`;
     }).join('') || empty('✅', items.length ? 'Nothing matches.' : 'All clear. Add your first task above.'));
     $('#cl', el).hidden = !items.some(t => t.done);
   }
   $('#add', el).onclick = () => {
     const text = $('#tx', el).value.trim(); if (!text) { toast('Write a task first'); return; }
+    if (items.length >= 500) {
+      /* Make room by dropping the oldest finished task; an open task is never thrown away. */
+      const di = items.findIndex(t => t.done);
+      if (di < 0) { toast('The list is full (500 tasks). Finish or delete some tasks first.'); return; }
+      items.splice(di, 1); toast('List is full: the oldest completed task was removed');
+    }
     items.push({ id: uid(), text: text.slice(0, 100), due: $('#du', el).value, cat: $('#ct', el).value, done: false, at: Date.now() });
-    if (items.length > 500) items.shift();
     save(); $('#tx', el).value = ''; $('#du', el).value = ''; draw();
   };
   $('#tx', el).onkeydown = (e) => { if (e.key === 'Enter') $('#add', el).click(); };
   $('#se', el).oninput = (e) => { q = e.target.value.trim().toLowerCase(); draw(); };
   $('#ls', el).onclick = (e) => {
     const c = e.target.closest('[data-c]'), x = e.target.closest('[data-x]');
-    if (c) { const t = items.find(z => z.id === c.dataset.c); t.done = c.checked; save(); draw(); }
+    if (c) { const t = items.find(z => z.id === c.dataset.c); if (t) { t.done = c.checked; save(); } draw(); }
     if (x) { items = items.filter(z => z.id !== x.dataset.x); save(); draw(); }
   };
   $('#cl', el).onclick = () => { items = items.filter(t => !t.done); save(); draw(); };
@@ -973,18 +1073,26 @@ Tools.register({ id: 'quicktimers', name: 'Quick Timers', icon: '🥚', cat: 'da
   let run = Store.get('daily.qt', []), seq = Store.get('daily.qtseq', 1), alive = true;
   el.innerHTML = `<div class="grid" style="grid-template-columns:repeat(4,1fr);gap:10px">${PRE.map((p, i) => `<button class="btn alt" data-p="${i}" style="padding:12px 2px;display:flex;flex-direction:column;gap:4px;align-items:center;font-size:12px"><span style="font-size:26px">${p[0]}</span>${p[1]}<small class="muted">${p[2]} min</small></button>`).join('')}</div>
     <div class="card row" style="gap:8px"><input id="lb" type="text" maxlength="24" placeholder="Label" aria-label="Label"><input id="mn" type="number" min="1" max="999" inputmode="numeric" placeholder="min" aria-label="Minutes" style="flex:0 0 76px"><button class="btn" id="go" style="flex:0 0 auto">Start</button></div>
-    <div style="${H2}">Running</div><div class="list" id="ls"></div>${sub(notesLine())}`;
-  const nid = (t) => 760000 + (t.n % 900);
+    <div style="${H2}">Running</div><div class="list" id="ls"></div>${sub(notesLine())}${blockedHtml()}`;
+  const root = rootOf(el);
+  const nid = (t) => t.nb != null ? t.nb : 760000 + (t.n % 900); // timers made before the id blocks keep their old ids
   const save = () => Store.set('daily.qt', run);
   async function add(label, mins) {
-    mins = clamp(+mins || 0, 0.1, 999); if (!mins) return;
-    const t = { id: uid(), n: seq++, label: label || mins + ' min timer', endAt: Date.now() + mins * 60000, total: mins * 60000, done: false };
-    Store.set('daily.qtseq', seq); run.push(t); save(); askWebNote(); await notifyAt(nid(t), t.label, 'Time is up', t.endAt); draw();
+    mins = +mins;
+    if (!(mins >= 1)) { toast('Enter minutes'); return false; }
+    mins = Math.min(999, mins);
+    if (run.length >= 20) { toast('Up to 20 timers at once'); return false; }
+    const n = seq++;
+    const t = { id: uid(), n, nb: noteId('qt', n), label: label || mins + ' min timer', endAt: Date.now() + mins * 60000, total: mins * 60000, done: false };
+    Store.set('daily.qtseq', seq); run.push(t); save(); askWebNote(); draw();
+    const ok = await notifyAt(nid(t), t.label, 'Time is up', t.endAt);
+    if (alive) setBlocked(root, !alertsOk(ok));
+    return true;
   }
   function draw() {
     $('#ls', el).innerHTML = run.map(t => {
       const left = t.endAt - Date.now(), pc = clamp(100 - left / t.total * 100, 0, 100);
-      return `<div class="item" style="flex-wrap:wrap;gap:8px 12px;padding:14px"><span class="grow"><b>${esc(t.label)}</b><br><span data-l="${t.id}" style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;${left <= 0 ? 'color:var(--ok)' : ''}">${left <= 0 ? 'Done' : fmtDur(left)}</span></span><button class="btn alt" data-x="${t.id}" aria-label="Remove ${esc(t.label)}" style="padding:10px 14px">${left <= 0 ? 'Dismiss' : 'Cancel'}</button><div class="progress" style="flex:1 0 100%"><i style="width:${pc}%"></i></div></div>`;
+      return `<div class="item" style="flex-wrap:wrap;gap:8px 12px;padding:14px"><span class="grow"><b>${esc(t.label)}</b><br><span data-l="${t.id}" style="font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;${left <= 0 ? 'color:var(--ok)' : ''}">${left <= 0 ? 'Done' : fmtDur(left)}</span></span><button class="btn alt" data-x="${t.id}" aria-label="${left <= 0 ? 'Dismiss' : 'Cancel'} ${esc(t.label)}" style="padding:10px 14px;min-width:44px">${left <= 0 ? 'Dismiss' : 'Cancel'}</button><div class="progress" style="flex:1 0 100%"><i style="width:${pc}%"></i></div></div>`;
     }).join('') || empty('⏲️', 'Tap a preset to start a timer.');
   }
   function tick() {
@@ -993,12 +1101,13 @@ Tools.register({ id: 'quicktimers', name: 'Quick Timers', icon: '🥚', cat: 'da
     if (changed) { save(); draw(); return; }
     run.forEach(t => { const s = $(`[data-l="${t.id}"]`, el), left = t.endAt - Date.now(); if (s && left > 0) { s.textContent = fmtDur(left); s.closest('.item').querySelector('.progress i').style.width = (100 - left / t.total * 100) + '%'; } });
   }
-  el.onclick = async (e) => {
+  root.onclick = async (e) => {
     const p = e.target.closest('[data-p]'), x = e.target.closest('[data-x]');
     if (p) add(PRE[+p.dataset.p][1], PRE[+p.dataset.p][2]);
-    if (x) { const t = run.find(z => z.id === x.dataset.x); run = run.filter(z => z !== t); save(); await cancelNotes([nid(t)]); draw(); }
+    if (x) { const t = run.find(z => z.id === x.dataset.x); if (!t) return; run = run.filter(z => z !== t); save(); await cancelNotes([nid(t)]); draw(); }
   };
-  $('#go', el).onclick = () => { add($('#lb', el).value.trim(), $('#mn', el).value); $('#lb', el).value = ''; $('#mn', el).value = ''; };
+  $('#go', el).onclick = async () => { if (await add($('#lb', el).value.trim(), $('#mn', el).value)) { $('#lb', el).value = ''; $('#mn', el).value = ''; } };
+  probeBlocked(root);
   draw(); const iv = setInterval(tick, 500);
   return () => { alive = false; clearInterval(iv); };
 } });
@@ -1013,7 +1122,7 @@ Tools.register({ id: 'clipboard', name: 'Clipboard Pad', icon: '📋', cat: 'dai
   function draw() {
     const v = clips.slice().sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0) || b.at - a.at);
     $('#ls', el).innerHTML = v.map(c => `<div class="item" style="gap:10px;padding:12px 14px;align-items:flex-start"><span class="grow" data-c="${c.id}" style="white-space:pre-wrap;word-break:break-word;max-height:7.5em;overflow:hidden;cursor:pointer">${esc(c.t)}</span>
-      <span style="display:flex;flex-direction:column;gap:6px"><button class="btn" data-c="${c.id}" style="padding:8px 12px">Copy</button><span class="row" style="gap:6px"><button class="btn alt" data-p="${c.id}" aria-label="${c.pin ? 'Unpin' : 'Pin'}" style="padding:8px">${c.pin ? '📌' : '📍'}</button><button class="btn alt" data-x="${c.id}" aria-label="Delete" style="padding:8px">✕</button></span></span></div>`).join('') || empty('📋', 'Nothing saved yet.');
+      <span style="display:flex;flex-direction:column;gap:6px"><button class="btn" data-c="${c.id}" style="padding:8px 12px;min-width:44px">Copy</button><span class="row" style="gap:6px"><button class="btn alt" data-p="${c.id}" aria-label="${c.pin ? 'Unpin' : 'Pin'} clip" aria-pressed="${!!c.pin}" style="padding:8px;min-width:44px">${c.pin ? '📌' : '📍'}</button><button class="btn alt" data-x="${c.id}" aria-label="Delete clip" style="padding:8px;min-width:44px">✕</button></span></span></div>`).join('') || empty('📋', 'Nothing saved yet.');
   }
   $('#ps', el).onclick = async () => { try { $('#tx', el).value = (await navigator.clipboard.readText()).slice(0, 2000); } catch (e) { toast('Paste with a long press in the box instead'); } };
   $('#sv', el).onclick = () => { const t = $('#tx', el).value.trim(); if (!t) { toast('Nothing to save'); return; } clips.unshift({ id: uid(), t, at: Date.now(), pin: false }); save(); $('#tx', el).value = ''; draw(); };
@@ -1033,19 +1142,20 @@ Tools.register({ id: 'shopping', name: 'Shopping List', icon: '🛒', cat: 'dail
   el.innerHTML = `<div class="card list" style="gap:10px"><div class="row"><input id="nm" type="text" maxlength="40" placeholder="Add an item" aria-label="Item"><input id="qt" type="number" min="1" max="99" value="1" inputmode="numeric" aria-label="Quantity" style="flex:0 0 64px"><button class="btn" id="add" style="flex:0 0 auto">Add</button></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${['Milk', 'Bread', 'Eggs', 'Rice', 'Fruit', 'Water'].map(n => `<button class="btn alt" data-q="${n}" style="padding:6px 12px;font-size:13px;border-radius:99px">+ ${n}</button>`).join('')}</div></div>
     <div id="sm" class="muted" style="font-size:13px;margin:0 4px"></div><div class="list" id="ls"></div><button class="btn alt" id="cl">Remove checked items</button>`;
+  const root = rootOf(el);
   function draw() {
     const v = items.slice().sort((a, b) => a.done - b.done || a.at - b.at), left = items.filter(i => !i.done).length;
     $('#sm', el).textContent = items.length ? `${left} to buy · ${items.length - left} in the basket` : '';
-    $('#ls', el).innerHTML = v.map(i => `<div class="item" style="gap:10px;padding:10px 14px"><input type="checkbox" data-c="${i.id}" ${i.done ? 'checked' : ''} aria-label="In basket: ${esc(i.n)}" style="width:26px;height:26px;flex:none">
-      <span class="grow" style="${i.done ? 'opacity:.5;text-decoration:line-through' : ''}">${esc(i.n)}</span>
-      <button class="btn alt" data-m="${i.id}" aria-label="Less" style="padding:6px 11px">−</button><b style="min-width:22px;text-align:center">${i.q}</b><button class="btn alt" data-a="${i.id}" aria-label="More" style="padding:6px 11px">+</button>
-      <button class="btn alt" data-x="${i.id}" aria-label="Delete ${esc(i.n)}" style="padding:6px 10px">✕</button></div>`).join('') || empty('🛒', 'Your list is empty.');
+    $('#ls', el).innerHTML = v.map(i => `<div class="item" style="gap:4px 6px;padding:4px 10px 4px 4px;flex-wrap:wrap"><label style="display:grid;place-items:center;min-width:44px;min-height:44px;flex:none"><input type="checkbox" data-c="${i.id}" ${i.done ? 'checked' : ''} aria-label="In basket: ${esc(i.n)}" style="width:26px;height:26px"></label>
+      <span class="grow" style="flex:1 1 90px;${i.done ? 'opacity:.5;text-decoration:line-through' : ''}">${esc(i.n)}</span>
+      <span style="display:flex;align-items:center;gap:2px;margin-left:auto"><button class="btn alt" data-m="${i.id}" aria-label="Less ${esc(i.n)}" style="padding:0;min-width:44px">−</button><b style="min-width:24px;text-align:center" aria-label="Quantity ${i.q}">${i.q}</b><button class="btn alt" data-a="${i.id}" aria-label="More ${esc(i.n)}" style="padding:0;min-width:44px">+</button>
+      <button class="btn alt" data-x="${i.id}" aria-label="Delete ${esc(i.n)}" style="padding:0;min-width:44px">✕</button></span></div>`).join('') || empty('🛒', 'Your list is empty.');
     $('#cl', el).hidden = !items.some(i => i.done);
   }
-  const add = (n, q) => { n = n.trim().slice(0, 40); if (!n) { toast('Type an item'); return; } const f = items.find(i => !i.done && i.n.toLowerCase() === n.toLowerCase()); if (f) f.q = Math.min(99, f.q + q); else items.push({ id: uid(), n, q: clamp(q, 1, 99), done: false, at: Date.now() }); save(); draw(); };
+  const add = (n, q) => { n = n.trim().slice(0, 40); if (!n) { toast('Type an item'); return; } if (items.length >= 200 && !items.find(i => !i.done && i.n.toLowerCase() === n.toLowerCase())) { toast('Up to 200 items. Remove some first.'); return; } const f = items.find(i => !i.done && i.n.toLowerCase() === n.toLowerCase()); if (f) f.q = Math.min(99, f.q + q); else items.push({ id: uid(), n, q: clamp(q, 1, 99), done: false, at: Date.now() }); save(); draw(); };
   $('#add', el).onclick = () => { add($('#nm', el).value, Math.floor(+$('#qt', el).value) || 1); $('#nm', el).value = ''; $('#qt', el).value = 1; };
   $('#nm', el).onkeydown = (e) => { if (e.key === 'Enter') $('#add', el).click(); };
-  el.addEventListener('click', (e) => {
+  root.addEventListener('click', (e) => {
     const q = e.target.closest('[data-q]'), c = e.target.closest('[data-c]'), m = e.target.closest('[data-m]'), a = e.target.closest('[data-a]'), x = e.target.closest('[data-x]');
     const f = (id) => items.find(i => i.id === id);
     if (q) return add(q.dataset.q, 1);
@@ -1062,8 +1172,9 @@ Tools.register({ id: 'expenses', name: 'Expense Tracker', icon: '💸', cat: 'da
   let list = Store.get('daily.exp', []), cur = Store.get('daily.expcur', ''), vm = new Date(); vm.setDate(1);
   const save = () => Store.set('daily.exp', list);
   const money = (n) => (cur ? cur + ' ' : '') + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  el.innerHTML = `<div class="card list" style="gap:10px"><div class="row"><input id="am" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Amount" aria-label="Amount"><select id="ct" aria-label="Category">${EC.map(c => `<option>${c[0]}</option>`).join('')}</select></div>
-      <div class="row"><input id="nt" type="text" maxlength="40" placeholder="Note (optional)" aria-label="Note"><input id="dt" type="date" aria-label="Date" value="${dayKey(new Date())}"></div>
+  const moneyH = (n) => esc(money(n)); // the user's currency text must be escaped before it goes into innerHTML
+  el.innerHTML = `<div class="card list" style="gap:10px"><div class="row"><input id="am" type="number" min="0.01" max="1000000000" step="0.01" inputmode="decimal" placeholder="Amount" aria-label="Amount"><select id="ct" aria-label="Category">${EC.map(c => `<option>${c[0]}</option>`).join('')}</select></div>
+      <div class="row"><input id="nt" type="text" maxlength="40" placeholder="Note (optional)" aria-label="Note"><input id="dt" type="date" aria-label="Date" min="2000-01-01" max="2100-12-31" value="${dayKey(new Date())}"></div>
       <div class="row"><button class="btn" id="add">Add expense</button><input id="cu" type="text" maxlength="4" placeholder="Currency" aria-label="Currency symbol" value="${esc(cur)}" style="flex:0 0 88px"></div></div>
     <div class="row" style="gap:8px"><button class="btn alt" id="pv" aria-label="Previous month" style="flex:0 0 52px">‹</button><div id="mh" class="center" style="font-weight:700;font-size:17px"></div><button class="btn alt" id="nx" aria-label="Next month" style="flex:0 0 52px">›</button></div>
     <div class="card center" style="${GRAD}"><div class="muted" style="font-size:12px;letter-spacing:.08em;text-transform:uppercase">Month total</div><div id="tt" style="font-size:38px;font-weight:800;font-variant-numeric:tabular-nums"></div></div>
@@ -1090,13 +1201,14 @@ Tools.register({ id: 'expenses', name: 'Expense Tracker', icon: '💸', cat: 'da
     const mine = list.filter(e => inMonth(e, vm)).sort((a, b) => b.date.localeCompare(a.date) || b.at - a.at), total = mine.reduce((s, e) => s + e.amt, 0);
     $('#tt', el).textContent = money(total);
     const by = EC.map(c => [c, mine.filter(e => e.cat === c[0]).reduce((s, e) => s + e.amt, 0)]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]);
-    $('#bars', el).innerHTML = by.length ? by.map(([c, v]) => `<div style="margin:8px 0"><div class="row" style="font-size:14px"><span>${c[1]} ${c[0]}</span><b style="text-align:right">${money(v)}</b></div><div class="progress" style="margin-top:4px"><i style="width:${v / by[0][1] * 100}%;background:${c[2]}"></i></div></div>`).join('') : '<div class="muted center">No spending this month.</div>';
-    $('#ls', el).innerHTML = mine.map(e => { const c = EC.find(x => x[0] === e.cat) || EC[7]; return `<div class="item" style="gap:12px"><span style="font-size:22px">${c[1]}</span><span class="grow">${esc(e.note || e.cat)}<br><small class="muted">${new Date(e.date + 'T00:00').toLocaleDateString([], { day: 'numeric', month: 'short' })} · ${e.cat}</small></span><b>${money(e.amt)}</b><button class="btn alt" data-x="${e.id}" aria-label="Delete" style="padding:8px 10px">✕</button></div>`; }).join('');
+    $('#bars', el).innerHTML = by.length ? by.map(([c, v]) => `<div style="margin:8px 0"><div class="row" style="font-size:14px"><span>${c[1]} ${c[0]}</span><b style="text-align:right">${moneyH(v)}</b></div><div class="progress" style="margin-top:4px"><i style="width:${v / by[0][1] * 100}%;background:${c[2]}"></i></div></div>`).join('') : '<div class="muted center">No spending this month.</div>';
+    $('#ls', el).innerHTML = mine.map(e => { const c = EC.find(x => x[0] === e.cat) || EC[7]; return `<div class="item" style="gap:12px"><span style="font-size:22px">${c[1]}</span><span class="grow">${esc(e.note || e.cat)}<br><small class="muted">${new Date(e.date + 'T00:00').toLocaleDateString([], { day: 'numeric', month: 'short' })} · ${e.cat}</small></span><b>${moneyH(e.amt)}</b><button class="btn alt" data-x="${e.id}" aria-label="Delete expense ${esc(e.note || e.cat)}" style="padding:8px 10px;min-width:44px">✕</button></div>`; }).join('');
     chart();
   }
   $('#add', el).onclick = () => {
     const amt = Math.round((+$('#am', el).value) * 100) / 100; if (!(amt > 0)) { toast('Enter an amount'); return; }
-    const date = $('#dt', el).value || dayKey(new Date());
+    const date = /^d{4}-d{2}-d{2}$/.test($('#dt', el).value) ? $('#dt', el).value : dayKey(new Date());
+    if (list.length >= 5000) { toast('Up to 5000 expenses. Delete some old ones first.'); return; }
     list.push({ id: uid(), amt: Math.min(amt, 1e9), cat: $('#ct', el).value, note: $('#nt', el).value.trim().slice(0, 40), date, at: Date.now() });
     save(); $('#am', el).value = ''; $('#nt', el).value = ''; vm = new Date(date + 'T00:00'); vm.setDate(1); toast('Added'); draw();
   };
@@ -1147,7 +1259,7 @@ Tools.register({ id: 'calendar', name: 'Calendar', icon: '🗓️', cat: 'daily'
     <div class="card center" id="inf" style="${GRAD}"></div>
     <label class="item" style="min-height:48px"><span class="grow">Week starts on Monday</span><input type="checkbox" id="mo" ${mon ? 'checked' : ''} style="width:22px;height:22px"></label>
     <div style="${H2}">Days between two dates</div>
-    <div class="card list" style="gap:10px"><div class="row"><input id="d1" type="date" aria-label="From" value="${dayKey(now)}"><input id="d2" type="date" aria-label="To"></div><div id="df" class="center" style="font-weight:600;min-height:24px"></div></div>`;
+    <div class="card list" style="gap:10px"><div class="row"><input id="d1" type="date" aria-label="From" min="1900-01-01" max="2200-12-31" value="${dayKey(now)}"><input id="d2" type="date" aria-label="To" min="1900-01-01" max="2200-12-31"></div><div id="df" class="center" style="font-weight:600;min-height:24px"></div></div>`;
   function draw() {
     $('#tdy', el).textContent = MONTHS[vm.getMonth()] + ' ' + vm.getFullYear();
     const first = new Date(vm.getFullYear(), vm.getMonth(), 1), lead = (first.getDay() - (mon ? 1 : 0) + 7) % 7, dim = daysInMonth(vm.getFullYear(), vm.getMonth());
@@ -1185,27 +1297,45 @@ Tools.register({ id: 'birthdays', name: 'Birthdays', icon: '🎂', cat: 'daily',
   el.innerHTML = `<div class="card list" style="gap:10px"><input id="nm" type="text" maxlength="30" placeholder="Name" aria-label="Name">
       <div class="row"><select id="mo" aria-label="Month">${MONTHS.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}</select><input id="dy" type="number" min="1" max="31" inputmode="numeric" placeholder="Day" aria-label="Day" style="flex:0 0 72px"><input id="yr" type="number" min="1900" max="2100" inputmode="numeric" placeholder="Year?" aria-label="Birth year (optional)" style="flex:0 0 88px"></div>
       <label class="item" style="min-height:48px"><span class="grow">Remind me at 9:00 each year</span><input type="checkbox" id="rm" checked style="width:22px;height:22px"></label><button class="btn" id="add">Add birthday</button></div>
-    <div class="list" id="ls"></div>${sub(notesLine())}`;
-  const nid = (b) => 770000 + (b.n % 9000);
+    ${blockedHtml()}<div class="list" id="ls"></div>${sub(notesLine() + ' A 29 February birthday is counted on 28 February in years that are not leap years; its reminder is renewed each time you open this tool.')}`;
+  const nid = (b) => b.nb != null ? b.nb : 770000 + (b.n % 9000); // birthdays saved before the id blocks keep their old ids
+  const isLeapDay = (b) => b.m === 2 && b.d === 29;
+  /* Next 9:00 on the birthday; a plain Date would roll 29 Feb over to 1 March. */
+  function nextBdayAt(b, now) {
+    let t = bdayDate(now.getFullYear(), b.m, b.d); t.setHours(9, 0, 0, 0);
+    if (t <= now) { t = bdayDate(now.getFullYear() + 1, b.m, b.d); t.setHours(9, 0, 0, 0); }
+    return t;
+  }
+  /* The yearly repeat of Android only fires on a real 29 Feb, so leap-day birthdays get a single notification for the next
+     occurrence, renewed every time the tool opens. Returns true when Android accepted it (or there is nothing to schedule). */
   async function remind(b) {
-    const ln = LN(); if (!ln || !b.rem) return;
-    try { const p = await ln.requestPermissions(); if (p.display !== 'granted') return; await ln.schedule({ notifications: [{ id: nid(b), title: '🎂 ' + b.name, body: 'It is ' + b.name + '\'s birthday today', schedule: { on: { month: b.m, day: b.d, hour: 9, minute: 0 }, allowWhileIdle: true } }] }); } catch (e) {}
+    if (!LN() || !b.rem) return true;
+    const title = '🎂 ' + b.name, body = 'It is ' + b.name + '\'s birthday today';
+    return isLeapDay(b) ? notifySchedule(nid(b), title, body, { at: nextBdayAt(b, new Date()) })
+      : notifySchedule(nid(b), title, body, { on: { month: b.m, day: b.d, hour: 9, minute: 0 } });
   }
   function draw() {
     const now = new Date(), v = list.map(b => Object.assign({ u: daysUntil(b.m, b.d, now) }, b)).sort((a, b) => a.u.days - b.u.days);
     $('#ls', el).innerHTML = v.map(b => {
-      const age = b.y ? b.u.date.getFullYear() - b.y : null;
-      return `<div class="item" style="gap:12px;padding:12px 14px"><span style="font-size:26px">${b.u.days === 0 ? '🎉' : '🎂'}</span><span class="grow"><b>${esc(b.name)}</b><br><small class="muted">${b.d} ${MONTHS[b.m - 1]}${age ? ' · turns ' + age : ''}</small></span>
-        <span style="text-align:right;font-weight:700;${b.u.days === 0 ? 'color:var(--ok)' : ''}">${b.u.days === 0 ? 'Today!' : b.u.days === 1 ? 'Tomorrow' : 'in ' + b.u.days + ' d'}</span><button class="btn alt" data-x="${b.id}" aria-label="Delete ${esc(b.name)}" style="padding:8px 10px">✕</button></div>`;
+      const age = b.y ? b.u.date.getFullYear() - b.y : 0;
+      const feb29 = isLeapDay(b) && !isLeap(b.u.date.getFullYear()) ? ' (28 Feb this year)' : '';
+      return `<div class="item" style="gap:12px;padding:12px 14px"><span style="font-size:26px">${b.u.days === 0 ? '🎉' : '🎂'}</span><span class="grow"><b>${esc(b.name)}</b><br><small class="muted">${b.d} ${MONTHS[b.m - 1]}${feb29}${age > 0 ? ' · turns ' + age : ''}</small></span>
+        <span style="text-align:right;font-weight:700;${b.u.days === 0 ? 'color:var(--ok)' : ''}">${b.u.days === 0 ? 'Today!' : b.u.days === 1 ? 'Tomorrow' : 'in ' + b.u.days + ' d'}</span><button class="btn alt" data-x="${b.id}" aria-label="Delete ${esc(b.name)}" style="padding:8px 10px;min-width:44px">✕</button></div>`;
     }).join('') || empty('🎂', 'No birthdays yet.');
   }
   $('#add', el).onclick = async () => {
     const name = $('#nm', el).value.trim(), m = +$('#mo', el).value, d = Math.floor(+$('#dy', el).value), y = Math.floor(+$('#yr', el).value) || 0;
-    if (!name) { toast('Enter a name'); return; } if (!(d >= 1 && d <= daysInMonth(2024, m - 1))) { toast('Enter a valid day'); return; }
-    const b = { id: uid(), n: seq++, name, m, d, y: y >= 1900 && y <= 2100 ? y : 0, rem: $('#rm', el).checked };
-    Store.set('daily.bseq', seq); list.push(b); save(); $('#nm', el).value = ''; $('#dy', el).value = ''; $('#yr', el).value = ''; draw(); await remind(b);
+    if (!name) { toast('Enter a name'); return; } if (list.length >= 200) { toast('Up to 200 birthdays'); return; } if (!(d >= 1 && d <= daysInMonth(2024, m - 1))) { toast('Enter a valid day'); return; }
+    const n = seq++, b = { id: uid(), n, nb: noteId('bday', n), name, m, d, y: y >= 1900 && y <= 2100 ? y : 0, rem: $('#rm', el).checked };
+    Store.set('daily.bseq', seq); list.push(b); save(); $('#nm', el).value = ''; $('#dy', el).value = ''; $('#yr', el).value = ''; draw();
+    const ok = await remind(b);
+    if (b.rem) { setBlocked(el, !alertsOk(ok)); if (!alertsOk(ok)) toast('Saved, but notifications are blocked'); }
   };
-  $('#ls', el).onclick = async (e) => { const x = e.target.closest('[data-x]'); if (x) { const b = list.find(z => z.id === x.dataset.x); list = list.filter(z => z !== b); save(); draw(); await cancelNotes([nid(b)]); } };
+  $('#ls', el).onclick = async (e) => { const x = e.target.closest('[data-x]'); if (x) { const b = list.find(z => z.id === x.dataset.x); if (!b) return; list = list.filter(z => z !== b); save(); draw(); await cancelNotes([nid(b)]); } };
+  probeBlocked(el);
+  /* Leap-day reminders are one-shot, so renew them quietly (only if notifications are already allowed). */
+  const leap = list.filter(b => b.rem && isLeapDay(b));
+  if (leap.length && LN() && LN().checkPermissions) LN().checkPermissions().then(p => { if (p.display === 'granted') leap.forEach(remind); }).catch(() => {});
   draw();
 } });
 
@@ -1222,7 +1352,7 @@ Tools.register({ id: 'multiwatch', name: 'Multi Stopwatch', icon: '🏃', cat: '
     $('#ls', el).innerHTML = runners.map((r, i) => {
       const best = r.laps.length ? Math.min(...r.laps) : 0;
       return `<div class="item" style="gap:12px;padding:12px 14px"><span class="grow"><b>${esc(r.name)}</b><br><small class="muted">${r.laps.length ? `Lap ${r.laps.length}: <b>${fmt(r.laps[r.laps.length - 1], true)}</b> · best ${fmt(best, true)}<br>Total ${fmt(total(r), true)}` : 'No laps yet'}</small></span>
-        <button class="btn" data-l="${i}" style="min-width:76px;padding:16px 10px">Lap</button><button class="btn alt" data-x="${i}" aria-label="Remove ${esc(r.name)}" style="padding:8px 10px">✕</button></div>`;
+        <button class="btn" data-l="${i}" style="min-width:76px;padding:16px 10px">Lap</button><button class="btn alt" data-x="${i}" aria-label="Remove ${esc(r.name)}" style="padding:8px 10px;min-width:44px">✕</button></div>`;
     }).join('') || empty('🏃', 'Add a runner to begin.');
   }
   const paint = () => { $('#d', el).textContent = fmt(now(), true); };
@@ -1243,7 +1373,7 @@ Tools.register({ id: 'moonphase', name: 'Moon Phase', icon: '🌙', cat: 'daily'
   let date = new Date();
   el.innerHTML = `<div class="card center" style="background:linear-gradient(160deg,#10163a,#1d2550);color:#fff;border-color:transparent"><canvas id="mc" width="240" height="240" style="width:210px;height:210px;background:none;border:0;display:block;margin:6px auto"></canvas><div id="nm" style="font-size:24px;font-weight:800"></div><div id="il" style="opacity:.75;margin-top:2px"></div></div>
     <div class="card list" style="gap:2px;padding:4px 14px" id="inf"></div>
-    <div class="row"><button class="btn alt" id="pv" aria-label="Previous day">‹ Day</button><input id="dt" type="date" aria-label="Date"><button class="btn alt" id="nx" aria-label="Next day">Day ›</button></div>
+    <div class="row"><button class="btn alt" id="pv" aria-label="Previous day">‹ Day</button><input id="dt" type="date" aria-label="Date" min="1900-01-01" max="2200-12-31"><button class="btn alt" id="nx" aria-label="Next day">Day ›</button></div>
     <button class="btn alt" id="td">Today</button>${sub('Calculated from the average length of the lunar month, so the date of a phase can be off by up to half a day. The picture shows the northern hemisphere view.')}`;
   function paintMoon(frac) {
     const cv = $('#mc', el), c = cv.getContext('2d'), R = 100, cx = 120, cy = 120;
@@ -1276,9 +1406,10 @@ Tools.register({ id: 'suntimes', name: 'Sunrise & Sunset', icon: '🌅', cat: 'n
   const st = Object.assign({ lat: 51.5074, lon: -0.1278 }, Store.get('daily.sunloc', {}));
   el.innerHTML = `<div class="card center" style="${GRAD};padding:20px"><div id="ic" style="font-size:44px">🌅</div><div id="dl" style="font-size:30px;font-weight:800;margin:4px 0"></div><div class="muted" id="ds"></div><div class="progress" style="margin:14px 10px 0"><i id="pg" style="width:0"></i></div></div>
     <div class="card list" style="gap:2px;padding:4px 14px" id="inf"></div>
-    <div class="card list" style="gap:10px"><div class="row"><label class="f">Latitude<input id="la" type="number" step="any" inputmode="decimal" value="${st.lat}"></label><label class="f">Longitude<input id="lo" type="number" step="any" inputmode="decimal" value="${st.lon}"></label></div>
-      <div class="row"><input id="dt" type="date" aria-label="Date" value="${dayKey(new Date())}"><button class="btn alt" id="me">Use my location</button></div></div>
+    <div class="card list" style="gap:10px"><div class="row"><label class="f">Latitude<input id="la" type="number" min="-90" max="90" step="any" inputmode="decimal" value="${st.lat}"></label><label class="f">Longitude<input id="lo" type="number" min="-180" max="180" step="any" inputmode="decimal" value="${st.lon}"></label></div>
+      <div class="row"><input id="dt" type="date" aria-label="Date" min="1900-01-01" max="2200-12-31" value="${dayKey(new Date())}"><button class="btn alt" id="me">Use my location</button></div></div>
     ${sub('Times are shown in this phone\'s time zone. North is positive, east is positive. Accurate to about a minute outside the polar regions.')}`;
+  const root = rootOf(el);
   const tm = (d) => d ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '--';
   function draw() {
     const lat = clamp(+$('#la', el).value || 0, -90, 90), lon = clamp(+$('#lo', el).value || 0, -180, 180), v = $('#dt', el).value;
@@ -1293,7 +1424,7 @@ Tools.register({ id: 'suntimes', name: 'Sunrise & Sunset', icon: '🌅', cat: 'n
     const rows = [['🌅 Sunrise', tm(s.rise)], ['☀️ Solar noon', tm(s.noon)], ['🌇 Sunset', tm(s.set)], ['Civil dawn', tm(cv.rise)], ['Civil dusk', tm(cv.set)]];
     $('#inf', el).innerHTML = rows.map(([k, val], i) => `<div class="item" style="border:0;${i ? 'border-top:1px solid var(--line);' : ''}border-radius:0;padding:13px 0"><span class="grow">${k}</span><b style="font-size:18px">${val}</b></div>`).join('');
   }
-  el.oninput = draw;
+  root.oninput = draw;
   $('#me', el).onclick = () => {
     if (!navigator.geolocation) { toast('No location support'); return; }
     toast('Finding you...');
@@ -1306,9 +1437,9 @@ Tools.register({ id: 'suntimes', name: 'Sunrise & Sunset', icon: '🌅', cat: 'n
 Tools.register({ id: 'meetingplanner', name: 'Meeting Planner', icon: '🤝', cat: 'daily', desc: 'Compare working hours across time zones side by side and find the hours that suit everyone.', keys: ['time zone', 'call', 'schedule', 'overlap', 'remote', 'international'], needs: ['storage'], render(el) {
   const localZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   let zones = Store.get('daily.mzones', [{ n: 'London', z: 'Europe/London' }, { n: 'Tokyo', z: 'Asia/Tokyo' }]), day = dayKey(new Date());
-  el.innerHTML = `<div class="row"><input id="cs" type="text" list="cl" placeholder="Add a city" aria-label="City" autocomplete="off"><button class="btn" id="add" style="flex:0 0 auto">Add</button></div>
+  el.innerHTML = `<div class="row"><input id="cs" type="text" list="cl" placeholder="Add a city" aria-label="City" maxlength="40" autocomplete="off"><button class="btn" id="add" style="flex:0 0 auto">Add</button></div>
     <datalist id="cl">${CITIES.map(c => `<option value="${esc(c[0])}"></option>`).join('')}</datalist>
-    <input id="dt" type="date" aria-label="Day" value="${day}"><div class="card list" style="gap:12px" id="gr"></div>
+    <input id="dt" type="date" aria-label="Day" min="1970-01-01" max="2100-12-31" value="${day}"><div class="card list" style="gap:12px" id="gr"></div>
     <div class="card" id="bw"></div>
     ${sub('Rows show the local hour in each place for the 24 hours of your chosen day. <span style="color:var(--ok);font-weight:700">Green</span> is 9 to 17, <span style="color:#f59e0b;font-weight:700">amber</span> is early or late, grey is night.')}`;
   const save = () => Store.set('daily.mzones', zones);
@@ -1319,7 +1450,7 @@ Tools.register({ id: 'meetingplanner', name: 'Meeting Planner', icon: '🤝', ca
     const kind = (x) => x >= 9 && x < 17 ? 0 : (x >= 7 && x < 22 ? 1 : 2);
     $('#gr', el).innerHTML = all.map((zn, i) => {
       let off = 0; try { off = tzOffsetMin(zn.z, base); } catch (e) {}
-      return `<div><div class="row" style="font-size:14px;margin-bottom:5px"><b>${esc(zn.n)} <small class="muted" style="font-weight:400">${offLabel(off)}</small></b>${i ? `<button class="btn alt" data-x="${i - 1}" aria-label="Remove ${esc(zn.n)}" style="flex:0 0 auto;padding:2px 10px;min-height:26px">✕</button>` : '<span></span>'}</div>
+      return `<div><div class="row" style="font-size:14px;margin-bottom:5px"><b>${esc(zn.n)} <small class="muted" style="font-weight:400">${offLabel(off)}</small></b>${i ? `<button class="btn alt" data-x="${i - 1}" aria-label="Remove ${esc(zn.n)}" style="flex:0 0 auto;padding:0 10px;min-width:44px;min-height:44px">✕</button>` : '<span></span>'}</div>
         <div style="display:flex;gap:1px">${hrs[i].map(x => `<div style="flex:1;height:30px;border-radius:3px;display:grid;place-items:center;font-size:9px;font-weight:600;background:${['color-mix(in srgb,var(--ok) 55%,var(--surface))', 'color-mix(in srgb,#f59e0b 45%,var(--surface))', 'var(--surface2)'][kind(x)]};color:${kind(x) === 2 ? 'var(--muted)' : 'var(--text)'}">${x}</div>`).join('')}</div></div>`;
     }).join('');
     const good = [...Array(24)].map((_, h) => hrs.every(r => kind(r[h]) === 0));
@@ -1342,11 +1473,11 @@ Tools.register({ id: 'typingtest', name: 'Typing Speed', icon: '⌨️', cat: 'f
   const TXT = ['The quick brown fox jumps over the lazy dog while the sun sets slowly behind the quiet hills.', 'Good habits are built one small step at a time, and every step forward counts more than waiting for a perfect start.',
     'A clear desk and a calm mind make it easier to finish the work in front of you before the day is over.', 'Travel light, ask for directions, and remember that the best stories often begin with a wrong turn.',
     'Water the plants, send that message, take a short walk, and leave a little time for doing nothing at all.', 'Practice makes progress, and progress makes patience easier, so keep your eyes on the next word and keep typing.'];
-  let target = '', t0 = 0, secs = 30, iv = null, over = false, best = Store.get('daily.typebest', 0);
+  let target = '', t0 = 0, secs = 30, iv = null, over = false, best = Store.get('daily.typebest', 0), prev = '';
   el.innerHTML = `<div id="tabs">${segHtml([['30', '30 seconds'], ['60', '60 seconds']], '30')}</div>
     <div class="card row center" style="gap:0"><div><div class="mid" id="wp">0</div><small class="muted">WPM</small></div><div><div class="mid" id="ac">100%</div><small class="muted">Accuracy</small></div><div><div class="mid" id="tl">30</div><small class="muted">Seconds</small></div></div>
     <div class="card" id="ps" style="font-size:19px;line-height:1.7;letter-spacing:.2px;word-break:break-word"></div>
-    <textarea id="in" rows="3" placeholder="Start typing here to begin..." aria-label="Type the text above" autocapitalize="off" autocomplete="off" spellcheck="false" style="font-size:17px"></textarea>
+    <textarea id="in" rows="3" maxlength="400" placeholder="Start typing here to begin..." aria-label="Type the text above" autocapitalize="off" autocomplete="off" spellcheck="false" style="font-size:17px"></textarea>
     <div class="card center" id="rs" hidden></div><button class="btn" id="nw">New text</button><div class="muted center" id="bs" style="font-size:13px"></div>`;
   function show(typed) {
     $('#ps', el).innerHTML = [...target].map((ch, i) => {
@@ -1355,7 +1486,7 @@ Tools.register({ id: 'typingtest', name: 'Typing Speed', icon: '⌨️', cat: 'f
     }).join('');
   }
   function reset() {
-    clearInterval(iv); iv = null; t0 = 0; over = false; target = TXT[Math.floor(Math.random() * TXT.length)]; if (secs === 60) target += ' ' + TXT[Math.floor(Math.random() * TXT.length)];
+    clearInterval(iv); iv = null; t0 = 0; over = false; prev = ''; target = TXT[Math.floor(Math.random() * TXT.length)]; if (secs === 60) target += ' ' + TXT[Math.floor(Math.random() * TXT.length)];
     $('#in', el).value = ''; $('#in', el).disabled = false; $('#rs', el).hidden = true; $('#wp', el).textContent = 0; $('#ac', el).textContent = '100%'; $('#tl', el).textContent = secs;
     $('#bs', el).textContent = best ? 'Personal best: ' + best + ' WPM' : ''; show('');
   }
@@ -1366,8 +1497,13 @@ Tools.register({ id: 'typingtest', name: 'Typing Speed', icon: '⌨️', cat: 'f
     $('#rs', el).hidden = false; $('#rs', el).innerHTML = `<div style="font-size:30px">${nb ? '🏆' : '👏'}</div><div style="font-size:20px;font-weight:700">${s.wpm} WPM at ${s.acc}% accuracy</div><div class="muted">${nb ? 'New personal best!' : 'Keep going, you are improving.'}</div>`;
     $('#bs', el).textContent = 'Personal best: ' + best + ' WPM';
   }
+  /* Pasting would finish the test in an instant with a fake 1000+ WPM, so it is blocked, and so is any burst faster than 40 ms per character. */
+  $('#in', el).onpaste = (e) => { e.preventDefault(); toast('Pasting is turned off in the typing test'); };
+  $('#in', el).ondrop = (e) => e.preventDefault();
   $('#in', el).oninput = (e) => {
     if (over) return; const typed = e.target.value.slice(0, target.length);
+    if (typed.length >= 5 && Date.now() - (t0 || Date.now()) < typed.length * 40) { e.target.value = prev; toast('That is faster than anyone can type'); return; }
+    prev = typed;
     if (!t0) { t0 = Date.now(); iv = setInterval(() => { const left = secs - (Date.now() - t0) / 1000; if (left <= 0) { $('#tl', el).textContent = 0; finish(); } else $('#tl', el).textContent = Math.ceil(left); }, 200); }
     show(typed); const s = typingStats(target, typed, Date.now() - t0); $('#wp', el).textContent = s.wpm; $('#ac', el).textContent = s.acc + '%';
     if (typed.length >= target.length) finish();
