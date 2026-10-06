@@ -43,20 +43,20 @@
 - category: camera
 - plan: free
 - needs: camera, microphone
-- what: Records video from the front or rear camera while the whole screen is black so recording is discreet. A large dim Stop button ends the recording, then the video can be previewed and saved or shared. A clear note warns that recording others without consent may be illegal.
+- what: Records video from the front or rear camera while the whole screen is black so recording is discreet. A large dim Stop button ends the recording (automatic stop at 30 minutes), then the video can be previewed and saved or shared. The screen is kept awake while recording. If only the microphone is denied it records video without sound and says so. Leaving the tool mid-recording stops it and offers what was captured to the share sheet. A clear note warns that recording others without consent may be illegal.
 - test:
   1. Open the tool. Expected: the legal note about consent is visible.
   2. Choose a camera, keep Record sound ticked and tap Start recording; allow permissions. Expected: the screen goes fully black with a faint timer and a Stop button.
   3. Wait ten seconds, then tap Stop. Expected: the black screen closes and a video player with the file size appears.
   4. Tap Save / share video. Expected: the share sheet or a download of a WebM file.
-  5. Untick Record sound and record again, or deny the microphone. Expected: it still records video only or shows a clear message. Leaving the tool mid-recording stops the camera.
+  5. Untick Record sound and record again, or deny the microphone. Expected: it still records video only or shows a clear message. Leaving the tool mid-recording stops the camera and offers the recording to the share sheet instead of discarding it. Double tapping Start recording starts only one recording.
 
 ## Motion Cam
 - id: motioncam
 - category: camera
 - plan: pro (motion)
 - needs: camera
-- what: Watches the camera and detects movement by comparing small frames, ignoring small noise. When enough of the picture changes it beeps and vibrates, and saves a snapshot with the time to a log in the app. Sensitivity can be changed and the log entries can be saved.
+- what: Watches the camera and detects movement by comparing small frames, ignoring small noise. When enough of the picture changes it beeps and vibrates, and keeps a snapshot with the time in a list for this session only (it is cleared when you leave the tool, so save entries you want). Sensitivity can be changed and the entries can be saved. The screen stays awake while watching.
 - test:
   1. As a free user open the tool. Expected: the Pro sheet appears. With Pro, the tool opens.
   2. Point the phone at a still scene and tap Start watching. Expected: Watching badge, level bar near zero, no log entries after the 2 second arming time.
@@ -95,7 +95,7 @@
 - category: camera
 - plan: free
 - needs: camera
-- what: Scans QR codes and barcodes with the camera using the built-in BarcodeDetector when the phone has it, otherwise a bundled jsQR for QR codes. It shows the result, copies it, offers an Open link button only for http and https text, keeps a history, and can also scan a picture from the phone.
+- what: Scans QR codes with the camera using a bundled jsQR, and other barcodes too when the phone has the built-in BarcodeDetector (a note under the viewfinder says which). Scanning a picture tries several sizes. It shows the result, copies it, offers an Open link button only for http and https text, keeps a history, and can also scan a picture from the phone.
 - test:
   1. Open the tool and point at a QR code containing https://example.com. Expected: a result card shows the text, the phone vibrates, and Open link and Copy are available.
   2. Scan a QR code with plain text. Expected: the text is shown and no Open link button appears.
@@ -212,10 +212,10 @@
 - category: camera
 - plan: free
 - needs: storage
-- what: Removes hidden metadata such as GPS location, camera model and time from photos by re-encoding them at full size, and tells you whether metadata was found in each JPEG. Nothing is uploaded.
+- what: Removes hidden metadata such as GPS location, camera model and time from photos by re-encoding them (pictures over 4096 px on the longest side are scaled down to 4096 px), and tells you whether metadata was found in each JPEG. Nothing is uploaded.
 - test:
   1. Pick a photo taken with the phone camera with location on. Expected: the result says Removed metadata including location.
-  2. Tap Save and open the saved file in an EXIF viewer. Expected: no GPS or camera data remains and the picture size is unchanged.
+  2. Tap Save and open the saved file in an EXIF viewer. Expected: no GPS or camera data remains and the picture size is unchanged (unless it was over 4096 px).
   3. Pick a screenshot (PNG). Expected: it says Re-encoded without metadata and saves as PNG.
   4. Pick several photos at once. Expected: each is listed with its own Save button.
   5. Pick a file that is not a picture. Expected: Could not read this file for that item only.

@@ -16,13 +16,14 @@
 - category: audio
 - plan: free
 - needs: none
-- what: Plays a pure tone from 20 Hz to 20 kHz (log slider plus number box) as sine, square, triangle or sawtooth, with a volume control and an optional looping frequency sweep. Shows the nearest note and warns about loud sound.
+- what: Plays a pure tone from 20 Hz to 20 kHz (log slider plus number box) as sine, square, triangle or sawtooth, with a volume control and an optional looping frequency sweep. Shows the nearest note and warns about loud sound. Output is capped at about half amplitude and runs through a limiter; a confirmation appears before playing above 70% volume at more than 1 kHz.
 - test:
   1. Press Play at the default 440 Hz: a steady tone plays at low volume and the note reads A4. Press Stop: it fades out.
   2. Drag the slider while playing: the pitch changes smoothly and the number box follows. Type 1000 in the box: pitch jumps to 1 kHz. Type 5 or 99999: it clamps to 20 or 20000.
   3. Change waveform to square: the timbre becomes buzzier. Raise volume above 70%: label shows "(loud!)".
   4. Tick Sweep, set To 2000 and 5 seconds, press Play: the frequency glides up and down repeatedly and the readout moves.
-  5. Leave the tool while playing: sound stops.
+  5. Set volume above 70% and press Play at 5000 Hz: a confirmation about hearing damage appears; Cancel keeps it stopped.
+  6. Leave the tool while playing: sound fades out without a click.
 
 ## Tuner
 - id: tuner
@@ -49,13 +50,14 @@
   3. Move the volume boost slider: the voice gets louder or quieter. At 0% it is silent.
   4. Press Stop: sound stops and the bar empties. Leave the tool while running: the microphone is released.
   5. Deny the permission: a message says the microphone permission was denied.
+  6. Double tap Start quickly. Expected: only one loop starts (no doubled echo) and Stop silences everything. The sound fades in over about a third of a second.
 
 ## Voice Recorder
 - id: recorder
 - category: audio
 - plan: free with limit: 3 saved recordings (Pro: unlimited)
 - needs: microphone, storage
-- what: Records voice memos with MediaRecorder with pause, resume and stop. Recordings are kept in IndexedDB on the device and listed with play, rename, share or download and delete. The free plan keeps 3 recordings, then shows the Pro sheet.
+- what: Records voice memos with MediaRecorder with pause, resume and stop. Recordings are kept in IndexedDB on the device and listed with play, rename, share or download and delete. The free plan keeps 3 recordings, then shows the Pro sheet. The Record button is disabled until the saved list has loaded and while a recording is starting, a recording stops by itself after 1 hour, and the free limit is checked again when a recording ends.
 - test:
   1. Press Record, allow the microphone, speak for a few seconds: the timer counts and status says Recording. Press Pause: the timer freezes; Resume continues; Stop saves a "Recording <date time>" item.
   2. Press play on an item: it plays and the button becomes a stop square. Press it again: playback stops.
@@ -63,17 +65,18 @@
   4. Press the bin once: it turns into "Sure?"; press again to delete. Without the second press it resets after 3 seconds.
   5. As a free user with 3 recordings, press Record: the Pro sheet opens and nothing records.
   6. Deny the microphone: a permission message shows.
+  7. Double tap Record quickly: only one recording starts.
 
 ## Piano
 - id: piano
 - category: audio
 - plan: free
 - needs: none
-- what: Two-octave (25 key) on-screen piano with multi-touch chords, finger sliding between keys, octave shift of two octaves either way and four waveform sounds.
+- what: On-screen piano with 15 wide keys (C to D an octave higher), multi-touch chords, finger sliding between keys, octave shift of two octaves either way and four waveform sounds.
 - test:
   1. Tap white and black keys: the matching notes sound and the key highlights while pressed.
   2. Press three keys with different fingers: all three sound together (chord) and release independently.
-  3. Press Oct + : labels change to the next range (for example C5 to C7) and the pitch is higher. Oct - at the lowest range does nothing more.
+  3. Press Oct + : labels change to the next range (for example C5 to D6) and the pitch is higher. Oct - at the lowest range does nothing more.
   4. Change Sound to Retro: the timbre changes on the next key press.
   5. Slide a finger across the keys: notes change as the finger crosses each key, with no stuck notes after lifting.
 
@@ -82,7 +85,7 @@
 - category: audio
 - plan: free
 - needs: microphone
-- what: Live frequency spectrum bars (48 log-spaced bands, 30 Hz to 16 kHz, with falling peak caps) and a waveform trace from the microphone, plus the loudest frequency in Hz.
+- what: Live frequency spectrum bars (48 log-spaced bands, 30 Hz to 16 kHz, with falling peak caps) and a waveform trace from the microphone, plus the loudest frequency in Hz (ignores the lowest bins and interpolates between them for a steadier reading).
 - test:
   1. Press Start and allow the microphone: bars move with ambient sound and the waveform scrolls.
   2. Whistle or play a steady tone: one tall bar appears at the matching band and the "loudest frequency" number matches roughly.
@@ -171,9 +174,9 @@
 - category: audio
 - plan: free
 - needs: none
-- what: Plays a low 165 Hz tone (or a 100 to 450 Hz sweep for dust) for 15 seconds to 2 minutes to help shake water out of a phone speaker, with a countdown and progress bar.
+- what: Plays a low 165 Hz tone (or a 100 to 450 Hz sweep for dust) for 15 seconds to 2 minutes to help shake water out of a phone speaker, with a countdown and progress bar. Reminds you to unplug headphones; output is limited to about half amplitude.
 - test:
-  1. Read the 3-step instructions, turn media volume up and press Start: a loud low tone plays and the countdown runs down.
+  1. Read the instructions (including "Unplug headphones and earbuds first"), turn media volume up and press Start: a low tone plays and the countdown runs down.
   2. Pick the sweep mode and start: the pitch wobbles slowly between low notes.
   3. Press Stop early: sound stops and the progress resets.
   4. Let it finish: sound stops, the display says Done, the phone vibrates and a message appears.
@@ -183,12 +186,13 @@
 - category: audio
 - plan: free
 - needs: none
-- what: High-pitched tone from 8 to 22 kHz with presets and steady, pulsing or sweeping patterns for attracting or training pets. Warns about volume and that many phone speakers cannot reach the top range.
+- what: High-pitched tone from 8 to 22 kHz with presets and steady, pulsing or sweeping patterns for attracting or training pets. Warns about volume and that many phone speakers cannot reach the top range. Output is limited to about half amplitude and starting above 70% volume asks for confirmation.
 - test:
   1. Set 12000 Hz and press Play: a high tone is clearly audible. Raise the frequency: it becomes fainter or inaudible to you.
   2. Tap the 15k, 17k, 19k and 21k presets: the frequency value and slider update, the sound changes live.
   3. Choose Pulsing: the tone beeps on and off. Choose Sweep: the pitch glides around the chosen value.
-  4. Press Stop or leave the tool: sound stops.
+  4. Raise volume above 70% and press Play: a confirmation appears.
+  5. Press Stop or leave the tool: sound fades out and stops.
 
 ## Chords & Scales
 - id: chords

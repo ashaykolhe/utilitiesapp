@@ -10,6 +10,26 @@ const hex2 = (n) => pad(Math.round(clamp(n, 0, 255)).toString(16), 2).toUpperCas
 const toHex = (r, g, b) => '#' + hex2(r) + hex2(g) + hex2(b);
 const kb = (n) => n >= 1048576 ? (n / 1048576).toFixed(2) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
 const stamp = () => { const d = new Date(); return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds()); };
+/* Screen wake lock held while a long capture runs. Re-acquired when the page becomes visible again. */
+function wakeLock() {
+  let lock = null, want = false;
+  const get = async () => {
+    if (!want || lock || !navigator.wakeLock || document.visibilityState !== 'visible') return;
+    try {
+      const l = await navigator.wakeLock.request('screen');
+      if (!want) { l.release().catch(() => {}); return; }
+      lock = l; l.addEventListener('release', () => { if (lock === l) lock = null; });
+    } catch (e) { /* not supported or refused */ }
+  };
+  const vis = () => { if (want) get(); };
+  document.addEventListener('visibilitychange', vis);
+  const w = {
+    on() { want = true; get(); },
+    off() { want = false; if (lock) { const l = lock; lock = null; l.release().catch(() => {}); } },
+    dispose() { w.off(); document.removeEventListener('visibilitychange', vis); }
+  };
+  return w;
+}
 const tick = () => { if (typeof beep === 'function') { try { beep(); } catch (e) { /* ignore */ } } else if (navigator.vibrate) navigator.vibrate(60); };
 
 function camMsg(e) {
@@ -40,6 +60,7 @@ function makeCam(video, msgEl) {
       stream = s; c.track = s.getVideoTracks()[0];
       video.muted = true; video.setAttribute('playsinline', ''); video.srcObject = s;
       try { await video.play(); } catch (e) { /* autoplay handled by attribute */ }
+      if (my !== tok) { if (stream === s) c.release(); return false; }
       say('');
       return true;
     },
@@ -63,7 +84,7 @@ function zoomCtl(cam, slider, label, onCss) {
     },
     set(v) {
       v = +v; label.textContent = v.toFixed(1) + '×';
-      if (hw) { cssZ = 1; try { cam.track.applyConstraints({ advanced: [{ zoom: v }] }); } catch (e) { /* ignore */ } }
+      if (hw) { cssZ = 1; try { cam.track.applyConstraints({ advanced: [{ zoom: v }] }).catch(() => {}); } catch (e) { /* ignore */ } }
       else cssZ = v;
       if (onCss) onCss(cssZ);
     }
@@ -91,14 +112,24 @@ const toBlob = (cv, type, q) => new Promise(res => cv.toBlob(res, type || 'image
 const b64 = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
 
 /* Save: native share sheet on Android (Filesystem + Share), else a normal download. */
+const CHUNK = 3 * 1024 * 1024; // multiple of 3 so each base64 piece joins cleanly
 async function saveBlob(blob, name) {
   const P = window.Capacitor && window.Capacitor.Plugins;
   if (P && P.Filesystem && P.Share) {
+    let uri = null;
     try {
-      const r = await P.Filesystem.writeFile({ path: name, data: await b64(blob), directory: 'CACHE' });
-      try { await P.Share.share({ title: name, url: r.uri }); } catch (e) { /* user closed the sheet */ }
+      for (let off = 0; off === 0 || off < blob.size; off += CHUNK) {
+        const data = await b64(blob.slice(off, off + CHUNK));
+        if (off === 0) uri = (await P.Filesystem.writeFile({ path: name, data, directory: 'CACHE' })).uri;
+        else await P.Filesystem.appendFile({ path: name, data, directory: 'CACHE' });
+      }
+    } catch (e) { uri = null; /* fall back to download */ }
+    if (uri) {
+      try { await P.Share.share({ title: name, url: uri }); } catch (e) { /* user closed the sheet */ }
+      // Delete the cache copy later so the receiving app has time to read it.
+      setTimeout(() => { try { P.Filesystem.deleteFile({ path: name, directory: 'CACHE' }).catch(() => {}); } catch (e) { /* ignore */ } }, 60000);
       return;
-    } catch (e) { /* fall back to download */ }
+    }
   }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
@@ -123,7 +154,24 @@ function pickFiles(multi, cb, capture, accept) {
   i.click();
 }
 
-async function loadBitmap(file) {
+/* Natural size of an image file without decoding it into a bitmap (the browser decodes lazily). */
+async function imageSize(file) {
+  const url = URL.createObjectURL(file);
+  try { const img = await new Promise((res, rej) => { const m = new Image(); m.onload = () => res(m); m.onerror = rej; m.src = url; }); return { w: img.naturalWidth, h: img.naturalHeight }; }
+  finally { URL.revokeObjectURL(url); }
+}
+/* max: longest side to decode at. Large photos are decoded already shrunk, so 12 MP pictures do not exhaust memory. bmp.origW/origH keep the real size. */
+async function loadBitmap(file, max) {
+  if (max) {
+    try {
+      const d = await imageSize(file);
+      if (d.w && d.h && Math.max(d.w, d.h) > max) {
+        const [w, hh] = fitSize(d.w, d.h, max);
+        const b = await createImageBitmap(file, { resizeWidth: w, resizeHeight: hh, resizeQuality: 'high' });
+        b.origW = d.w; b.origH = d.h; return b;
+      }
+    } catch (e) { /* fall back to a normal decode */ }
+  }
   try { return await createImageBitmap(file); } catch (e) { /* fall through to <img> */ }
   const url = URL.createObjectURL(file);
   try {
@@ -141,28 +189,38 @@ function pickMime() {
 }
 
 /* Turn JPEG blobs into one WebM by replaying them on a canvas that is being recorded. */
-async function framesToWebm(blobs, fps, prog) {
+/* ctl.cancel = true aborts the export (checked every frame). */
+async function framesToWebm(blobs, fps, prog, ctl) {
+  ctl = ctl || {};
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) throw new Error('Video export is not supported on this device.');
   if (!blobs.length) throw new Error('No frames to export.');
   const first = await createImageBitmap(blobs[0]);
   const cv = document.createElement('canvas'); cv.width = first.width & ~1 || 2; cv.height = first.height & ~1 || 2;
   const g = cv.getContext('2d');
   const stream = cv.captureStream(fps), mime = pickMime();
-  const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 4000000 } : undefined);
+  let rec;
+  try { rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 4000000 } : undefined); }
+  catch (e) { first.close(); stream.getTracks().forEach(t => t.stop()); throw e; }
   const chunks = []; rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
   const done = new Promise(r => { rec.onstop = r; });
   const paint = (b) => { g.fillStyle = '#000'; g.fillRect(0, 0, cv.width, cv.height); const k = Math.min(cv.width / b.width, cv.height / b.height); const w = b.width * k, hh = b.height * k; g.drawImage(b, (cv.width - w) / 2, (cv.height - hh) / 2, w, hh); };
-  paint(first); rec.start();
+  let cancelled = false;
   try {
+    paint(first); rec.start();
     for (let i = 0; i < blobs.length; i++) {
-      const b = i ? await createImageBitmap(blobs[i]) : first;
-      paint(b); if (i) b.close();
+      if (ctl.cancel) { cancelled = true; break; }
+      if (i) { const b = await createImageBitmap(blobs[i]); paint(b); b.close(); }
       if (prog) prog(i + 1, blobs.length);
       await sleep(1000 / fps);
     }
-    await sleep(1000 / fps);
-  } finally { if (rec.state !== 'inactive') rec.stop(); }
-  await done; stream.getTracks().forEach(t => t.stop());
+    if (!cancelled) await sleep(1000 / fps);
+  } finally {
+    first.close();
+    if (rec.state !== 'inactive') { try { rec.stop(); } catch (e) { /* ignore */ } }
+  }
+  await Promise.race([done, sleep(5000)]);
+  stream.getTracks().forEach(t => t.stop());
+  if (cancelled || ctl.cancel) throw new Error('Export cancelled.');
   return new Blob(chunks, { type: (mime || 'video/webm').split(';')[0] });
 }
 const videoExt = (blob) => /mp4/.test(blob.type) ? '.mp4' : '.webm';
@@ -181,7 +239,7 @@ function nearestName(r, g, b) {
 }
 
 /* Reusable camera viewport markup. */
-const VIEW = (extra) => '<div class="card" style="padding:0;overflow:hidden;position:relative;line-height:0;min-height:160px"><video id="v" playsinline muted autoplay style="width:100%;display:block;border:0;border-radius:0;transform-origin:center"></video>' + (extra || '') + '</div><div class="muted center" id="msg" style="margin:6px 0;min-height:18px"></div>';
+const VIEW = (extra) => '<div class="card" style="padding:0;overflow:hidden;position:relative;line-height:0;min-height:160px"><video id="v" playsinline muted autoplay style="width:100%;display:block;border:0;border-radius:0;transform-origin:center;touch-action:pan-y"></video>' + (extra || '') + '</div><div class="muted center" id="msg" style="margin:6px 0;min-height:18px"></div>';
 const SLIDER = (id, label, min, max, step, val) => '<label class="f">' + label + ' <span class="muted" id="' + id + 'L"></span><input type="range" id="' + id + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '"></label>';
 
 /* ---------- 1. Magnifier ---------- */
@@ -244,7 +302,7 @@ Tools.register({ id: 'colordetect', name: 'Colour Detector', icon: '🌈', cat: 
 
 /* ---------- 3. Night Mode Cam ---------- */
 Tools.register({ id: 'nightcam', name: 'Night Cam', icon: '🦉', cat: 'camera', desc: 'Brighten dark scenes live with brightness, contrast and gamma boost, with an optional green night-vision tint, and capture a photo.', keys: ['night vision', 'dark', 'low light'], needs: ['camera'], render(el) {
-  el.innerHTML = '<div class="card" style="padding:0;overflow:hidden;line-height:0;min-height:160px"><canvas id="cv" style="display:block;border:0;border-radius:0"></canvas></div><video id="v" playsinline muted style="display:none"></video><div class="muted center" id="msg" style="margin:6px 0;min-height:18px"></div>' +
+  el.innerHTML = '<div class="card" style="padding:0;overflow:hidden;line-height:0;min-height:160px"><canvas id="cv" style="display:block;border:0;border-radius:0;touch-action:pan-y"></canvas></div><video id="v" playsinline muted style="display:none"></video><div class="muted center" id="msg" style="margin:6px 0;min-height:18px"></div>' +
     SLIDER('br', 'Brightness', 1, 4, 0.1, 2) + SLIDER('co', 'Contrast', 0.8, 2.5, 0.05, 1.3) + SLIDER('ga', 'Gamma boost', 1, 3, 0.1, 1.6) +
     '<label class="item" style="gap:10px"><input type="checkbox" id="gr" checked> <span class="grow">Green night-vision tint</span></label>' +
     '<div class="row"><button class="btn alt" id="tc">Torch</button><button class="btn" id="sv">Capture photo</button></div>';
@@ -283,35 +341,66 @@ Tools.register({ id: 'nightcam', name: 'Night Cam', icon: '🦉', cat: 'camera',
 } });
 
 /* ---------- 4. Blank Cam ---------- */
-Tools.register({ id: 'blankcam', name: 'Blank Cam', icon: '⚫', cat: 'camera', desc: 'Record video with the screen showing black so recording is discreet. A large stop button ends the recording and lets you save or share it.', keys: ['spy', 'secret', 'discreet', 'video recorder', 'hidden'], needs: ['camera', 'microphone'], render(el) {
+Tools.register({ id: 'blankcam', name: 'Blank Cam', icon: '⚫', cat: 'camera', desc: 'Record video with the screen showing black so recording is discreet. A large stop button ends the recording (up to 30 minutes) and lets you save or share it. The screen stays awake while recording.', keys: ['spy', 'secret', 'discreet', 'video recorder', 'hidden'], needs: ['camera', 'microphone'], render(el) {
   el.innerHTML = '<div class="card"><b>Record with a black screen</b><div class="muted" style="margin-top:6px">Recording other people without their knowledge or consent may be illegal where you live. Use this only where it is lawful and fair to everyone involved.</div></div>' +
     '<label class="f">Camera<select id="fc"><option value="environment">Rear camera</option><option value="user">Front camera</option></select></label>' +
     '<label class="item" style="gap:10px"><input type="checkbox" id="au" checked> <span class="grow">Record sound</span></label>' +
     '<div class="muted center" id="msg" style="margin:6px 0;min-height:18px"></div><button class="btn" id="go">Start recording</button><div id="res"></div>';
-  let overlay = null, stream = null, rec = null, timer = null, resUrl = null, t0 = 0, stopping = false;
+  const MAX_MS = 30 * 60 * 1000;
+  const wl = wakeLock();
+  let overlay = null, stream = null, rec = null, timer = null, resUrl = null, t0 = 0, stopping = false, starting = false, gone = false;
+  const say = (t) => { const m = $('#msg', el); if (m) m.textContent = t; };
+  const dropStream = (s) => { if (s) s.getTracks().forEach(t => { try { t.stop(); } catch (e) { /* ignore */ } }); };
   function cleanupRec() {
-    clearInterval(timer); if (overlay) overlay.remove(); overlay = null;
-    if (stream) stream.getTracks().forEach(t => t.stop()); stream = null;
+    clearInterval(timer); timer = null; if (overlay) overlay.remove(); overlay = null;
+    dropStream(stream); stream = null; wl.off();
+  }
+  function stopRec() { if (!stopping && rec && rec.state !== 'inactive') { stopping = true; try { rec.stop(); } catch (e) { stopping = false; cleanupRec(); } } }
+  async function openStream(facing, wantAudio) {
+    const video = { facingMode: { ideal: facing } };
+    try { return { s: await navigator.mediaDevices.getUserMedia({ video, audio: wantAudio }), noAudio: false }; }
+    catch (e) {
+      if (!wantAudio) throw e;
+      // The microphone may be the only thing that failed: retry with video only.
+      const s = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+      return { s, noAudio: true, name: e && e.name };
+    }
   }
   async function start() {
-    const msg = $('#msg', el); msg.textContent = '';
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) { msg.textContent = 'Video recording is not supported on this device.'; return; }
-    const wantAudio = $('#au', el).checked;
+    if (starting || rec && rec.state !== 'inactive') return;
+    say('');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) { say('Video recording is not supported on this device.'); return; }
+    starting = true; const go = $('#go', el); if (go) go.disabled = true;
+    let s = null;
     try {
-      try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: $('#fc', el).value } }, audio: wantAudio }); }
-      catch (e) { if (wantAudio && e && e.name !== 'NotAllowedError' && e.name !== 'SecurityError') { msg.textContent = 'No microphone, recording without sound.'; stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: $('#fc', el).value } }, audio: false }); } else throw e; }
-    } catch (e) { msg.textContent = camMsg(e); return; }
-    const mime = pickMime(), chunks = [];
-    try { rec = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined); } catch (e) { msg.textContent = 'Recording is not supported on this device.'; cleanupRec(); return; }
-    rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-    rec.onstop = () => {
-      const blob = new Blob(chunks, { type: (mime || 'video/webm').split(';')[0] }); cleanupRec(); finish(blob);
-    };
-    rec.start(1000); t0 = Date.now(); stopping = false;
-    overlay = h('<div style="position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px"><div id="bt" style="color:#333;font-size:14px">00:00</div><button id="bs" aria-label="Stop recording" style="width:70vw;max-width:300px;height:90px;border-radius:24px;border:2px solid #333;background:#111;color:#666;font-size:20px">Stop</button><div style="color:#2a2a2a;font-size:12px;padding:0 24px;text-align:center">Recording. Tap Stop to finish.</div></div>');
-    document.body.appendChild(overlay);
-    $('#bs', overlay).onclick = () => { if (!stopping && rec && rec.state !== 'inactive') { stopping = true; rec.stop(); } };
-    timer = setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); const b = $('#bt', overlay); if (b) b.textContent = pad(Math.floor(s / 60)) + ':' + pad(s % 60); }, 500);
+      let r;
+      try { r = await openStream($('#fc', el) ? $('#fc', el).value : 'environment', $('#au', el) ? $('#au', el).checked : false); }
+      catch (e) { if (!gone) say(camMsg(e)); return; }
+      s = r.s;
+      if (gone) { dropStream(s); s = null; return; }
+      if (r.noAudio) say(r.name === 'NotAllowedError' || r.name === 'SecurityError' ? 'Microphone permission was denied, recording without sound.' : 'No microphone, recording without sound.');
+      const mime = pickMime(), chunks = [];
+      let mr;
+      try { mr = new MediaRecorder(s, mime ? { mimeType: mime } : undefined); } catch (e) { say('Recording is not supported on this device.'); dropStream(s); s = null; return; }
+      mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      mr.onstop = () => {
+        const blob = new Blob(chunks, { type: (mime || 'video/webm').split(';')[0] }); cleanupRec(); stopping = false; rec = null;
+        if (!blob.size) { if (!gone) say('Nothing was recorded.'); return; }
+        // Left the tool while recording: keep what was captured and hand it to the share sheet.
+        if (gone) { toast('Recording stopped, saving it'); saveBlob(blob, 'blankcam-' + stamp() + videoExt(blob)); return; }
+        finish(blob);
+      };
+      stream = s; rec = mr; s = null; stopping = false;
+      try { mr.start(1000); } catch (e) { say('Could not start recording on this device.'); cleanupRec(); rec = null; return; }
+      t0 = Date.now(); wl.on();
+      overlay = h('<div style="position:fixed;inset:0;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px"><div id="bt" style="color:#333;font-size:14px">00:00</div><button id="bs" aria-label="Stop recording" style="width:70vw;max-width:300px;height:90px;border-radius:24px;border:2px solid #333;background:#111;color:#666;font-size:20px">Stop</button><div style="color:#2a2a2a;font-size:12px;padding:0 24px;text-align:center">Recording. Tap Stop to finish.</div></div>');
+      document.body.appendChild(overlay);
+      $('#bs', overlay).onclick = stopRec;
+      timer = setInterval(() => {
+        const ms = Date.now() - t0, sec = Math.floor(ms / 1000); const b = overlay && $('#bt', overlay); if (b) b.textContent = pad(Math.floor(sec / 60)) + ':' + pad(sec % 60);
+        if (ms >= MAX_MS) { toast('30 minute limit reached, saving'); stopRec(); }
+      }, 500);
+    } finally { starting = false; if (s) dropStream(s); const g2 = $('#go', el); if (g2 && !gone) g2.disabled = false; }
   }
   function finish(blob) {
     if (resUrl) URL.revokeObjectURL(resUrl);
@@ -321,11 +410,18 @@ Tools.register({ id: 'blankcam', name: 'Blank Cam', icon: '⚫', cat: 'camera', 
     $('#sv', res).onclick = () => saveBlob(blob, 'blankcam-' + stamp() + videoExt(blob));
   }
   $('#go', el).onclick = start;
-  return () => { if (rec && rec.state !== 'inactive') { rec.onstop = null; try { rec.stop(); } catch (e) { /* ignore */ } } cleanupRec(); if (resUrl) URL.revokeObjectURL(resUrl); };
+  return () => {
+    gone = true;
+    // If a recording is running, stop it normally so onstop saves the captured data; otherwise just release everything.
+    if (rec && rec.state !== 'inactive') { clearInterval(timer); if (overlay) overlay.remove(); overlay = null; stopRec(); }
+    else cleanupRec();
+    wl.dispose(); if (resUrl) URL.revokeObjectURL(resUrl);
+  };
 } });
 
 /* ---------- 5. Motion Cam (Pro) ---------- */
-Tools.register({ id: 'motioncam', name: 'Motion Cam', icon: '🕵️', cat: 'camera', pro: true, proKey: 'motion', desc: 'Watches the camera for movement. When something moves it beeps, vibrates and saves a snapshot with the time to a log in the app.', keys: ['motion detector', 'security camera', 'intruder', 'surveillance'], needs: ['camera'], render(el) {
+Tools.register({ id: 'motioncam', name: 'Motion Cam', icon: '🕵️', cat: 'camera', pro: true, proKey: 'motion', desc: 'Watches the camera for movement. When something moves it beeps, vibrates and keeps a snapshot with the time in a list for this session only (save the ones you want before leaving). The screen stays awake while watching.', keys: ['motion detector', 'security camera', 'intruder', 'surveillance'], needs: ['camera'], render(el) {
+  if (typeof isPro === 'function' && !isPro()) { el.innerHTML = '<div class="card center"><b>Pro feature</b><div class="muted">This tool is part of PocketKit Pro.</div></div>'; return; }
   el.innerHTML = VIEW('<div id="mot" style="position:absolute;left:8px;top:8px;line-height:1.2;font-size:12px;padding:3px 8px;border-radius:99px;background:rgba(0,0,0,.6);color:#fff">Idle</div>') +
     SLIDER('se', 'Sensitivity (1 low, 10 high)', 1, 10, 1, 5) +
     '<div class="progress" aria-label="Movement level"><i id="lvl" style="width:0"></i></div>' +
@@ -333,7 +429,8 @@ Tools.register({ id: 'motioncam', name: 'Motion Cam', icon: '🕵️', cat: 'cam
     '<div class="row"><button class="btn" id="go">Start watching</button><button class="btn alt" id="cl">Clear log</button></div><div class="list" id="log" style="margin-top:8px"></div>';
   const v = $('#v', el), cam = makeCam(v, $('#msg', el)), W = 64, H = 48;
   const sc = document.createElement('canvas'); sc.width = W; sc.height = H; const g = sc.getContext('2d', { willReadFrequently: true });
-  let running = false, timer = null, prev = null, hits = 0, last = 0, armedAt = 0, log = [];
+  let running = false, timer = null, prev = null, hits = 0, last = 0, armedAt = 0, log = [], gone = false, starting = false;
+  const wl = wakeLock();
   const sens = () => +$('#se', el).value;
   function drawLog() {
     const box = $('#log', el); box.innerHTML = log.length ? '' : '<div class="muted center">No motion logged yet.</div>';
@@ -344,7 +441,7 @@ Tools.register({ id: 'motioncam', name: 'Motion Cam', icon: '🕵️', cat: 'cam
   }
   async function trigger(pct) {
     const cv = grab(v, { max: 640 }); if (!cv) return;
-    const blob = await toBlob(cv, 'image/jpeg', 0.8); if (!blob) return;
+    const blob = await toBlob(cv, 'image/jpeg', 0.8); if (!blob || gone) return;
     const d = new Date();
     log.unshift({ url: URL.createObjectURL(blob), blob, time: d.toLocaleTimeString() + ' ' + d.toLocaleDateString(), pct, file: stamp() });
     while (log.length > 30) URL.revokeObjectURL(log.pop().url);
@@ -364,11 +461,14 @@ Tools.register({ id: 'motioncam', name: 'Motion Cam', icon: '🕵️', cat: 'cam
     }
     prev = cur;
   }
-  function stopWatch() { running = false; clearInterval(timer); $('#go', el).textContent = 'Start watching'; $('#mot', el).textContent = 'Idle'; $('#lvl', el).style.width = '0'; }
+  function stopWatch() { running = false; clearInterval(timer); timer = null; wl.off(); $('#go', el).textContent = 'Start watching'; $('#mot', el).textContent = 'Idle'; $('#lvl', el).style.width = '0'; }
   $('#go', el).onclick = async () => {
     if (running) { stopWatch(); return; }
-    if (!cam.stream && !(await cam.start('environment'))) return;
-    running = true; prev = null; hits = 0; armedAt = Date.now() + 2000;
+    if (starting) return;
+    starting = true;
+    try { if (!cam.stream && !(await cam.start('environment'))) return; } finally { starting = false; }
+    if (gone || running) return;
+    wl.on(); running = true; prev = null; hits = 0; armedAt = Date.now() + 2000;
     $('#go', el).textContent = 'Stop watching'; $('#mot', el).textContent = 'Watching';
     timer = setInterval(check, 200);
   };
@@ -376,11 +476,12 @@ Tools.register({ id: 'motioncam', name: 'Motion Cam', icon: '🕵️', cat: 'cam
   $('#se', el).addEventListener('input', () => { $('#seL', el).textContent = sens(); }); $('#seL', el).textContent = sens();
   drawLog();
   cam.start('environment');
-  return () => { clearInterval(timer); cam.stop(); log.forEach(e => URL.revokeObjectURL(e.url)); };
+  return () => { gone = true; running = false; clearInterval(timer); wl.dispose(); cam.stop(); log.forEach(e => URL.revokeObjectURL(e.url)); };
 } });
 
 /* ---------- 6. Stop Motion (Pro) ---------- */
 Tools.register({ id: 'stopmotion', name: 'Stop Motion', icon: '🎬', cat: 'camera', pro: true, proKey: 'motion', desc: 'Make stop-motion films: capture frames with an onion-skin view of the previous frame, reorder or delete frames, preview at your chosen speed and export a WebM video.', keys: ['animation', 'frames', 'claymation', 'onion skin'], needs: ['camera'], render(el) {
+  if (typeof isPro === 'function' && !isPro()) { el.innerHTML = '<div class="card center"><b>Pro feature</b><div class="muted">This tool is part of PocketKit Pro.</div></div>'; return; }
   el.innerHTML = VIEW('<img id="onion" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;opacity:.4;pointer-events:none;display:none;border:0"><img id="pv" alt="Preview" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000;display:none;border:0">') +
     '<div class="row"><button class="btn" id="cap">Capture frame</button><button class="btn alt" id="play">Play</button></div>' +
     '<label class="f">Playback speed <span class="muted" id="fpL"></span><input type="range" id="fp" min="1" max="24" step="1" value="8"></label>' +
@@ -388,7 +489,7 @@ Tools.register({ id: 'stopmotion', name: 'Stop Motion', icon: '🎬', cat: 'came
     '<div class="row"><button class="btn alt" id="ex">Export WebM video</button><button class="btn danger" id="clr">Delete all</button></div><div class="muted center" id="st" style="margin:6px 0"></div><div class="list" id="fl"></div>';
   const v = $('#v', el), cam = makeCam(v, $('#msg', el));
   let frames = [], playing = null, gone = false, exporting = false;
-  const MAXF = 300;
+  const ctl = { cancel: false }, MAXF = 300;
   const fps = () => +$('#fp', el).value;
   function onion() {
     const o = $('#onion', el), f = frames[frames.length - 1];
@@ -397,7 +498,7 @@ Tools.register({ id: 'stopmotion', name: 'Stop Motion', icon: '🎬', cat: 'came
   function list() {
     const box = $('#fl', el); box.innerHTML = frames.length ? '' : '<div class="muted center">No frames yet. Move your subject a little, then capture again.</div>';
     frames.forEach((f, i) => {
-      const row = h('<div class="item"><img src="' + f.url + '" alt="Frame ' + (i + 1) + '" style="width:64px;height:48px;object-fit:cover;border-radius:8px;border:0"><div class="grow">Frame ' + (i + 1) + '</div><button class="btn alt" data-a="up" aria-label="Move earlier" style="min-width:44px;min-height:44px">◀</button><button class="btn alt" data-a="dn" aria-label="Move later" style="min-width:44px;min-height:44px">▶</button><button class="btn danger" data-a="rm" aria-label="Delete frame" style="min-width:44px;min-height:44px">✕</button></div>');
+      const row = h('<div class="item"><img src="' + f.thumb + '" alt="Frame ' + (i + 1) + '" style="width:64px;height:48px;object-fit:cover;border-radius:8px;border:0"><div class="grow">Frame ' + (i + 1) + '</div><button class="btn alt" data-a="up" aria-label="Move earlier" style="min-width:44px;min-height:44px">◀</button><button class="btn alt" data-a="dn" aria-label="Move later" style="min-width:44px;min-height:44px">▶</button><button class="btn danger" data-a="rm" aria-label="Delete frame" style="min-width:44px;min-height:44px">✕</button></div>');
       $$('button', row).forEach(b => b.onclick = () => {
         const a = b.dataset.a;
         if (a === 'rm') { URL.revokeObjectURL(f.url); frames.splice(i, 1); }
@@ -414,7 +515,9 @@ Tools.register({ id: 'stopmotion', name: 'Stop Motion', icon: '🎬', cat: 'came
     if (frames.length >= MAXF) { toast('Frame limit reached (' + MAXF + ')'); return; }
     const cv = grab(v, { max: 720 }); if (!cv) { toast('Camera is not ready'); return; }
     const blob = await toBlob(cv, 'image/jpeg', 0.85); if (!blob || gone) return;
-    frames.push({ blob, url: URL.createObjectURL(blob) }); list(); onion();
+    const tc = document.createElement('canvas'), k = 96 / Math.max(cv.width, cv.height); tc.width = Math.max(1, Math.round(cv.width * k)); tc.height = Math.max(1, Math.round(cv.height * k));
+    tc.getContext('2d').drawImage(cv, 0, 0, tc.width, tc.height);
+    frames.push({ blob, url: URL.createObjectURL(blob), thumb: tc.toDataURL('image/jpeg', 0.6) }); list(); onion();
   };
   function stopPlay() { clearInterval(playing); playing = null; $('#pv', el).style.display = 'none'; $('#play', el).textContent = 'Play'; onion(); }
   $('#play', el).onclick = () => {
@@ -432,14 +535,14 @@ Tools.register({ id: 'stopmotion', name: 'Stop Motion', icon: '🎬', cat: 'came
     if (frames.length < 2) { toast('Capture at least 2 frames'); return; }
     exporting = true; stopPlay();
     try {
-      const blob = await framesToWebm(frames.map(f => f.blob), fps(), (i, n) => { const s = $('#st', el); if (s) s.textContent = 'Exporting ' + i + ' / ' + n + ' ...'; });
+      const blob = await framesToWebm(frames.map(f => f.blob), fps(), (i, n) => { const s = $('#st', el); if (s) s.textContent = 'Exporting ' + i + ' / ' + n + ' ...'; }, ctl);
       if (!gone) { await saveBlob(blob, 'stopmotion-' + stamp() + videoExt(blob)); list(); }
-    } catch (e) { toast(e.message || 'Export failed'); if (!gone) list(); }
+    } catch (e) { if (!gone) { toast(e.message || 'Export failed'); list(); } }
     exporting = false;
   };
   $('#fpL', el).textContent = fps() + ' fps'; list();
   cam.start('environment');
-  return () => { gone = true; clearInterval(playing); cam.stop(); frames.forEach(f => URL.revokeObjectURL(f.url)); };
+  return () => { gone = true; ctl.cancel = true; clearInterval(playing); cam.stop(); frames.forEach(f => URL.revokeObjectURL(f.url)); };
 } });
 
 /* ---------- 7. Mirror ---------- */
@@ -461,14 +564,16 @@ Tools.register({ id: 'mirror', name: 'Mirror', icon: '🪞', cat: 'camera', desc
 } });
 
 /* ---------- 8. Code Scanner ---------- */
-Tools.register({ id: 'codescan', name: 'Code Scanner', icon: '📷', cat: 'camera', desc: 'Scan QR codes and barcodes with the camera or from a picture. Copy the result, or open it if it is a web link.', keys: ['qr', 'barcode', 'scan', 'reader'], needs: ['camera'], render(el) {
+Tools.register({ id: 'codescan', name: 'Code Scanner', icon: '📷', cat: 'camera', desc: 'Scan QR codes with the camera or from a picture (other barcode types only on devices that support barcode detection). Copy the result, or open it if it is a web link.', keys: ['qr', 'barcode', 'scan', 'reader'], needs: ['camera'], render(el) {
   el.innerHTML = VIEW('<div style="position:absolute;left:15%;right:15%;top:20%;bottom:20%;border:2px solid rgba(255,255,255,.8);border-radius:16px;box-shadow:0 0 0 9999px rgba(0,0,0,.25);pointer-events:none"></div>') +
+    '<div class="muted center" id="qrnote" style="margin-bottom:6px"></div>' +
     '<div class="card" id="res" style="display:none"><div class="muted" id="fmt"></div><div id="txt" style="word-break:break-all;margin:6px 0"></div><div class="row"><button class="btn" id="cp">Copy</button><a class="btn alt" id="op" target="_blank" rel="noopener noreferrer" style="text-align:center;text-decoration:none;display:none">Open link</a></div><button class="btn alt" id="again" style="margin-top:8px">Scan again</button></div>' +
     '<button class="btn alt" id="img">Scan from a picture</button>' +
     '<div class="card"><div class="muted">History</div><div class="list" id="hist"></div><button class="btn alt" id="clr" style="margin-top:8px">Clear history</button></div>';
   const v = $('#v', el), cam = makeCam(v, $('#msg', el)), sc = document.createElement('canvas'), g = sc.getContext('2d', { willReadFrequently: true });
   let bd = null, timer = null, paused = false, busy = false, hist = Store.get('codescan.history', []), gone = false;
   if ('BarcodeDetector' in window) { try { bd = new BarcodeDetector(); } catch (e) { bd = null; } }
+  $('#qrnote', el).textContent = bd ? 'Scans QR codes and common barcodes.' : 'This device can scan QR codes only (barcode scanning is not available here).';
   const isUrl = (t) => /^https?:\/\/\S+$/i.test(t);
   function drawHist() {
     const box = $('#hist', el); box.innerHTML = hist.length ? '' : '<div class="muted center">No scans yet.</div>';
@@ -480,10 +585,10 @@ Tools.register({ id: 'codescan', name: 'Code Scanner', icon: '📷', cat: 'camer
     $('#cp', el).onclick = () => copyText(text);
     if (add) { hist = [{ t: text, f: fmt }].concat(hist.filter(x => x.t !== text)).slice(0, 20); Store.set('codescan.history', hist); drawHist(); }
   }
-  async function decode(source, w, hh) {
-    if (bd) { try { const r = await bd.detect(source); if (r && r.length) return { t: r[0].rawValue, f: r[0].format }; return null; } catch (e) { bd = null; } }
+  async function decode(source, w, hh, maxSide) {
+    if (bd) { try { const r = await bd.detect(source); if (r && r.length) return { t: r[0].rawValue, f: r[0].format }; return null; } catch (e) { bd = null; if (!gone) $('#qrnote', el).textContent = 'This device can scan QR codes only (barcode scanning is not available here).'; } }
     if (typeof jsQR !== 'function') return null;
-    const k = Math.min(1, 640 / Math.max(w, hh)), cw = Math.round(w * k), ch = Math.round(hh * k);
+    const k = Math.min(1, (maxSide || 640) / Math.max(w, hh)), cw = Math.round(w * k), ch = Math.round(hh * k);
     sc.width = cw; sc.height = ch; g.drawImage(source, 0, 0, cw, ch);
     const c = jsQR(g.getImageData(0, 0, cw, ch).data, cw, ch);
     return c && c.data ? { t: c.data, f: 'QR code' } : null;
@@ -496,7 +601,14 @@ Tools.register({ id: 'codescan', name: 'Code Scanner', icon: '📷', cat: 'camer
   }
   $('#again', el).onclick = () => { $('#res', el).style.display = 'none'; paused = false; };
   $('#img', el).onclick = () => pickFiles(false, async (f) => {
-    try { const b = await loadBitmap(f[0]); const r = await decode(b._img || b, b.width, b.height); if (r && r.t) { paused = true; showRes(r.t, r.f, true); } else toast('No code found in that picture'); } catch (e) { toast('Could not read that picture'); }
+    try {
+      const b = await loadBitmap(f[0], 2400); let r = null;
+      // Small codes need a large scale, big or blurry ones a small one: try several.
+      for (const m of [1600, 1000, 640, 400]) { r = await decode(b._img || b, b.width, b.height, m); if (r || gone) break; await sleep(0); }
+      if (b.close) b.close();
+      if (gone) return;
+      if (r && r.t) { paused = true; showRes(r.t, r.f, true); } else toast('No code found in that picture');
+    } catch (e) { if (!gone) toast('Could not read that picture'); }
   });
   $('#clr', el).onclick = () => { hist = []; Store.set('codescan.history', hist); drawHist(); };
   drawHist();
@@ -512,12 +624,13 @@ function quadMap(p) {
   const den = dx1 * dy2 - dx2 * dy1;
   const gg = den ? (dx3 * dy2 - dx2 * dy3) / den : 0, hh = den ? (dx1 * dy3 - dx3 * dy1) / den : 0;
   const a = x1 - x0 + gg * x1, b = x3 - x0 + hh * x3, d = y1 - y0 + gg * y1, e = y3 - y0 + hh * y3;
-  return (u, v) => { const w = gg * u + hh * v + 1; return [(a * u + b * v + x0) / w, (d * u + e * v + y0) / w]; };
+  // Pass an array as the third argument to reuse it instead of allocating one per call.
+  return (u, v, res) => { const w = gg * u + hh * v + 1, px = (a * u + b * v + x0) / w, py = (d * u + e * v + y0) / w; if (res) { res[0] = px; res[1] = py; return res; } return [px, py]; };
 }
 function warpImage(src, sw, sh, quad, ow, oh) {
-  const out = new ImageData(ow, oh), map = quadMap(quad), s = src.data, o = out.data;
+  const out = new ImageData(ow, oh), map = quadMap(quad), s = src.data, o = out.data, pt = [0, 0];
   for (let y = 0; y < oh; y++) for (let x = 0; x < ow; x++) {
-    const [fx, fy] = map(x / (ow - 1 || 1), y / (oh - 1 || 1));
+    map(x / (ow - 1 || 1), y / (oh - 1 || 1), pt); const fx = pt[0], fy = pt[1];
     const x0 = clamp(Math.floor(fx), 0, sw - 1), y0 = clamp(Math.floor(fy), 0, sh - 1), x1 = Math.min(sw - 1, x0 + 1), y1 = Math.min(sh - 1, y0 + 1);
     const tx = clamp(fx - x0, 0, 1), ty = clamp(fy - y0, 0, 1), oi = (y * ow + x) * 4;
     for (let c = 0; c < 4; c++) {
@@ -561,7 +674,7 @@ const HANDLE = (id) => '<div id="' + id + '" style="position:absolute;width:32px
 
 Tools.register({ id: 'docscan', name: 'Doc Scanner', icon: '📄', cat: 'camera', desc: 'Photograph or pick a page, drag the four corners to straighten it, choose colour, grey or black-and-white, and save it as an image.', keys: ['document', 'scan', 'paper', 'receipt', 'crop', 'perspective'], needs: ['camera', 'storage'], render(el) {
   el.innerHTML = '<div class="row"><button class="btn" id="take">Take photo</button><button class="btn alt" id="pick">Pick image</button></div><div class="muted center" id="msg" style="margin:6px 0">Take a photo of a page on a plain background.</div>' +
-    '<div id="ed" style="display:none"><div id="wrap" style="position:relative;line-height:0;touch-action:none;user-select:none"><canvas id="cv" style="display:block"></canvas><svg id="sv" viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"><polygon id="pg" fill="rgba(80,140,255,.2)" stroke="#4a8cff" stroke-width=".6" vector-effect="non-scaling-stroke"/></svg>' + HANDLE('h0') + HANDLE('h1') + HANDLE('h2') + HANDLE('h3') + '</div>' +
+    '<div id="ed" style="display:none"><div id="wrap" style="position:relative;line-height:0;touch-action:pan-y;user-select:none"><canvas id="cv" style="display:block"></canvas><svg id="sv" viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"><polygon id="pg" fill="rgba(80,140,255,.2)" stroke="#4a8cff" stroke-width=".6" vector-effect="non-scaling-stroke"/></svg>' + HANDLE('h0') + HANDLE('h1') + HANDLE('h2') + HANDLE('h3') + '</div>' +
     '<button class="btn" id="cut" style="margin-top:8px">Straighten and crop</button></div>' +
     '<div id="out" style="display:none"><canvas id="oc" style="display:block"></canvas><label class="f">Look<select id="lk"><option value="c">Colour</option><option value="g">Grey</option><option value="b" selected>Black and white</option></select></label><div class="row"><button class="btn alt" id="rot">Rotate</button><button class="btn alt" id="ed2">Adjust corners</button></div><div class="row"><button class="btn" id="sj">Save as JPEG</button><button class="btn alt" id="sp">Save as PNG</button></div></div>';
   let bmp = null, base = null, pts = [{ x: .08, y: .08 }, { x: .92, y: .08 }, { x: .92, y: .92 }, { x: .08, y: .92 }], rawOut = null;
@@ -569,7 +682,8 @@ Tools.register({ id: 'docscan', name: 'Doc Scanner', icon: '📄', cat: 'camera'
   function poly() { $('#pg', el).setAttribute('points', pts.map(p => (p.x * 100) + ',' + (p.y * 100)).join(' ')); }
   const places = pts.map((p, i) => dragPoint($('#wrap', el), $('#h' + i, el), p, poly));
   function load(files) {
-    loadBitmap(files[0]).then(b => {
+    loadBitmap(files[0], 3000).then(b => {
+      if (bmp && bmp.close) bmp.close();
       bmp = b; const [w, hh] = fitSize(b.width, b.height, 1600); base = document.createElement('canvas'); base.width = w; base.height = hh; drawSrc(base.getContext('2d'), b, 0, 0, w, hh);
       const [dw, dh] = fitSize(w, hh, 900); cv.width = dw; cv.height = dh; cv.style.width = '100%'; cv.getContext('2d').drawImage(base, 0, 0, dw, dh);
       [[.08, .08], [.92, .08], [.92, .92], [.08, .92]].forEach((c, i) => { pts[i].x = c[0]; pts[i].y = c[1]; places[i](); }); poly();
@@ -577,10 +691,16 @@ Tools.register({ id: 'docscan', name: 'Doc Scanner', icon: '📄', cat: 'camera'
     }).catch(() => { $('#msg', el).textContent = 'Could not open that image.'; });
   }
   const dist = (a, b) => Math.hypot((a.x - b.x) * base.width, (a.y - b.y) * base.height);
-  function cut() {
-    if (!base) return;
+  let working = false, gone = false;
+  async function cut() {
+    if (!base || working) return;
+    working = true; $('#msg', el).textContent = 'Processing...'; $('#cut', el).disabled = true;
+    await sleep(40); // let the browser paint the message before the heavy loop
+    try { if (!gone) cutNow(); } finally { working = false; const c = $('#cut', el); if (c) c.disabled = false; if (!gone) $('#msg', el).textContent = ''; }
+  }
+  function cutNow() {
     const ow = Math.max(8, Math.round(Math.max(dist(pts[0], pts[1]), dist(pts[3], pts[2])))), oh = Math.max(8, Math.round(Math.max(dist(pts[0], pts[3]), dist(pts[1], pts[2]))));
-    const k = Math.min(1, 1600 / Math.max(ow, oh)), W = Math.max(8, Math.round(ow * k)), H = Math.max(8, Math.round(oh * k));
+    const k = Math.min(1, 1200 / Math.max(ow, oh)), W = Math.max(8, Math.round(ow * k)), H = Math.max(8, Math.round(oh * k));
     const src = base.getContext('2d').getImageData(0, 0, base.width, base.height);
     const q = pts.map(p => ({ x: p.x * (base.width - 1), y: p.y * (base.height - 1) }));
     rawOut = warpImage(src, base.width, base.height, q, W, H); look();
@@ -603,7 +723,7 @@ Tools.register({ id: 'docscan', name: 'Doc Scanner', icon: '📄', cat: 'camera'
   };
   $('#sj', el).onclick = () => saveCanvas(oc, 'scan', 'image/jpeg', 0.9);
   $('#sp', el).onclick = () => saveCanvas(oc, 'scan', 'image/png');
-  return () => { if (bmp && bmp.close) bmp.close(); };
+  return () => { gone = true; if (bmp && bmp.close) bmp.close(); };
 } });
 
 /* ---------- 10. Grid Cam (grid + horizon level) ---------- */
@@ -673,36 +793,36 @@ Tools.register({ id: 'timercam', name: 'Timer Cam', icon: '⏲️', cat: 'camera
 } });
 
 /* ---------- 12. Time-lapse ---------- */
-Tools.register({ id: 'timelapse', name: 'Time-lapse', icon: '🎥', cat: 'camera', desc: 'Capture a frame every few seconds with the camera and turn them into a time-lapse WebM video. Keep the app open and the phone steady.', keys: ['interval', 'timelapse', 'video'], needs: ['camera'], render(el) {
+Tools.register({ id: 'timelapse', name: 'Time-lapse', icon: '🎥', cat: 'camera', desc: 'Capture a frame every few seconds with the camera and turn them into a time-lapse WebM video. Keep the app open and the phone steady; the screen stays awake while capturing.', keys: ['interval', 'timelapse', 'video'], needs: ['camera'], render(el) {
   el.innerHTML = VIEW() + '<div class="row"><label class="f">Every<select id="iv"><option value="1">1 s</option><option value="2">2 s</option><option value="5" selected>5 s</option><option value="10">10 s</option><option value="30">30 s</option><option value="60">60 s</option></select></label><label class="f">Video speed<select id="fp"><option value="8">8 fps</option><option value="12" selected>12 fps</option><option value="24">24 fps</option></select></label></div>' +
     '<div class="row"><button class="btn" id="go">Start capturing</button><button class="btn alt" id="mk">Make video</button></div><div class="muted center" id="st" style="margin:6px 0">0 frames</div><button class="btn danger" id="clr">Discard frames</button><div id="res"></div>';
-  const v = $('#v', el), cam = makeCam(v, $('#msg', el)), MAXF = 600; let blobs = [], timer = null, gone = false, making = false, resUrl = null;
+  const v = $('#v', el), cam = makeCam(v, $('#msg', el)), MAXF = 600, wl = wakeLock(), ctl = { cancel: false }; let blobs = [], timer = null, gone = false, making = false, resUrl = null;
   const upd = () => { const s = $('#st', el); if (s && !making) s.textContent = blobs.length + ' frames' + (timer ? ', capturing' : ''); };
   async function snap() {
     if (blobs.length >= MAXF) { stop(); toast('Frame limit reached'); return; }
     const cv = grab(v, { max: 720 }); if (!cv) return; const b = await toBlob(cv, 'image/jpeg', 0.8); if (b && !gone) { blobs.push(b); upd(); }
   }
-  function stop() { clearInterval(timer); timer = null; const g = $('#go', el); if (g) g.textContent = 'Start capturing'; upd(); }
+  function stop() { clearInterval(timer); timer = null; wl.off(); const g = $('#go', el); if (g) g.textContent = 'Start capturing'; upd(); }
   $('#go', el).onclick = () => {
     if (timer) { stop(); return; }
     if (!v.videoWidth) { toast('Camera is not ready'); return; }
-    snap(); timer = setInterval(snap, +$('#iv', el).value * 1000); $('#go', el).textContent = 'Stop capturing'; upd();
+    wl.on(); snap(); timer = setInterval(snap, +$('#iv', el).value * 1000); $('#go', el).textContent = 'Stop capturing'; upd();
   };
   $('#clr', el).onclick = () => { stop(); blobs = []; upd(); };
   $('#mk', el).onclick = async () => {
     if (making) return; if (blobs.length < 2) { toast('Capture at least 2 frames'); return; } stop(); making = true;
     try {
-      const blob = await framesToWebm(blobs, +$('#fp', el).value, (i, n) => { const s = $('#st', el); if (s) s.textContent = 'Building video ' + i + ' / ' + n + ' ...'; });
+      const blob = await framesToWebm(blobs, +$('#fp', el).value, (i, n) => { const s = $('#st', el); if (s) s.textContent = 'Building video ' + i + ' / ' + n + ' ...'; }, ctl);
       if (!gone) {
         if (resUrl) URL.revokeObjectURL(resUrl); resUrl = URL.createObjectURL(blob);
         $('#res', el).innerHTML = '<div class="card"><video controls playsinline src="' + resUrl + '"></video><div class="muted">' + kb(blob.size) + '</div></div><button class="btn" id="sv">Save / share video</button>';
         $('#sv', el).onclick = () => saveBlob(blob, 'timelapse-' + stamp() + videoExt(blob));
       }
-    } catch (e) { toast(e.message || 'Could not make the video'); }
+    } catch (e) { if (!gone) toast(e.message || 'Could not make the video'); }
     making = false; if (!gone) upd();
   };
   cam.start('environment');
-  return () => { gone = true; clearInterval(timer); cam.stop(); if (resUrl) URL.revokeObjectURL(resUrl); };
+  return () => { gone = true; ctl.cancel = true; clearInterval(timer); wl.dispose(); cam.stop(); if (resUrl) URL.revokeObjectURL(resUrl); };
 } });
 /* ---------- picture tools (pick images from the phone) ---------- */
 const EXT = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
@@ -728,7 +848,7 @@ function batchTool(el, opts) {
     for (let i = 0; i < files.length && !gone; i++) {
       const f = files[i]; $('#st', el).textContent = 'Working ' + (i + 1) + ' / ' + files.length + ' ...';
       try {
-        const bmp = await loadBitmap(f), r = await opts.process(bmp, f); if (bmp.close) bmp.close();
+        const bmp = await loadBitmap(f, opts.max), r = await opts.process(bmp, f); if (bmp.close) bmp.close();
         if (!r.blob) throw new Error('encode failed');
         outs.push(r);
         const row = h('<div class="item"><div class="grow" style="min-width:0"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.name) + '</div><div class="muted">' + esc(r.info) + '</div></div><button class="btn" style="min-height:44px">Save</button></div>');
@@ -760,7 +880,7 @@ Tools.register({ id: 'collage', name: 'Collage', icon: '🏞️', cat: 'camera',
   }
   $('#pk', el).onclick = () => pickFiles(true, async (f) => {
     $('#st', el).textContent = 'Loading ...'; bmps.forEach(b => b.close && b.close()); bmps = [];
-    for (const x of f.slice(0, 9)) { try { bmps.push(await loadBitmap(x)); } catch (e) { /* skip unreadable file */ } }
+    for (const x of f.slice(0, 9)) { try { const b = await loadBitmap(x, 1400); if (gone) { if (b.close) b.close(); return; } bmps.push(b); } catch (e) { /* skip unreadable file */ } }
     if (gone) return; $('#st', el).textContent = bmps.length ? bmps.length + ' pictures. Pictures repeat if the layout has more cells.' : 'None of those files could be read.'; draw();
   });
   ['ly', 'gp', 'bg'].forEach(id => $('#' + id, el).addEventListener('input', () => { if (id === 'gp') $('#gpL', el).textContent = $('#gp', el).value + ' px'; draw(); }));
@@ -812,7 +932,7 @@ Tools.register({ id: 'photofx', name: 'Photo FX', icon: '🖼️', cat: 'camera'
     const dw = rot % 2 ? hh : w, dh = rot % 2 ? w : hh; drawSrc(g, bmp, -dw / 2, -dh / 2, dw, dh);
   }
   const draw = () => { if (bmp) { cv.style.display = ''; render(cv, 900); } };
-  $('#pk', el).onclick = () => pickFiles(false, async (f) => { try { if (bmp && bmp.close) bmp.close(); bmp = await loadBitmap(f[0]); rot = 0; flip = false; draw(); $('#st', el).textContent = bmp.width + ' x ' + bmp.height; } catch (e) { toast('Could not open that picture'); } });
+  $('#pk', el).onclick = () => pickFiles(false, async (f) => { try { if (bmp && bmp.close) bmp.close(); bmp = await loadBitmap(f[0], 3000); rot = 0; flip = false; draw(); $('#st', el).textContent = (bmp.origW || bmp.width) + ' x ' + (bmp.origH || bmp.height) + (bmp.origW ? ' (editing a copy shrunk to ' + bmp.width + ' x ' + bmp.height + ')' : ''); } catch (e) { toast('Could not open that picture'); } });
   ['lk', 'br', 'co', 'sa'].forEach(id => $('#' + id, el).addEventListener('input', () => { if ($('#' + id + 'L', el)) $('#' + id + 'L', el).textContent = val(id); draw(); }));
   $('#rt', el).onclick = () => { rot = (rot + 1) % 4; draw(); }; $('#fl', el).onclick = () => { flip = !flip; draw(); };
   $('#rs', el).onclick = () => { $('#lk', el).value = 'none'; $('#br', el).value = $('#co', el).value = $('#sa', el).value = 1; ['br', 'co', 'sa'].forEach(i => { $('#' + i + 'L', el).textContent = '1'; }); rot = 0; flip = false; draw(); };
@@ -845,9 +965,9 @@ function exifInfo(buf) {
   }
   return { jpeg: true, exif: false, gps: false };
 }
-Tools.register({ id: 'exifclean', name: 'Photo Cleaner', icon: '🧼', cat: 'camera', desc: 'Remove hidden data such as location, camera model and time from photos before you share them. Pictures are re-encoded at full size without metadata.', keys: ['exif', 'metadata', 'privacy', 'gps', 'location', 'strip'], needs: ['storage'], render(el) {
-  const controls = '<div class="muted" style="margin:6px 0">Each picture is redrawn and saved fresh, so location, camera details and timestamps are left behind. The picture itself is not resized.</div>';
-  const stop = batchTool(el, { controls, run: 'Clean pictures', async process(bmp, f) {
+Tools.register({ id: 'exifclean', name: 'Photo Cleaner', icon: '🧼', cat: 'camera', desc: 'Remove hidden data such as location, camera model and time from photos before you share them. Pictures are re-encoded without metadata; anything larger than 4096 px on its longest side is scaled down to 4096 px.', keys: ['exif', 'metadata', 'privacy', 'gps', 'location', 'strip'], needs: ['storage'], render(el) {
+  const controls = '<div class="muted" style="margin:6px 0">Each picture is redrawn and saved fresh, so location, camera details and timestamps are left behind. Pictures keep their size, except that very large ones (over 4096 px on the longest side) are scaled down to 4096 px to avoid running out of memory.</div>';
+  const stop = batchTool(el, { controls, run: 'Clean pictures', max: 4096, async process(bmp, f) {
     let note = 'No metadata found'; try { const e = exifInfo(await f.arrayBuffer()); if (e.exif) note = e.gps ? 'Removed metadata including location' : 'Removed metadata'; else if (!e.jpeg) note = 'Re-encoded without metadata'; } catch (e) { /* unreadable header */ }
     const type = f.type === 'image/png' ? 'image/png' : f.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
     const blob = await encodeImage(bmp, { type, q: 0.95 });
@@ -902,7 +1022,7 @@ Tools.register({ id: 'eyedrop', name: 'Eye Dropper', icon: '🖍️', cat: 'came
 /* ---------- 19. Pixel Ruler ---------- */
 Tools.register({ id: 'pixelruler', name: 'Pixel Ruler', icon: '🎚️', cat: 'camera', desc: 'Take or pick a photo, drag two points over it to measure the distance in pixels, and calibrate with an object of known length to read real units.', keys: ['measure', 'distance', 'photo ruler', 'size of object', 'calibrate'], needs: ['camera', 'storage'], render(el) {
   el.innerHTML = '<div class="row"><button class="btn" id="take">Take photo</button><button class="btn alt" id="pick">Pick picture</button></div>' +
-    '<div id="wrap" style="position:relative;line-height:0;margin-top:8px;display:none;touch-action:none;user-select:none"><img id="im" alt="Photo to measure" style="display:block;width:100%;border:0"><svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"><line id="ln" stroke="#ffd400" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>' + HANDLE('a') + HANDLE('b') + '</div>' +
+    '<div id="wrap" style="position:relative;line-height:0;margin-top:8px;display:none;touch-action:pan-y;user-select:none"><img id="im" alt="Photo to measure" style="display:block;width:100%;border:0"><svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"><line id="ln" stroke="#ffd400" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>' + HANDLE('a') + HANDLE('b') + '</div>' +
     '<div class="card center"><div class="big" id="out">-</div><div class="muted" id="px">Pick a photo, then drag the two circles.</div></div>' +
     '<div class="card"><b>Calibrate</b><div class="muted">Place the two points on an object whose length you know (a coin, a ruler, a card) and enter it. All later measurements use that scale.</div><div class="row" style="margin-top:8px"><label class="f">Known length<input id="kl" type="number" inputmode="decimal" min="0" step="any" placeholder="e.g. 85.6"></label><label class="f">Unit<input id="ku" maxlength="6" value="mm"></label></div><div class="row"><button class="btn" id="cal">Set scale</button><button class="btn alt" id="rs">Clear scale</button></div></div>';
   const A = { x: .3, y: .5 }, B = { x: .7, y: .5 }; let url = null, nat = null, scale = null;

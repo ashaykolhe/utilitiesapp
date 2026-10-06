@@ -48,6 +48,16 @@ function logSliderInv(f, lo, hi) { return Math.round(1000 * Math.log(f / lo) / M
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, isNaN(v) ? a : v));
 const setText = (el, sel, t) => { const n = $(sel, el); if (n) n.textContent = t; };
+/* close() on an already closed AudioContext rejects, so guard it and swallow the rejection. */
+const closeCtx = (c) => { try { if (c && c.state !== 'closed') { const p = c.close(); if (p && p.catch) p.catch(() => {}); } } catch (e) { /* ignore */ } };
+const stopStream = (s) => { if (s) s.getTracks().forEach(t => { try { t.stop(); } catch (e) { /* ignore */ } }); };
+/* Safety limiter for generated tones: a compressor in front of the speakers. */
+function limiter(ctx) { const c = ctx.createDynamicsCompressor(); c.threshold.value = -18; c.knee.value = 6; c.ratio.value = 12; c.attack.value = 0.003; c.release.value = 0.1; c.connect(ctx.destination); return c; }
+/* Fade a tone to silence, then run the real cleanup, so leaving the tool does not click. */
+function fadeLeave(L, ctx, g) {
+  if (ctx && g && ctx.state !== 'closed') { try { g.gain.cancelScheduledValues(ctx.currentTime); g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.015); } catch (e) { /* ignore */ } setTimeout(() => L.stop(), 90); }
+  else L.stop();
+}
 
 /* Lifecycle helper: tracks contexts, streams, timers so one stop() cleans everything. */
 function life() {
@@ -61,14 +71,15 @@ function life() {
         o.streams.push(s); return s;
       });
     },
+    drop(s) { stopStream(s); o.streams = o.streams.filter(x => x !== s); },
     on(fn) { o.fns.push(fn); },
     raf(fn) { let id; const loop = () => { if (!o.alive) return; try { fn(); } catch (e) { } id = requestAnimationFrame(loop); }; loop(); o.fns.push(() => cancelAnimationFrame(id)); },
     every(fn, ms) { const id = setInterval(fn, ms); o.fns.push(() => clearInterval(id)); return id; },
     stop() {
       o.alive = false;
       o.fns.forEach(f => { try { f(); } catch (e) { } });
-      o.streams.forEach(s => s.getTracks().forEach(t => t.stop()));
-      o.ctxs.forEach(c => { try { c.close(); } catch (e) { } });
+      o.streams.forEach(stopStream);
+      o.ctxs.forEach(closeCtx);
     }
   };
   return o;
@@ -78,31 +89,50 @@ function micFail(el, e, sel) {
   const m = $(sel || '#msg', el); if (!m) return;
   m.textContent = (e && e.name === 'NotAllowedError') ? 'Microphone permission was denied. Allow it in the app settings.' : 'Microphone is not available on this device.';
 }
-function noiseBuf(ctx, type, secs) {
-  const n = Math.floor(ctx.sampleRate * secs), b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+/* loop: true crossfades the end of the buffer into its start (0.3 s, equal power) so a looped source has no click at the seam. */
+function noiseBuf(ctx, type, secs, loop) {
+  const n = Math.floor(ctx.sampleRate * secs), X = loop ? Math.min(Math.floor(ctx.sampleRate * 0.3), n >> 1) : 0, tot = n + X;
+  const b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0), raw = X ? new Float32Array(tot) : d;
   let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0, last = 0;
-  for (let i = 0; i < n; i++) {
+  for (let i = 0; i < tot; i++) {
     const w = Math.random() * 2 - 1;
     if (type === 'pink') {
       b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
       b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
-      d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926;
-    } else if (type === 'brown') { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
-    else d[i] = w;
+      raw[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926;
+    } else if (type === 'brown') { last = (last + 0.02 * w) / 1.02; raw[i] = last * 3.5; }
+    else raw[i] = w;
+  }
+  if (X) {
+    // The extra X samples after the end are the natural continuation; fade them in over the start.
+    for (let i = 0; i < n; i++) d[i] = raw[i];
+    for (let i = 0; i < X; i++) { const a = (i + 0.5) / X * Math.PI / 2; d[i] = raw[i] * Math.sin(a) + raw[n + i] * Math.cos(a); }
   }
   return b;
 }
 function blobToB64(blob) {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
 }
+const CHUNK = 3 * 1024 * 1024; // multiple of 3 so each base64 piece joins cleanly
 async function saveBlob(blob, name) {
-  try {
-    const P = window.Capacitor && Capacitor.Plugins;
-    if (P && P.Filesystem && P.Share) {
-      const r = await P.Filesystem.writeFile({ path: name, data: await blobToB64(blob), directory: 'CACHE' });
-      await P.Share.share({ title: name, url: r.uri }); return;
+  const P = window.Capacitor && Capacitor.Plugins;
+  if (P && P.Filesystem && P.Share) {
+    let uri = null;
+    try {
+      // Write in pieces so a long recording is never held as one huge base64 string.
+      for (let off = 0; off === 0 || off < blob.size; off += CHUNK) {
+        const data = await blobToB64(blob.slice(off, off + CHUNK));
+        if (off === 0) uri = (await P.Filesystem.writeFile({ path: name, data, directory: 'CACHE' })).uri;
+        else await P.Filesystem.appendFile({ path: name, data, directory: 'CACHE' });
+      }
+    } catch (e) { uri = null; }
+    if (uri) {
+      try { await P.Share.share({ title: name, url: uri }); } catch (e) { /* sheet closed or cancelled */ }
+      // Delete the cache copy later so the receiving app has time to read it.
+      setTimeout(() => { try { P.Filesystem.deleteFile({ path: name, directory: 'CACHE' }).catch(() => {}); } catch (e) { /* ignore */ } }, 60000);
+      return;
     }
-  } catch (e) { if (e && /cancel/i.test(String(e.message || e))) return; }
+  }
   try {
     const f = new File([blob], name, { type: blob.type });
     if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f] }); return; }
@@ -181,7 +211,7 @@ Tools.register({ id: 'metronome', name: 'Metronome', icon: '🕰️', cat: 'audi
   }
   function stop() {
     playing = false; clearInterval(timer); timer = null; queue = [];
-    if (ctx) { try { ctx.close(); } catch (e) { } ctx = null; }
+    if (ctx) { closeCtx(ctx); ctx = null; }
     $('#go', el).textContent = 'Start'; drawDots();
   }
   L.on(() => clearInterval(timer));
@@ -232,21 +262,26 @@ Tools.register({ id: 'tonegen', name: 'Tone Generator', icon: '〰️', cat: 'au
   sl.oninput = () => { const f = Math.round(logSlider(+sl.value, 20, 20000)); num.value = f; t0 = performance.now(); show(f); };
   num.onchange = () => { num.value = clamp(+num.value, 20, 20000); t0 = performance.now(); show(+num.value); };
   $('#wf', el).onchange = e => { if (osc) osc.type = e.target.value; };
-  const level = v => Math.pow(v / 100, 2) * 0.9;
+  // Level is capped at 0.5 amplitude and passes through a compressor, so even 100% cannot be painfully loud.
+  const level = v => Math.pow(v / 100, 2) * 0.5;
+  const loudHigh = () => +$('#vol', el).value > 70 && Math.max(freq, $('#sw', el).checked ? clamp(+$('#to', el).value, 20, 20000) : 0) > 1000;
+  const sure = () => confirm('The volume is high for a high-pitched tone, which can hurt your ears and damage speakers or headphones. Play anyway?');
   $('#vol', el).oninput = e => {
     const v = +e.target.value; $('#vv', el).textContent = v + (v > 70 ? ' (loud!)' : '');
-    if (gain) gain.gain.setTargetAtTime(level(v), ctx.currentTime, 0.02);
+    if (v > 70 && playing && loudHigh() && !sure()) { e.target.value = 70; $('#vv', el).textContent = '70'; }
+    if (gain) gain.gain.setTargetAtTime(level(+e.target.value), ctx.currentTime, 0.02);
   };
   function start() {
+    if (loudHigh() && !sure()) return;
     ctx = L.ctx(); osc = ctx.createOscillator(); gain = ctx.createGain();
     osc.type = $('#wf', el).value; osc.frequency.value = freq; gain.gain.value = 0.0001;
-    osc.connect(gain); gain.connect(ctx.destination); osc.start();
+    osc.connect(gain); gain.connect(limiter(ctx)); osc.start();
     gain.gain.setTargetAtTime(level(+$('#vol', el).value), ctx.currentTime, 0.03);
     playing = true; t0 = performance.now(); $('#go', el).textContent = 'Stop';
   }
   function stop() {
     playing = false; const c = ctx, o = osc;
-    if (c) { gain.gain.setTargetAtTime(0.0001, c.currentTime, 0.02); setTimeout(() => { try { o.stop(); c.close(); } catch (e) { } }, 120); }
+    if (c) { gain.gain.setTargetAtTime(0.0001, c.currentTime, 0.02); setTimeout(() => { try { o.stop(); } catch (e) { } closeCtx(c); }, 120); }
     osc = null; ctx = null; $('#go', el).textContent = 'Play';
   }
   $('#go', el).onclick = () => playing ? stop() : start();
@@ -258,7 +293,7 @@ Tools.register({ id: 'tonegen', name: 'Tone Generator', icon: '〰️', cat: 'au
     osc.frequency.value = f; show(f, true);
   });
   show(440);
-  return () => { playing = false; L.stop(); };
+  return () => { playing = false; fadeLeave(L, ctx, gain); };
 } });
 
 /* ---------------------------------------------------------------- Tuner */
@@ -268,7 +303,7 @@ Tools.register({ id: 'tuner', name: 'Tuner', icon: '🎸', cat: 'audio', desc: '
     chromatic: ['Chromatic (any note)', []], guitar: ['Guitar (E A D G B E)', [40, 45, 50, 55, 59, 64]],
     ukulele: ['Ukulele (G C E A)', [67, 60, 64, 69]], bass: ['Bass (E A D G)', [28, 33, 38, 43]], violin: ['Violin (G D A E)', [55, 62, 69, 76]]
   };
-  let ctx = null, an = null, buf = null, frame = 0, miss = 0, hist = [], inst = Store.get('tuner.inst', 'chromatic'), locked = -1, running = false;
+  let ctx = null, an = null, buf = null, frame = 0, miss = 0, hist = [], inst = Store.get('tuner.inst', 'chromatic'), locked = -1, running = false, pending = false;
   if (!INST[inst]) inst = 'chromatic';
   el.innerHTML = `<div class="card center"><div class="big" id="note">--</div><div class="muted" id="hz">Press Start and play a note</div>
     <div style="position:relative;height:54px;margin:12px 4px;background:var(--surface2);border-radius:10px;border:1px solid var(--line)" aria-hidden="true">
@@ -318,15 +353,18 @@ Tools.register({ id: 'tuner', name: 'Tuner', icon: '🎸', cat: 'audio', desc: '
   });
   $('#go', el).onclick = () => {
     if (running) {
-      running = false; if (ctx) { try { ctx.close(); } catch (e) { } }
-      L.streams.forEach(s => s.getTracks().forEach(t => t.stop())); L.streams = []; ctx = null; an = null;
+      running = false; closeCtx(ctx);
+      L.streams.forEach(stopStream); L.streams = []; ctx = null; an = null;
       $('#go', el).textContent = 'Start tuner'; idle(); return;
     }
-    setText(el, '#msg', '');
+    if (pending) return;
+    pending = true; setText(el, '#msg', '');
     L.mic().then(s => {
-      ctx = L.ctx(); an = ctx.createAnalyser(); an.fftSize = 4096; ctx.createMediaStreamSource(s).connect(an);
-      buf = new Float32Array(an.fftSize); running = true; $('#go', el).textContent = 'Stop'; idle();
-    }).catch(e => micFail(el, e));
+      try {
+        ctx = L.ctx(); an = ctx.createAnalyser(); an.fftSize = 4096; ctx.createMediaStreamSource(s).connect(an);
+        buf = new Float32Array(an.fftSize); running = true; $('#go', el).textContent = 'Stop'; idle();
+      } catch (e) { L.drop(s); closeCtx(ctx); ctx = an = null; throw e; }
+    }).catch(e => micFail(el, e)).then(() => { pending = false; });
   };
   drawStrings(-1);
   return () => { running = false; L.stop(); };
@@ -335,7 +373,7 @@ Tools.register({ id: 'tuner', name: 'Tuner', icon: '🎸', cat: 'audio', desc: '
 /* ---------------------------------------------------------------- Mike */
 Tools.register({ id: 'mike', name: 'Mike', icon: '📣', cat: 'audio', desc: 'Use the microphone as a loudspeaker: your voice from the mic to the phone speaker or headphones with a gain control.', keys: ['microphone', 'loudspeaker', 'amplifier', 'megaphone', 'karaoke'], needs: ['microphone'], render(el) {
   const L = life();
-  let ctx = null, g = null, an = null, on = false, stream = null;
+  let ctx = null, g = null, an = null, on = false, pending = false;
   el.innerHTML = `<div class="card" style="border-color:var(--danger)"><b>Feedback warning</b><div class="muted" style="font-size:13px;margin-top:4px">If the speaker is near the microphone you will hear a loud screech. Use wired or Bluetooth headphones, or keep the volume low. A limiter is on, but it cannot remove feedback.</div>
     <label class="row" style="justify-content:flex-start;margin-top:8px"><input id="ok" type="checkbox" style="flex:none;width:auto"> <span>I am using headphones or will keep the volume low</span></label></div>
     <div class="card center"><div class="muted">Input level</div><div class="progress" style="height:12px"><div id="lv" style="height:100%;width:0;background:var(--ok)"></div></div></div>
@@ -346,21 +384,27 @@ Tools.register({ id: 'mike', name: 'Mike', icon: '📣', cat: 'audio', desc: 'Us
   $('#gain', el).oninput = e => { const v = +e.target.value; setText(el, '#gv', v); if (g) g.gain.setTargetAtTime(v / 100, ctx.currentTime, 0.02); };
   function stop() {
     on = false;
-    if (ctx) { try { ctx.close(); } catch (e) { } }
-    if (stream) stream.getTracks().forEach(t => t.stop());
-    ctx = g = an = stream = null; $('#go', el).textContent = 'Start'; $('#lv', el).style.width = '0';
+    // Stop every stream and close every context this tool opened, not just the latest.
+    L.ctxs.forEach(closeCtx); L.ctxs = [];
+    L.streams.forEach(stopStream); L.streams = [];
+    ctx = g = an = null; $('#go', el).textContent = 'Start'; $('#lv', el).style.width = '0';
   }
   $('#go', el).onclick = () => {
     if (on) { stop(); return; }
-    setText(el, '#msg', '');
+    if (pending) return;
+    pending = true; setText(el, '#msg', '');
     L.mic({ echoCancellation: $('#ec', el).checked, noiseSuppression: true, autoGainControl: false }).then(s => {
-      stream = s; ctx = L.ctx();
-      const src = ctx.createMediaStreamSource(s); g = ctx.createGain(); g.gain.value = +$('#gain', el).value / 100;
-      const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -12; lim.ratio.value = 20; lim.attack.value = 0.003;
-      an = ctx.createAnalyser(); an.fftSize = 512;
-      src.connect(an); src.connect(g); g.connect(lim); lim.connect(ctx.destination);
-      on = true; $('#go', el).textContent = 'Stop';
-    }).catch(e => micFail(el, e));
+      try {
+        ctx = L.ctx();
+        const src = ctx.createMediaStreamSource(s); g = ctx.createGain();
+        const target = +$('#gain', el).value / 100, t = ctx.currentTime;
+        g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(target, t + 0.3); // fade in so a loud start does not squeal
+        const lim = ctx.createDynamicsCompressor(); lim.threshold.value = -12; lim.ratio.value = 20; lim.attack.value = 0.003;
+        an = ctx.createAnalyser(); an.fftSize = 512;
+        src.connect(an); src.connect(g); g.connect(lim); lim.connect(ctx.destination);
+        on = true; $('#go', el).textContent = 'Stop';
+      } catch (e) { L.drop(s); closeCtx(ctx); ctx = g = an = null; throw e; }
+    }).catch(e => micFail(el, e)).then(() => { pending = false; });
   };
   L.raf(() => {
     if (!on || !an) return;
@@ -373,7 +417,8 @@ Tools.register({ id: 'mike', name: 'Mike', icon: '📣', cat: 'audio', desc: 'Us
 /* ---------------------------------------------------------------- Voice Recorder */
 Tools.register({ id: 'recorder', name: 'Voice Recorder', icon: '📼', cat: 'audio', desc: 'Record voice memos with pause and resume, then play, rename, share or delete them. Recordings are stored on the device.', keys: ['record', 'voice memo', 'dictaphone', 'audio'], needs: ['microphone', 'storage'], render(el) {
   const L = life();
-  let db = null, list = [], rec = null, chunks = [], state = 'idle', acc = 0, tStart = 0, mime = '', stream = null;
+  const MAX_MS = 60 * 60 * 1000; // longest single recording: 1 hour
+  let db = null, list = [], rec = null, chunks = [], state = 'idle', acc = 0, tStart = 0, mime = '', stream = null, starting = false, ready = false;
   let au = null, playId = null, playUrl = null, editId = null, armId = null;
   el.innerHTML = `<div class="card center"><div class="big" id="tm">00:00</div><div class="muted" id="st">Ready</div>
     <div class="row" style="margin-top:8px"><button class="btn" id="rec">Record</button><button class="btn alt" id="pa" disabled>Pause</button><button class="btn alt" id="sp" disabled>Stop</button></div>
@@ -391,6 +436,7 @@ Tools.register({ id: 'recorder', name: 'Voice Recorder', icon: '📼', cat: 'aud
     t.oncomplete = () => res(rq ? rq.result : undefined); t.onerror = t.onabort = () => rej(t.error);
   });
   const reload = () => tx('readonly', s => s.getAll()).then(a => { list = (a || []).sort((x, y) => y.date - x.date); draw(); }).catch(() => { setText(el, '#msg', 'Storage is not available.'); });
+  const loaded = () => { ready = true; ui(); };
   const dur = ms => { const s = Math.round(ms / 1000); return pad(Math.floor(s / 60), 2) + ':' + pad(s % 60, 2); };
   const kb = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
   function limitTxt() { const l = proLimit('recordings'); return 'Saved recordings: ' + list.length + (l === Infinity ? '' : ' of ' + l + ' (free)'); }
@@ -435,32 +481,49 @@ Tools.register({ id: 'recorder', name: 'Voice Recorder', icon: '📼', cat: 'aud
       tx('readwrite', s => s.delete(r.id)).then(reload, () => toast('Could not delete'));
     }
   }
-  function ticker() { setText(el, '#tm', dur(acc + (state === 'rec' ? performance.now() - tStart : 0))); }
+  function ticker() {
+    const total = acc + (state === 'rec' ? performance.now() - tStart : 0);
+    setText(el, '#tm', dur(total));
+    if (state === 'rec' && total >= MAX_MS) { toast('One hour limit reached, saving'); stopRec(); }
+  }
   function ui() {
-    $('#rec', el).disabled = state !== 'idle'; $('#pa', el).disabled = state === 'idle'; $('#sp', el).disabled = state === 'idle';
+    // Record stays disabled until the saved list has loaded (so the free limit is known) and while a start is in flight.
+    $('#rec', el).disabled = state !== 'idle' || starting || !ready; $('#pa', el).disabled = state === 'idle'; $('#sp', el).disabled = state === 'idle';
     $('#pa', el).textContent = state === 'pause' ? 'Resume' : 'Pause';
     setText(el, '#st', state === 'rec' ? 'Recording...' : state === 'pause' ? 'Paused' : 'Ready');
   }
   function release() { if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; } }
   $('#rec', el).onclick = () => {
+    if (starting || state !== 'idle') return;
+    if (!ready) { setText(el, '#msg', 'Still loading your recordings, try again in a moment.'); return; }
     if (!window.MediaRecorder) { setText(el, '#msg', 'Recording is not supported on this device.'); return; }
     if (list.length >= proLimit('recordings') && needPro('recordings')) return;
+    starting = true; ui(); // disable the button straight away so a double tap cannot start two recordings
     stopPlay(); setText(el, '#msg', '');
     L.mic({ echoCancellation: true, noiseSuppression: true }).then(s => {
       stream = s; chunks = []; acc = 0;
-      const pref = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
-      mime = pref.find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
-      rec = mime ? new MediaRecorder(s, { mimeType: mime }) : new MediaRecorder(s);
-      rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
-      rec.onstop = () => {
-        const ms = acc, type = rec.mimeType || mime || 'audio/webm', cs = chunks; chunks = []; release(); state = 'idle'; ui(); ticker();
-        if (!cs.length || !db) return;
-        const blob = new Blob(cs, { type });
-        const rd = new Date(), name = 'Recording ' + rd.getFullYear() + '-' + pad(rd.getMonth() + 1, 2) + '-' + pad(rd.getDate(), 2) + ' ' + pad(rd.getHours(), 2) + '.' + pad(rd.getMinutes(), 2);
-        tx('readwrite', st => st.add({ name, blob, ms, mime: type, date: Date.now() })).then(() => { toast('Saved'); return reload(); }).catch(() => toast('Could not save (storage full?)'));
-      };
-      rec.start(1000); state = 'rec'; tStart = performance.now(); ui();
-    }).catch(e => micFail(el, e));
+      try {
+        const pref = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+        mime = pref.find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) || '';
+        rec = mime ? new MediaRecorder(s, { mimeType: mime }) : new MediaRecorder(s);
+        rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+        rec.onstop = () => {
+          const ms = acc, type = rec.mimeType || mime || 'audio/webm', cs = chunks; chunks = []; release(); state = 'idle'; ui(); ticker();
+          if (!cs.length) { toast('Nothing was recorded'); return; }
+          if (!db) { toast('Storage is not available, the recording could not be saved'); return; }
+          const blob = new Blob(cs, { type });
+          const rd = new Date(), name = 'Recording ' + rd.getFullYear() + '-' + pad(rd.getMonth() + 1, 2) + '-' + pad(rd.getDate(), 2) + ' ' + pad(rd.getHours(), 2) + '.' + pad(rd.getMinutes(), 2);
+          // Re-check the free limit now: it may have changed while recording.
+          if (list.length >= proLimit('recordings')) {
+            toast('Free recording limit reached, choose where to keep this one'); needPro('recordings');
+            saveBlob(blob, name.replace(/[^\w\- ]+/g, '') + '.' + (/mp4|aac/.test(type) ? 'm4a' : /ogg/.test(type) ? 'ogg' : 'webm')).catch(() => {});
+            return;
+          }
+          tx('readwrite', st => st.add({ name, blob, ms, mime: type, date: Date.now() })).then(() => { toast('Saved'); return reload(); }).catch(() => toast('Could not save (storage full?)'));
+        };
+        rec.start(1000); state = 'rec'; tStart = performance.now();
+      } catch (e) { release(); rec = null; state = 'idle'; throw e; }
+    }).catch(e => { if (e && e.message !== 'gone') micFail(el, e); }).then(() => { starting = false; ui(); });
   };
   $('#pa', el).onclick = () => {
     if (!rec) return;
@@ -468,13 +531,14 @@ Tools.register({ id: 'recorder', name: 'Voice Recorder', icon: '📼', cat: 'aud
     else if (state === 'pause' && rec.resume) { rec.resume(); tStart = performance.now(); state = 'rec'; }
     ui(); ticker();
   };
-  $('#sp', el).onclick = () => {
+  function stopRec() {
     if (!rec || state === 'idle') return;
     if (state === 'rec') acc += performance.now() - tStart;
-    state = 'idle'; try { rec.stop(); } catch (e) { release(); }
-  };
+    state = 'idle'; try { rec.stop(); } catch (e) { release(); ui(); }
+  }
+  $('#sp', el).onclick = stopRec;
   L.every(ticker, 250);
-  openDb().then(d => { if (!L.alive) { d.close(); return; } db = d; reload(); }).catch(() => setText(el, '#msg', 'Storage is not available, recordings cannot be saved.'));
+  openDb().then(d => { if (!L.alive) { d.close(); return; } db = d; return reload().then(loaded); }).catch(() => { setText(el, '#msg', 'Storage is not available, recordings cannot be saved.'); });
   ui(); draw();
   return () => {
     stopPlay();
@@ -484,7 +548,7 @@ Tools.register({ id: 'recorder', name: 'Voice Recorder', icon: '📼', cat: 'aud
 } });
 
 /* ---------------------------------------------------------------- Piano */
-Tools.register({ id: 'piano', name: 'Piano', icon: '🎹', cat: 'audio', desc: 'Two-octave on-screen piano with multi-touch chords, octave shift and a choice of sound waveforms.', keys: ['keyboard', 'keys', 'synth', 'music', 'chords'], needs: [], render(el) {
+Tools.register({ id: 'piano', name: 'Piano', icon: '🎹', cat: 'audio', desc: 'On-screen piano with wide keys (15 keys, a little over an octave), multi-touch chords, octave shift and a choice of sound waveforms.', keys: ['keyboard', 'keys', 'synth', 'music', 'chords'], needs: [], render(el) {
   const L = life();
   let ctx = null, master = null, oct = 0, wave = 'triangle', keys = [];
   const voices = new Map();
@@ -493,7 +557,7 @@ Tools.register({ id: 'piano', name: 'Piano', icon: '🎹', cat: 'audio', desc: '
     <div id="kb" style="position:relative;height:200px;margin:10px 0;touch-action:none;user-select:none"></div>
     <p class="muted center" style="font-size:13px">Press several keys at once for chords. Slide a finger across the keys to glide.</p>`;
   const box = $('#kb', el), accent = cssVar(el, '--accent', '#4a90e2');
-  function build() { keys = buildKeys(box, 60 + 12 * oct, 25); setText(el, '#ol', 'C' + (4 + oct) + ' to C' + (6 + oct)); }
+  function build() { keys = buildKeys(box, 60 + 12 * oct, 15); setText(el, '#ol', 'C' + (4 + oct) + ' to D' + (5 + oct)); }
   function ensure() { if (!ctx) { ctx = L.ctx(); master = newMaster(ctx, 0.5); } else if (ctx.state === 'suspended') ctx.resume(); }
   function on(pid, i) {
     ensure(); const k = keys[i]; if (!k) return;
@@ -528,10 +592,10 @@ Tools.register({ id: 'piano', name: 'Piano', icon: '🎹', cat: 'audio', desc: '
 /* ---------------------------------------------------------------- Spectrum Analyzer */
 Tools.register({ id: 'spectrum', name: 'Spectrum', icon: '📊', cat: 'audio', desc: 'Live frequency spectrum bars and waveform from the microphone, with the loudest frequency shown.', keys: ['analyzer', 'frequency', 'fft', 'waveform', 'oscilloscope', 'equalizer'], needs: ['microphone'], render(el) {
   const L = life();
-  let ctx = null, an = null, running = false;
+  let ctx = null, an = null, running = false, pending = false;
   el.innerHTML = `<div class="card center"><div class="big" id="pk">--</div><div class="muted">loudest frequency (Hz)</div></div>
-    <canvas id="sp" class="canvas" style="width:100%;height:200px;background:var(--surface2);border-radius:12px;display:block"></canvas>
-    <canvas id="wv" class="canvas" style="width:100%;height:90px;background:var(--surface2);border-radius:12px;display:block;margin-top:8px"></canvas>
+    <canvas id="sp" class="canvas" style="touch-action:pan-y;width:100%;height:200px;background:var(--surface2);border-radius:12px;display:block"></canvas>
+    <canvas id="wv" class="canvas" style="touch-action:pan-y;width:100%;height:90px;background:var(--surface2);border-radius:12px;display:block;margin-top:8px"></canvas>
     <div class="row" style="margin:6px 0;font-size:12px;justify-content:space-between"><span class="muted">30 Hz</span><span class="muted">1 kHz</span><span class="muted">16 kHz</span></div>
     <button class="btn" id="go" style="width:100%">Start</button><div class="muted center" id="msg"></div>`;
   const cs = $('#sp', el), cw = $('#wv', el), BANDS = 48, caps = new Array(BANDS).fill(0);
@@ -543,8 +607,10 @@ Tools.register({ id: 'spectrum', name: 'Spectrum', icon: '📊', cat: 'audio', d
     if (!running || !an) return;
     const fb = new Uint8Array(an.frequencyBinCount), tb = new Uint8Array(an.fftSize), sr = ctx.sampleRate, binHz = sr / an.fftSize;
     an.getByteFrequencyData(fb); an.getByteTimeDomainData(tb);
-    let pi = 0; for (let i = 2; i < fb.length; i++) if (fb[i] > fb[pi]) pi = i;
-    setText(el, '#pk', fb[pi] > 60 ? Math.round(pi * binHz) : '--');
+    // Skip bins 0 and 1 (DC and rumble); refine the peak with a parabola through its neighbours.
+    let pi = 2; for (let i = 3; i < fb.length - 1; i++) if (fb[i] > fb[pi]) pi = i;
+    let off = 0; if (pi > 2 && pi < fb.length - 1) { const a = fb[pi - 1], b = fb[pi], c = fb[pi + 1], den = a - 2 * b + c; if (den < 0) off = clamp(0.5 * (a - c) / den, -0.5, 0.5); }
+    setText(el, '#pk', fb[pi] > 60 ? Math.round((pi + off) * binHz) : '--');
     const bw = W / BANDS, lo = 30, hi = Math.min(16000, sr / 2);
     for (let b = 0; b < BANDS; b++) {
       const f0 = lo * Math.pow(hi / lo, b / BANDS), f1 = lo * Math.pow(hi / lo, (b + 1) / BANDS);
@@ -564,14 +630,17 @@ Tools.register({ id: 'spectrum', name: 'Spectrum', icon: '📊', cat: 'audio', d
   });
   $('#go', el).onclick = () => {
     if (running) {
-      running = false; if (ctx) { try { ctx.close(); } catch (e) { } } L.streams.forEach(s => s.getTracks().forEach(t => t.stop())); L.streams = [];
+      running = false; closeCtx(ctx); L.streams.forEach(stopStream); L.streams = [];
       ctx = an = null; $('#go', el).textContent = 'Start'; setText(el, '#pk', '--'); return;
     }
-    setText(el, '#msg', '');
+    if (pending) return;
+    pending = true; setText(el, '#msg', '');
     L.mic().then(s => {
-      ctx = L.ctx(); an = ctx.createAnalyser(); an.fftSize = 2048; an.smoothingTimeConstant = 0.78;
-      ctx.createMediaStreamSource(s).connect(an); running = true; $('#go', el).textContent = 'Stop';
-    }).catch(e => micFail(el, e));
+      try {
+        ctx = L.ctx(); an = ctx.createAnalyser(); an.fftSize = 2048; an.smoothingTimeConstant = 0.78;
+        ctx.createMediaStreamSource(s).connect(an); running = true; $('#go', el).textContent = 'Stop';
+      } catch (e) { L.drop(s); closeCtx(ctx); ctx = an = null; throw e; }
+    }).catch(e => micFail(el, e)).then(() => { pending = false; });
   };
   return () => { running = false; L.stop(); };
 } });
@@ -590,7 +659,7 @@ Tools.register({ id: 'sleepsounds', name: 'Sleep Sounds', icon: '😴', cat: 'au
   $('#snd', el).innerHTML = SOUNDS.map(s => `<button data-s="${s[0]}">${s[1]}</button>`).join('');
   function mark() { $$('#snd button', el).forEach(b => { const a = b.dataset.s === cur; b.style.background = a ? 'var(--accent)' : ''; b.style.color = a ? 'var(--accent-t)' : ''; }); }
   const vv = () => Math.pow(vol / 100, 2) * 0.8;
-  function buffer(type) { if (!bufs[type]) bufs[type] = noiseBuf(ctx, type, 8); return bufs[type]; }
+  function buffer(type) { if (!bufs[type]) bufs[type] = noiseBuf(ctx, type, 8, true); return bufs[type]; }
   function src(type) { const s = ctx.createBufferSource(); s.buffer = buffer(type); s.loop = true; s.start(); nodes.push(s); return s; }
   function lfo(freq, depth, target) {
     const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = freq; g.gain.value = depth; o.connect(g); g.connect(target); o.start(); nodes.push(o); return o;
@@ -780,7 +849,7 @@ Tools.register({ id: 'binaural', name: 'Binaural Beats', icon: '🧠', cat: 'aud
   function stop() {
     playing = false; setText(el, '#go', 'Play'); setText(el, '#cd', '');
     const c = ctx, a = oL, b = oR;
-    if (c) { g.gain.setTargetAtTime(0.0001, c.currentTime, 0.2); setTimeout(() => { try { a.stop(); b.stop(); c.close(); } catch (e) { } }, 900); }
+    if (c) { g.gain.setTargetAtTime(0.0001, c.currentTime, 0.2); setTimeout(() => { try { a.stop(); b.stop(); } catch (e) { } closeCtx(c); }, 900); }
     ctx = null;
   }
   $$('#pre button', el).forEach(b => b.onclick = () => { $('#beat', el).value = PRE[+b.dataset.i][1]; upd(); });
@@ -885,7 +954,7 @@ Tools.register({ id: 'stereotest', name: 'Stereo Test', icon: '🔈', cat: 'audi
   }
   function begin(m) {
     halt(); if (!ctx) ctx = L.ctx(); mode = m; const s = $('#snd', el).value;
-    if (s === 'pink') { src = ctx.createBufferSource(); src.buffer = noiseBuf(ctx, 'pink', 3); src.loop = true; }
+    if (s === 'pink') { src = ctx.createBufferSource(); src.buffer = noiseBuf(ctx, 'pink', 3, true); src.loop = true; }
     else { src = ctx.createOscillator(); src.frequency.value = +s; }
     pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null; g = ctx.createGain(); g.gain.value = vol();
     src.connect(g); if (pan) { g.connect(pan); pan.connect(ctx.destination); } else g.connect(ctx.destination);
@@ -906,7 +975,7 @@ Tools.register({ id: 'stereotest', name: 'Stereo Test', icon: '🔈', cat: 'audi
 Tools.register({ id: 'speakerclean', name: 'Speaker Cleaner', icon: '💧', cat: 'audio', desc: 'Play a low 165 Hz tone or a low sweep to help push water or dust out of the phone speaker.', keys: ['water', 'eject', 'dust', 'speaker', 'clean', 'wet'], needs: [], render(el) {
   const L = life();
   let ctx = null, osc = null, g = null, endAt = 0, total = 0, running = false, t0 = 0;
-  el.innerHTML = `<div class="card"><b>How to use</b><ol class="muted" style="margin:6px 0 0 18px;padding:0;font-size:14px"><li>Turn the media volume to maximum.</li><li>Hold the phone with the speaker facing down.</li><li>Press Start and let the sound run. Wipe the phone afterwards.</li></ol></div>
+  el.innerHTML = `<div class="card"><b>How to use</b><ol class="muted" style="margin:6px 0 0 18px;padding:0;font-size:14px"><li>Unplug headphones and earbuds first, and keep the phone away from your ear.</li><li>Turn the media volume up (it is loud, so start lower if you are unsure).</li><li>Hold the phone with the speaker facing down.</li><li>Press Start and let the sound run. Wipe the phone afterwards.</li></ol></div>
     <label class="f">Mode<select id="md"><option value="165">Water eject (165 Hz)</option><option value="sweep">Dust shake (sweep 100 to 450 Hz)</option></select></label>
     <label class="f">Duration<select id="du"><option value="15">15 seconds</option><option value="30" selected>30 seconds</option><option value="60">60 seconds</option><option value="120">2 minutes</option></select></label>
     <div class="card center"><div class="big" id="cd">--</div><div class="progress" style="height:10px"><div id="pg" style="height:100%;width:0;background:var(--accent)"></div></div></div>
@@ -914,13 +983,13 @@ Tools.register({ id: 'speakerclean', name: 'Speaker Cleaner', icon: '💧', cat:
     <p class="muted center" style="font-size:13px">The tone is loud and low. Keep the phone away from your ear. This cannot fix a damaged speaker, and a wet phone should be dried properly.</p>`;
   function stop(done) {
     running = false; const c = ctx, o = osc;
-    if (c) { g.gain.setTargetAtTime(0.0001, c.currentTime, 0.02); setTimeout(() => { try { o.stop(); c.close(); } catch (e) { } }, 150); }
+    if (c) { g.gain.setTargetAtTime(0.0001, c.currentTime, 0.02); setTimeout(() => { try { o.stop(); } catch (e) { } closeCtx(c); }, 150); }
     ctx = osc = null; setText(el, '#go', 'Start'); setText(el, '#cd', done ? 'Done' : '--'); if (!done) $('#pg', el).style.width = '0';
     if (done) { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); toast('Speaker cleaning finished'); }
   }
   function start() {
     ctx = L.ctx(); osc = ctx.createOscillator(); g = ctx.createGain(); osc.type = 'sine'; osc.frequency.value = 165; g.gain.value = 0.0001;
-    osc.connect(g); g.connect(ctx.destination); osc.start(); g.gain.setTargetAtTime(0.95, ctx.currentTime, 0.05);
+    osc.connect(g); g.connect(limiter(ctx)); osc.start(); g.gain.setTargetAtTime(0.5, ctx.currentTime, 0.05);
     total = +$('#du', el).value * 1000; t0 = Date.now(); endAt = t0 + total; running = true; setText(el, '#go', 'Stop');
   }
   $('#go', el).onclick = () => running ? stop(false) : start();
@@ -931,7 +1000,7 @@ Tools.register({ id: 'speakerclean', name: 'Speaker Cleaner', icon: '💧', cat:
     if ($('#md', el).value === 'sweep') { const ph = ((now - t0) % 4000) / 4000; osc.frequency.value = 100 + 350 * (ph < 0.5 ? ph * 2 : 2 - ph * 2); } else osc.frequency.value = 165;
     if (!left) stop(true);
   });
-  return () => { running = false; L.stop(); };
+  return () => { running = false; fadeLeave(L, ctx, g); };
 } });
 
 /* ---------------------------------------------------------------- Dog Whistle */
@@ -945,15 +1014,17 @@ Tools.register({ id: 'dogwhistle', name: 'Dog Whistle', icon: '🐕', cat: 'audi
     <label class="f">Volume <span id="vv">25</span>%<input id="vol" type="range" min="1" max="100" value="25" style="width:100%"></label>
     <button class="btn" id="go" style="width:100%">Play</button>
     <p class="muted center" style="font-size:13px">Keep the volume low and the phone at a distance from animals. Stop if your pet shows signs of distress. Many phone speakers cannot play above 18 to 20 kHz.</p>`;
-  const vol = () => Math.pow(+$('#vol', el).value / 100, 2) * 0.8, fr = () => +$('#fr', el).value;
+  const vol = () => Math.pow(+$('#vol', el).value / 100, 2) * 0.5, fr = () => +$('#fr', el).value;
+  const sure = () => confirm('The volume is high for a high-pitched sound, which can hurt your ears and upset animals nearby. Play anyway?');
   function show() { setText(el, '#hz', fr()); if (osc && $('#md', el).value !== 'sweep') osc.frequency.setTargetAtTime(fr(), ctx.currentTime, 0.02); }
   function start() {
+    if (+$('#vol', el).value > 70 && !sure()) return;
     ctx = L.ctx(); osc = ctx.createOscillator(); g = ctx.createGain(); osc.frequency.value = fr(); g.gain.value = 0.0001;
-    osc.connect(g); g.connect(ctx.destination); osc.start(); playing = true; t0 = Date.now(); setText(el, '#go', 'Stop');
+    osc.connect(g); g.connect(limiter(ctx)); osc.start(); playing = true; t0 = Date.now(); setText(el, '#go', 'Stop');
   }
   function stop() {
     playing = false; const c = ctx, o = osc;
-    if (c) { g.gain.setTargetAtTime(0.0001, c.currentTime, 0.02); setTimeout(() => { try { o.stop(); c.close(); } catch (e) { } }, 120); }
+    if (c) { g.gain.setTargetAtTime(0.0001, c.currentTime, 0.02); setTimeout(() => { try { o.stop(); } catch (e) { } closeCtx(c); }, 120); }
     ctx = osc = null; setText(el, '#go', 'Play');
   }
   L.raf(() => {
@@ -966,8 +1037,9 @@ Tools.register({ id: 'dogwhistle', name: 'Dog Whistle', icon: '🐕', cat: 'audi
   });
   $('#fr', el).oninput = show; $('#md', el).onchange = show;
   $$('#pre button', el).forEach(b => b.onclick = () => { $('#fr', el).value = b.dataset.f; show(); });
+  $('#vol', el).oninput = e => { const v = +e.target.value; setText(el, '#vv', v); if (v > 70 && playing && !sure()) { e.target.value = 70; setText(el, '#vv', 70); } };
   $('#go', el).onclick = () => playing ? stop() : start();
-  return () => { playing = false; L.stop(); };
+  return () => { playing = false; fadeLeave(L, ctx, g); };
 } });
 
 /* ---------------------------------------------------------------- Chords and Scales */
@@ -1015,7 +1087,7 @@ Tools.register({ id: 'chords', name: 'Chords & Scales', icon: '🎼', cat: 'audi
 /* ---------------------------------------------------------------- Clap Counter */
 Tools.register({ id: 'clapcounter', name: 'Clap Counter', icon: '👏', cat: 'audio', desc: 'Counts claps or sharp sounds with the microphone, shows claps per minute, with adjustable sensitivity.', keys: ['clap', 'count', 'tally', 'applause', 'beat', 'sound counter'], needs: ['microphone'], render(el) {
   const L = life();
-  let ctx = null, an = null, buf = null, on = false, count = 0, last = 0, prev = 0, times = [];
+  let ctx = null, an = null, buf = null, on = false, count = 0, last = 0, prev = 0, times = [], pending = false;
   el.innerHTML = `<div class="card center"><div class="big" id="n">0</div><div class="muted"><span id="cpm">0</span> claps per minute</div>
     <div style="position:relative;height:14px;background:var(--surface2);border-radius:7px;margin-top:10px;overflow:hidden"><div id="lv" style="height:100%;width:0;background:var(--ok)"></div><div id="th" style="position:absolute;top:0;bottom:0;width:2px;background:var(--danger)"></div></div></div>
     <label class="f">Sensitivity<input id="sens" type="range" min="1" max="10" value="5" style="width:100%"></label>
@@ -1038,12 +1110,15 @@ Tools.register({ id: 'clapcounter', name: 'Clap Counter', icon: '👏', cat: 'au
     setText(el, '#cpm', times.length > 1 ? Math.round(times.length * 6) : 0);
   });
   $('#go', el).onclick = () => {
-    if (on) { on = false; if (ctx) { try { ctx.close(); } catch (e) { } } L.streams.forEach(s => s.getTracks().forEach(t => t.stop())); L.streams = []; ctx = an = null; setText(el, '#go', 'Start listening'); return; }
-    setText(el, '#msg', '');
+    if (on) { on = false; closeCtx(ctx); L.streams.forEach(stopStream); L.streams = []; ctx = an = null; setText(el, '#go', 'Start listening'); return; }
+    if (pending) return;
+    pending = true; setText(el, '#msg', '');
     L.mic().then(s => {
-      ctx = L.ctx(); an = ctx.createAnalyser(); an.fftSize = 1024; ctx.createMediaStreamSource(s).connect(an);
-      buf = new Float32Array(an.fftSize); on = true; prev = 1; setText(el, '#go', 'Stop');
-    }).catch(e => micFail(el, e));
+      try {
+        ctx = L.ctx(); an = ctx.createAnalyser(); an.fftSize = 1024; ctx.createMediaStreamSource(s).connect(an);
+        buf = new Float32Array(an.fftSize); on = true; prev = 1; setText(el, '#go', 'Stop');
+      } catch (e) { L.drop(s); closeCtx(ctx); ctx = an = null; throw e; }
+    }).catch(e => micFail(el, e)).then(() => { pending = false; });
   };
   return () => { on = false; L.stop(); };
 } });
@@ -1051,7 +1126,7 @@ Tools.register({ id: 'clapcounter', name: 'Clap Counter', icon: '👏', cat: 'au
 /* ---------------------------------------------------------------- Vocal Range */
 Tools.register({ id: 'vocalrange', name: 'Vocal Range', icon: '🎤', cat: 'audio', desc: 'Sing your lowest and highest notes and see your vocal range in notes and octaves, with a rough voice type guess.', keys: ['voice', 'sing', 'singing', 'pitch', 'soprano', 'tenor', 'bass', 'alto', 'range'], needs: ['microphone'], render(el) {
   const L = life();
-  let ctx = null, an = null, buf = null, on = false, frame = 0, lo = null, hi = null, stable = 0, lastM = null;
+  let ctx = null, an = null, buf = null, on = false, frame = 0, lo = null, hi = null, stable = 0, lastM = null, pending = false;
   const saved = Store.get('vocal.range', null);
   if (saved && typeof saved.lo === 'number' && typeof saved.hi === 'number') { lo = saved.lo; hi = saved.hi; }
   el.innerHTML = `<div class="card center"><div class="big" id="cn">--</div><div class="muted" id="cf">Sing a steady note</div></div>
@@ -1084,12 +1159,15 @@ Tools.register({ id: 'vocalrange', name: 'Vocal Range', icon: '🎤', cat: 'audi
     }
   });
   $('#go', el).onclick = () => {
-    if (on) { on = false; if (ctx) { try { ctx.close(); } catch (e) { } } L.streams.forEach(s => s.getTracks().forEach(t => t.stop())); L.streams = []; ctx = an = null; setText(el, '#go', 'Start'); return; }
-    setText(el, '#msg', '');
+    if (on) { on = false; closeCtx(ctx); L.streams.forEach(stopStream); L.streams = []; ctx = an = null; setText(el, '#go', 'Start'); return; }
+    if (pending) return;
+    pending = true; setText(el, '#msg', '');
     L.mic().then(s => {
-      ctx = L.ctx(); an = ctx.createAnalyser(); an.fftSize = 4096; ctx.createMediaStreamSource(s).connect(an);
-      buf = new Float32Array(an.fftSize); on = true; stable = 0; lastM = null; setText(el, '#go', 'Stop');
-    }).catch(e => micFail(el, e));
+      try {
+        ctx = L.ctx(); an = ctx.createAnalyser(); an.fftSize = 4096; ctx.createMediaStreamSource(s).connect(an);
+        buf = new Float32Array(an.fftSize); on = true; stable = 0; lastM = null; setText(el, '#go', 'Stop');
+      } catch (e) { L.drop(s); closeCtx(ctx); ctx = an = null; throw e; }
+    }).catch(e => micFail(el, e)).then(() => { pending = false; });
   };
   paint();
   return () => { on = false; L.stop(); };
@@ -1114,7 +1192,7 @@ Tools.register({ id: 'toneseq', name: 'Tone Sequencer', icon: '🎛️', cat: 'a
     c.onclick = () => { grid[r][s] = !grid[r][s]; paintCell(r, s); Store.set('toneseq.grid', grid); };
     gridEl.appendChild(c); (cells[r] = cells[r] || [])[s] = c;
   }
-  function paintCell(r, s) { const c = cells[r][s]; c.style.background = grid[r][s] ? 'var(--accent)' : (s % 4 === 0 ? 'var(--surface2)' : 'var(--surface)'); c.style.outline = s === lit ? '2px solid var(--ok)' : 'none'; }
+  function paintCell(r, s) { const c = cells[r][s]; c.setAttribute('aria-pressed', grid[r][s] ? 'true' : 'false'); c.style.background = grid[r][s] ? 'var(--accent)' : (s % 4 === 0 ? 'var(--surface2)' : 'var(--surface)'); c.style.outline = s === lit ? '2px solid var(--ok)' : 'none'; }
   function paintAll() { for (let r = 0; r < ROWS.length; r++) for (let s = 0; s < STEPS; s++) paintCell(r, s); }
   function play(m, t, d) {
     const o = ctx.createOscillator(), g = ctx.createGain(); o.type = $('#wf', el).value; o.frequency.value = midiToFreq(m);
@@ -1130,7 +1208,7 @@ Tools.register({ id: 'toneseq', name: 'Tone Sequencer', icon: '🎛️', cat: 'a
   }
   function stop() {
     playing = false; clearInterval(timer); timer = null; queue = [];
-    if (ctx) { try { ctx.close(); } catch (e) { } ctx = null; }
+    if (ctx) { closeCtx(ctx); ctx = null; }
     setText(el, '#go', 'Play'); const o = lit; lit = -1; if (o >= 0) for (let r = 0; r < ROWS.length; r++) paintCell(r, o);
   }
   $('#go', el).onclick = () => {
