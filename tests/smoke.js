@@ -59,7 +59,7 @@ vc.on('jsdomError', e => { if (!/Not implemented/.test(e.message)) fail('page er
     try {
       if (process.env.VERBOSE) console.log('render', t.id);
       const cleanup = t.render(host);
-      if (!host.innerHTML.trim()) fail(`${t.id}: rendered nothing`);
+      if (!host.innerHTML.trim() && !t.pro) fail(`${t.id}: rendered nothing`); // a locked Pro tool may refuse to render
       await new Promise(r => setTimeout(r, 5));
       if (typeof cleanup === 'function') cleanup();
       rendered++;

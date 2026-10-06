@@ -39,7 +39,9 @@
         let step = false;
         const thr = Math.max(MIN, 0.45 * avg);
         if (prev > prev2 && prev >= s && prev > thr && t - lastT >= 280) {
-          count++; lastT = t; avg = avg * 0.75 + prev * 0.25; step = true;
+          count++; lastT = t; avg = clamp(avg * 0.75 + prev * 0.25, 1.5, 6); step = true;
+        } else if (t - lastT > 2000) {
+          avg += (2.5 - avg) * 0.01; // no step for 2 s: relax the threshold so a later gentle walk is still seen
         }
         prev2 = prev; prev = s;
         return step;
@@ -65,7 +67,7 @@
     return out;
   }
   function ppgFilter(sig, fs) {
-    const slow = movAvg(sig, Math.max(3, Math.round(fs * 1.0)));
+    const slow = movAvg(sig, Math.max(3, Math.round(fs * 1.6)));
     return movAvg(sig.map((v, i) => v - slow[i]), Math.max(2, Math.round(fs * 0.12)));
   }
   function ppgBpm(sig, fs) {
@@ -109,14 +111,16 @@
   }
   function whrOf(waist, hip) { return (waist > 0 && hip > 0) ? waist / hip : null; }
   function whrRisk(sex, r) {
-    const t = sex === 'm' ? [0.90, 0.99] : [0.80, 0.84];
-    return r <= t[0] ? { label: 'Low risk', col: 'var(--ok)' } : r <= t[1] ? { label: 'Moderate risk', col: '#f59e0b' } : { label: 'High risk', col: 'var(--danger)' };
+    const cut = sex === 'm' ? 0.90 : 0.85; // WHO cut-offs for abdominal obesity
+    return r <= cut ? { label: 'At or below the WHO cut-off', col: 'var(--ok)' } : { label: 'Above the WHO cut-off (increased risk)', col: 'var(--danger)' };
   }
   /* Dates: always noon local to dodge daylight saving jumps. */
   const parseD = s => { const m = /^(\d{4})-(\d\d)-(\d\d)/.exec(s || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3], 12) : null; };
   const dkey = (d) => { d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
   const addDays = (d, n) => { const x = new Date(d.getTime()); x.setDate(x.getDate() + n); x.setHours(12, 0, 0, 0); return x; };
-  const diffDays = (a, b) => Math.round((b.getTime() - a.getTime()) / 864e5);
+  const atNoon = d => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12);
+  /* Whole calendar days from a to b: both moved to local noon first so a 23 or 25 hour DST day still counts as one. */
+  const diffDays = (a, b) => Math.round((atNoon(b).getTime() - atNoon(a).getTime()) / 864e5);
   function dueDate(lmp, cycle, today) {
     cycle = clamp(cycle || 28, 20, 45);
     const edd = addDays(lmp, 280 + (cycle - 28)), days = diffDays(lmp, today || new Date());
@@ -168,13 +172,13 @@
   const stat = (id, label, init) => `<div class="card center" style="padding:10px 4px"><div style="${LBL}">${label}</div><div class="mid" id="${id}" style="font-size:22px">${init || '--'}</div></div>`;
   function seg(id, opts, sel) {
     return `<div id="${id}" class="row" style="gap:4px;padding:4px;background:var(--surface2);border-radius:14px">${opts.map(o =>
-      `<button type="button" data-v="${o[0]}" style="padding:10px 4px;border:0;border-radius:11px;font-weight:600;font-size:14px;min-height:44px;transition:background .15s,color .15s;${o[0] === sel ? 'background:var(--accent);color:var(--accent-t)' : 'background:transparent;color:var(--muted)'}">${o[1]}</button>`).join('')}</div>`;
+      `<button type="button" data-v="${o[0]}" aria-pressed="${o[0] === sel}" style="padding:10px 4px;border:0;border-radius:11px;font-weight:600;font-size:14px;min-height:44px;transition:background .15s,color .15s;${o[0] === sel ? 'background:var(--accent);color:var(--accent-t)' : 'background:transparent;color:var(--muted)'}">${o[1]}</button>`).join('')}</div>`;
   }
   function segBind(el, id, cb) {
     const box = $('#' + id, el);
     box.onclick = e => {
       const b = e.target.closest('button'); if (!b) return;
-      $$('button', box).forEach(x => { const on = x === b; x.style.background = on ? 'var(--accent)' : 'transparent'; x.style.color = on ? 'var(--accent-t)' : 'var(--muted)'; });
+      $$('button', box).forEach(x => { const on = x === b; x.setAttribute('aria-pressed', on); x.style.background = on ? 'var(--accent)' : 'transparent'; x.style.color = on ? 'var(--accent-t)' : 'var(--muted)'; });
       cb(b.dataset.v);
     };
   }
@@ -182,7 +186,7 @@
   const select = (id, label, opts) => `<label class="f">${label}<select id="${id}">${opts.map((o, i) => `<option value="${i}">${esc(o[0])}</option>`).join('')}</select></label>`;
   /* Progress ring */
   function ringSVG(id, size, col) {
-    return `<svg id="${id}" viewBox="-100 -100 200 200" width="${size || 220}" height="${size || 220}" style="display:block;margin:0 auto;transform:rotate(-90deg)">
+    return `<svg id="${id}" role="img" aria-label="Progress ring" viewBox="-100 -100 200 200" width="${size || 220}" height="${size || 220}" style="display:block;margin:0 auto;transform:rotate(-90deg)">
       <circle r="84" fill="none" stroke="var(--surface2)" stroke-width="14"/>
       <circle class="rv" r="84" fill="none" stroke="${col || 'var(--accent)'}" stroke-width="14" stroke-linecap="round" pathLength="100" stroke-dasharray="0 100" style="transition:stroke-dasharray .5s ease"/></svg>`;
   }
@@ -234,6 +238,32 @@
       document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
     } catch (e) { toast('Could not save'); }
   }
+  /* Timers and sounds stop when the screen locks, so timed tools hold a screen wake lock and, in the
+     Android app, schedule a local notification for the end. Both are best effort. */
+  function keepAwake() {
+    let lock = null, dead = false;
+    const ask = () => navigator.wakeLock ? navigator.wakeLock.request('screen').then(l => {
+      if (dead) { l.release().catch(() => {}); return false; }
+      lock = l; l.addEventListener('release', () => { if (lock === l) lock = null; }); return true;
+    }).catch(() => false) : Promise.resolve(false);
+    const vis = () => { if (!document.hidden && !lock && !dead) ask(); };
+    document.addEventListener('visibilitychange', vis);
+    return { ready: ask(), off() { dead = true; document.removeEventListener('visibilitychange', vis); if (lock) lock.release().catch(() => {}); lock = null; } };
+  }
+  const LN = () => window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.LocalNotifications;
+  async function notifyAt(id, title, body, atMs) {
+    const ln = LN(); if (!ln || !(atMs > Date.now())) return false;
+    try {
+      const p = await ln.requestPermissions(); if (p.display !== 'granted') return false;
+      await ln.schedule({ notifications: [{ id, title, body, schedule: { at: new Date(atMs), allowWhileIdle: true } }] });
+      return true;
+    } catch (e) { return false; }
+  }
+  function cancelNote(id) { const ln = LN(); if (ln) { try { Promise.resolve(ln.cancel({ notifications: [{ id }] })).catch(() => {}); } catch (e) {} } }
+  /* Says what protects a running timer; asks to keep the screen on when nothing does. */
+  function awakeNote(el, wl, scheduled) {
+    Promise.all([wl.ready, scheduled]).then(r => { const m = $('#aw', el); if (m) m.textContent = r[0] || r[1] ? '' : 'Keep the screen on: the timer and sounds can stop when the screen locks.'; });
+  }
   const lastDays = (n) => { const out = []; for (let i = n - 1; i >= 0; i--) out.push(addDays(new Date(), -i)); return out; };
   const DAYL = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   const safe = (fn) => { try { return fn(); } catch (e) { return undefined; } };
@@ -251,9 +281,9 @@
     el.innerHTML = `<div style="${wrap}">${seg('un', [['m', 'Metric'], ['i', 'Imperial']], unit)}
       <div class="card list" id="inp"></div>
       <div class="card center"><div style="${LBL}">Your BMI</div><div class="big" id="b" style="margin:4px 0;font-size:56px">--</div><div id="cat" style="font-size:19px;font-weight:700;transition:color .25s">Enter height and weight</div>
-        <div style="position:relative;margin:26px 6px 6px"><div style="display:flex;height:14px;border-radius:99px;overflow:hidden"><i style="flex:6.5;background:#38bdf8"></i><i style="flex:6.5;background:var(--ok)"></i><i style="flex:5;background:#f59e0b"></i><i style="flex:5;background:#f97316"></i><i style="flex:5;background:var(--danger)"></i></div>
+        <div style="position:relative;margin:26px 6px 6px"><div style="display:flex;height:14px;border-radius:99px;overflow:hidden"><i style="flex:3.5;background:#38bdf8"></i><i style="flex:6.5;background:var(--ok)"></i><i style="flex:5;background:#f59e0b"></i><i style="flex:5;background:#f97316"></i><i style="flex:5;background:var(--danger)"></i></div>
           <div id="mk" style="position:absolute;top:-14px;left:0;width:0;height:0;margin-left:-8px;border-left:8px solid transparent;border-right:8px solid transparent;border-top:12px solid var(--text);transition:left .4s ease;opacity:0"></div>
-          <div style="display:flex;justify-content:space-between;${MUTED};margin-top:4px"><span>15</span><span>18.5</span><span>25</span><span>30</span><span>35</span><span>40</span></div></div>
+          <div style="position:relative;height:18px;${MUTED};margin-top:4px">${[15, 18.5, 25, 30, 35, 40].map(v => `<span style="position:absolute;left:${(v - 15) / 25 * 100}%;transform:translateX(${v === 15 ? '0' : v === 40 ? '-100%' : '-50%'})">${v}</span>`).join('')}</div></div>
         <div id="rng" style="${MUTED};margin-top:10px"></div></div>
       <div style="${NOTE}">BMI ignores muscle, age and body shape. ${MED}</div></div>`;
     function build() {
@@ -336,7 +366,7 @@
           <g clip-path="url(#cp)"><g id="lv" style="transition:transform .8s cubic-bezier(.3,.7,.3,1)" transform="translate(0 232)"><g><animateTransform attributeName="transform" type="translate" from="-100 0" to="0 0" dur="3s" repeatCount="indefinite"/>
             <path d="M0 0Q25 -9 50 0T100 0T150 0T200 0T250 0T300 0V260H0Z" fill="var(--accent)" opacity=".85"/></g></g></g>
           <path d="M30 10H170L158 220Q157 232 145 232H55Q43 232 42 220Z" fill="none" stroke="var(--line)" stroke-width="3"/></svg>
-        <div style="position:absolute;inset:0;display:grid;place-content:center"><div class="big" id="ml" style="margin:0;font-size:38px;text-shadow:0 1px 6px rgba(0,0,0,.35);color:#fff">0</div><div style="text-align:center;font-size:13px;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.35)" id="of"></div></div></div></div>
+        <div style="position:absolute;inset:0;display:grid;place-content:center"><div class="big" id="ml" style="margin:0;font-size:38px" aria-live="polite">0</div><div style="text-align:center;font-size:13px" id="of"></div></div></div></div>
       <div class="row">${[150, 250, 330, 500].map(v => `<button class="btn alt add" data-v="${v}" style="padding:12px 0;font-size:15px">+${v}</button>`).join('')}</div>
       <div class="row"><input id="cu" type="number" inputmode="numeric" placeholder="Custom ml" min="1" max="5000" aria-label="Custom amount in ml"><button class="btn" id="ca">Add</button><button class="btn alt" id="un">Undo</button></div>
       <div class="card"><div style="${LBL};margin-bottom:8px">Last 14 days (ml)</div><canvas id="cv" style="${CANVAS};height:130px"></canvas></div>
@@ -347,11 +377,18 @@
     function paint() {
       const c = cur(), p = clamp(c / goal, 0, 1);
       $('#lv', el).setAttribute('transform', `translate(0 ${232 - p * 215})`); $('#ml', el).textContent = c; $('#of', el).textContent = `of ${goal} ml · ${Math.round(c / goal * 100)}%`;
+      // white text only reads on the water once it is more than half full; otherwise use the theme text colour
+      const lbl = p < 0.5 ? ['var(--text)', 'none'] : ['#fff', '0 1px 6px rgba(0,0,0,.35)'];
+      [$('#ml', el), $('#of', el)].forEach(n => { n.style.color = lbl[0]; n.style.textShadow = lbl[1]; });
       bars($('#cv', el), lastDays(14).map(d => ({ label: DAYL[d.getDay()], v: days[dkey(d)] || 0 })), goal);
     }
     const add = v => { v = Math.round(v); if (!(v > 0) || v > 5000) return; days[today()] = cur() + v; log.push(v); save(); paint(); if (cur() >= goal && cur() - v < goal) { toast('Daily goal reached'); if (navigator.vibrate) navigator.vibrate(120); } };
     $$('.add', el).forEach(b => b.onclick = () => add(+b.dataset.v));
-    $('#ca', el).onclick = () => { add(num(el, '#cu')); $('#cu', el).value = ''; };
+    $('#ca', el).onclick = () => {
+      const v = num(el, '#cu');
+      if (!(v >= 1 && v <= 5000)) { toast('Enter an amount from 1 to 5000 ml'); return; }
+      add(v); $('#cu', el).value = '';
+    };
     $('#un', el).onclick = () => { const v = log.pop(); if (v) { days[today()] = Math.max(0, cur() - v); save(); paint(); } else toast('Nothing to undo this session'); };
     $('#gl', el).oninput = () => { goal = clamp(num(el, '#gl') || 2000, 500, 10000); Store.set('water.goal', goal); paint(); };
     requestAnimationFrame(paint);
@@ -370,7 +407,8 @@
     $('#age', el).value = S.age; $('#cm', el).value = S.cm; $('#kg', el).value = S.kg; $('#act', el).value = S.act; $('#gl', el).value = S.goal;
     function calc() {
       S.age = num(el, '#age'); S.cm = num(el, '#cm'); S.kg = num(el, '#kg'); S.act = +$('#act', el).value; S.goal = +$('#gl', el).value; Store.set('bmr.s', S);
-      if (!(S.age > 0 && S.cm > 0 && S.kg > 0)) { $('#tg', el).textContent = '--'; $('#bm', el).textContent = $('#td', el).textContent = '--'; return; }
+      const ok = S.age >= 10 && S.age <= 110 && S.cm >= 100 && S.cm <= 250 && S.kg >= 20 && S.kg <= 300;
+      if (!ok) { $('#tg', el).textContent = '--'; $('#bm', el).textContent = $('#td', el).textContent = '--'; $('#wn', el).textContent = 'Enter age 10 to 110, height 100 to 250 cm and weight 20 to 300 kg.'; return; }
       const b = bmr(S.sex, S.kg, S.cm, S.age), t = b * ACT[S.act][1], g = t + GOALS[S.goal][1], floor = S.sex === 'm' ? 1500 : 1200;
       $('#bm', el).textContent = Math.round(b); $('#td', el).textContent = Math.round(t); $('#tg', el).textContent = Math.round(g).toLocaleString();
       $('#wn', el).textContent = g < floor ? `That target is below ${floor} kcal, which is usually too low. Aim higher or talk to a professional.` : '';
@@ -381,7 +419,7 @@
   /* ================================================================== 5. Breathing */
   Tools.register({ id: 'breathe', name: 'Breathing', icon: '🌬️', cat: 'health', desc: 'Guided breathing with an animated circle: box breathing, 4-7-8 or your own pattern, with a session timer and optional vibration cues.', keys: ['relax', 'calm', 'box breathing', '4-7-8', 'stress', 'anxiety'], needs: [], render(el) {
     const PRE = { box: [4, 4, 4, 4], '478': [4, 7, 8, 0], calm: [5, 0, 5, 0], custom: null };
-    let key = 'box', pat = PRE.box.slice(), mins = 3, running = false, iv = 0, t0 = 0, lastI = -1;
+    let key = 'box', pat = PRE.box.slice(), mins = 3, running = false, iv = 0, t0 = 0, lastI = -1, wl = null;
     el.innerHTML = `<div style="${wrap}">${seg('pr', [['box', 'Box 4-4-4-4'], ['478', '4-7-8'], ['calm', '5-5'], ['custom', 'Custom']], 'box')}
       <div id="cu" class="card row" style="display:none">${field('c0', 'In', 'min="0" max="30" value="4"')}${field('c1', 'Hold', 'min="0" max="30" value="4"')}${field('c2', 'Out', 'min="0" max="30" value="4"')}${field('c3', 'Hold', 'min="0" max="30" value="0"')}</div>
       <div class="card center" style="padding:20px 8px"><div style="position:relative;width:240px;height:240px;margin:0 auto;display:grid;place-items:center">
@@ -391,17 +429,18 @@
         <div id="tm" style="${MUTED};margin-top:10px">Session 3:00</div></div>
       <div class="row">${field('mn', 'Session (minutes)', 'min="1" max="60" value="3"')}<label class="f">Vibration cues<select id="vb"><option value="1">On</option><option value="0">Off</option></select></label></div>
       <button class="btn" id="go" style="min-height:52px">Start</button>
+      <div id="aw" style="${NOTE};min-height:16px"></div>
       <div style="${NOTE}">Breathe through your nose if you can. Stop if you feel dizzy. ${MED}</div></div>`;
     const names = ['Breathe in', 'Hold', 'Breathe out', 'Hold'];
     const build = () => names.map((nm, i) => ({ name: nm, sec: pat[i] })).filter(p => p.sec > 0);
     const circle = (scale, sec) => { const c = $('#ci', el); c.style.transitionDuration = sec + 's'; c.style.transform = `scale(${scale})`; };
     function readPat() { if (key === 'custom') pat = [0, 1, 2, 3].map(i => clamp(Math.round(num(el, '#c' + i)) || 0, 0, 30)); else pat = PRE[key].slice(); }
     function stop(done) {
-      clearInterval(iv); running = false; $('#go', el).textContent = 'Start'; circle(.45, 1); $('#ph', el).textContent = done ? 'Well done' : 'Ready'; $('#ct', el).textContent = ''; $('#tm', el).textContent = `Session ${mmss(mins * 60)}`;
+      clearInterval(iv); running = false; $('#go', el).textContent = 'Start'; circle(.45, 1); if (wl) { wl.off(); wl = null; } cancelNote(9101); $('#aw', el).textContent = ''; $('#ph', el).textContent = done ? 'Well done' : 'Ready'; $('#ct', el).textContent = ''; $('#tm', el).textContent = `Session ${mmss(mins * 60)}`;
       if (done && navigator.vibrate) navigator.vibrate([200, 100, 200]);
     }
     function tick() {
-      const t = (performance.now() - t0) / 1000, total = mins * 60;
+      const t = (Date.now() - t0) / 1000, total = mins * 60;
       if (t >= total) { stop(true); return; }
       const sched = build(), p = phaseAt(sched, t); if (!p) { stop(false); return; }
       $('#tm', el).textContent = `Remaining ${mmss(total - t)}`; $('#ct', el).textContent = Math.ceil(p.left);
@@ -416,11 +455,12 @@
     $('#go', el).onclick = () => {
       if (running) { stop(false); return; }
       readPat(); mins = clamp(Math.round(num(el, '#mn')) || 3, 1, 60); if (!build().length) { toast('Set at least one time above 0'); return; }
-      running = true; lastI = -1; cycleN = -1; t0 = performance.now(); $('#go', el).textContent = 'Stop'; iv = setInterval(tick, 100); tick();
+      running = true; lastI = -1; cycleN = -1; t0 = Date.now(); $('#go', el).textContent = 'Stop'; iv = setInterval(tick, 100); tick();
+      wl = keepAwake(); awakeNote(el, wl, notifyAt(9101, 'Breathing session complete', 'Well done.', t0 + mins * 60000 + 1000));
     };
     segBind(el, 'pr', v => { key = v; $('#cu', el).style.display = v === 'custom' ? '' : 'none'; if (running) stop(false); });
     $('#mn', el).oninput = () => { if (!running) $('#tm', el).textContent = 'Session ' + mmss((clamp(Math.round(num(el, '#mn')) || 3, 1, 60)) * 60); };
-    return () => { clearInterval(iv); if (navigator.vibrate) navigator.vibrate(0); };
+    return () => { clearInterval(iv); if (wl) wl.off(); cancelNote(9101); if (navigator.vibrate) navigator.vibrate(0); };
   } });
 
   /* ================================================================== 6. Sleep calculator */
@@ -474,6 +514,8 @@
     $('#add', el).onclick = () => {
       const v = num(el, '#v'), v2 = num(el, '#v2'), date = $('#dt', el).value || dkey();
       if (!isFinite(v) || (type === 'bp' && !isFinite(v2))) { toast('Enter a value'); return; }
+      const R = type === 'weight' ? [20, 500] : type === 'sugar' ? [10, 1500] : type === 'bp' ? [40, 300] : [0, 1e6];
+      if (!(v > 0) || v < R[0] || v > R[1] || (type === 'bp' && !(v2 >= 20 && v2 <= 200))) { toast('That value looks out of range'); return; }
       if (type === 'custom' && !$('#nm', el).value.trim()) { toast('Give the measure a name'); return; }
       if (entries.length >= 1000) { toast('Log is full (1000 entries)'); return; }
       entries.push({ id: Date.now() + Math.floor(Math.random() * 1000), type, v: +v.toFixed(2), v2: type === 'bp' ? +v2.toFixed(1) : undefined, date, note: $('#nt', el).value.trim().slice(0, 60), name: type === 'custom' ? $('#nm', el).value.trim().slice(0, 20) : undefined, unit: type === 'custom' ? $('#un', el).value.trim().slice(0, 8) : undefined });
@@ -489,10 +531,10 @@
 
   /* ================================================================== 8. Heart rate (camera PPG) */
   Tools.register({ id: 'heartrate', name: 'Heart Rate', icon: '❤️', cat: 'health', desc: 'Approximate pulse estimate: rest a fingertip on the rear camera and flash and the app counts the brightness pulses. An estimate only, not a medical device.', keys: ['pulse', 'bpm', 'heartbeat', 'ppg'], needs: ['camera'], render(el) {
-    const DUR = 20; let stream = null, vid = null, raf = 0, track = null, dead = false, running = false;
+    const DUR = 20; let stream = null, vid = null, raf = 0, track = null, dead = false, running = false, starting = false;
     let ts = [], vals = [], tStart = 0, lastCalc = 0, bpmNow = null;
     el.innerHTML = `<div style="${wrap}"><div class="card center" style="padding:16px 8px"><div style="position:relative;width:200px;margin:0 auto">${ringSVG('rg', 200, 'var(--danger)')}
-        <div style="position:absolute;inset:0;display:grid;place-content:center"><div id="hr" style="font-size:20px;color:var(--danger)">❤️</div><div class="big" id="bpm" style="margin:0;font-size:52px">--</div><div style="${MUTED}">BPM</div></div></div>
+        <div style="position:absolute;inset:0;display:grid;place-content:center"><div id="hr" style="font-size:20px;color:var(--danger)">❤️</div><div class="big" id="bpm" style="margin:0;font-size:52px" aria-live="polite">--</div><div style="${MUTED}">BPM</div></div></div>
         <div id="msg" style="font-size:14px;margin-top:10px;min-height:20px">Press start, then cover the rear camera and flash with your fingertip.</div></div>
       <div class="card"><canvas id="cv" style="${CANVAS};height:110px"></canvas></div>
       <button class="btn" id="go" style="min-height:52px">Start measuring</button>
@@ -506,7 +548,7 @@
       setRing($('#rg', el), 1); }
     function stopCam() {
       running = false; cancelAnimationFrame(raf);
-      if (track) { safe(() => track.applyConstraints({ advanced: [{ torch: false }] })); }
+      if (track) { const tr = track; safe(() => tr.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {})); }
       if (stream) stream.getTracks().forEach(t => t.stop());
       stream = track = null; $('#go', el).textContent = 'Start measuring';
     }
@@ -518,6 +560,7 @@
       for (let i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; } const N = d.length / 4; r /= N; g /= N; b /= N;
       const covered = r > 110 && r > g * 1.6 && r > b * 1.6, now = performance.now();
       if (!covered) { if (ts.length) { ts = []; vals = []; tStart = 0; setRing($('#rg', el), 0); } say(el, 'Cover the camera and flash with your fingertip.'); $('#bpm', el).textContent = '--'; return; }
+      if (ts.length && now - ts[ts.length - 1] > 300) { ts = []; vals = []; tStart = 0; setRing($('#rg', el), 0); say(el, 'Signal interrupted, measuring again. Hold still.'); }
       if (!tStart) tStart = now;
       ts.push(now); vals.push(r);
       const el_s = (now - tStart) / 1000; setRing($('#rg', el), el_s / DUR); say(el, `Measuring... ${Math.max(0, Math.ceil(DUR - el_s))} s. Hold still.`);
@@ -534,15 +577,19 @@
     }
     async function start() {
       if (running) { stopCam(); say(el, 'Stopped.'); return; }
+      if (starting) return;
+      starting = true;
+      stopCam(); // never leave an earlier stream running
       ts = []; vals = []; tStart = 0; bpmNow = null; setRing($('#rg', el), 0); $('#bpm', el).textContent = '--'; say(el, 'Starting camera...');
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 30 } }, audio: false });
-        if (dead) { stream.getTracks().forEach(t => t.stop()); return; }
+        if (dead) { stream.getTracks().forEach(t => t.stop()); stream = null; return; }
         track = stream.getVideoTracks()[0]; vid = $('#v', el); vid.srcObject = stream; await vid.play();
         const caps = track.getCapabilities ? track.getCapabilities() : {};
         if (caps.torch) await track.applyConstraints({ advanced: [{ torch: true }] }).catch(() => {}); else toast('No flash found. Use a bright light instead.');
         running = true; $('#go', el).textContent = 'Stop'; loop();
       } catch (e) { stopCam(); say(el, e && e.name === 'NotAllowedError' ? 'Camera permission denied.' : 'Camera not available.'); }
+      finally { starting = false; }
     }
     $('#go', el).onclick = start;
     return () => { dead = true; stopCam(); };
@@ -585,12 +632,12 @@
   } });
 
   /* ================================================================== 11. Waist to hip */
-  Tools.register({ id: 'whr', name: 'Waist-Hip Ratio', icon: '🧵', cat: 'health', desc: 'Waist-to-hip ratio with the WHO risk bands, a quick check of where body fat is carried.', keys: ['waist', 'hip', 'ratio', 'whr'], needs: [], render(el) {
+  Tools.register({ id: 'whr', name: 'Waist-Hip Ratio', icon: '🧵', cat: 'health', desc: 'Waist-to-hip ratio with the WHO cut-offs (0.90 men, 0.85 women), a quick check of where body fat is carried.', keys: ['waist', 'hip', 'ratio', 'whr'], needs: [], render(el) {
     let sex = 'm';
     el.innerHTML = `<div style="${wrap}"><div class="card list">${seg('sx', [['m', 'Male'], ['f', 'Female']], 'm')}<div class="row">${field('wa', 'Waist (any unit)', 'min="0" step="0.1"')}${field('hi', 'Hip (same unit)', 'min="0" step="0.1"')}</div></div>
       <div class="card center"><div style="${LBL}">Ratio</div><div class="big" id="r" style="margin:2px 0">--</div><div id="rk" style="font-size:19px;font-weight:700"></div></div>
       <div style="${NOTE}">Measure waist at the narrowest point and hips at the widest, both over thin clothes. ${MED}</div></div>`;
-    function calc() { const r = whrOf(num(el, '#wa'), num(el, '#hi')); $('#r', el).textContent = r ? r.toFixed(2) : '--'; const k = r ? whrRisk(sex, r) : null; $('#rk', el).textContent = k ? k.label : ''; if (k) $('#rk', el).style.color = k.col; }
+    function calc() { let r = whrOf(num(el, '#wa'), num(el, '#hi')); if (r && (r < 0.3 || r > 2)) r = null; $('#r', el).textContent = r ? r.toFixed(2) : '--'; const k = r ? whrRisk(sex, r) : null; $('#rk', el).textContent = k ? k.label : ''; if (k) $('#rk', el).style.color = k.col; }
     segBind(el, 'sx', v => { sex = v; calc(); }); el.addEventListener('input', calc);
   } });
 
@@ -647,12 +694,12 @@
       <button class="btn" id="go" style="min-height:52px">Start fast</button>
       <div class="card"><div style="${LBL};margin-bottom:6px">History</div><div id="hs" class="list"></div></div>
       <div style="${NOTE}">Fasting is not suitable for everyone, including pregnancy, diabetes, under-18s and eating disorders. Talk to a doctor first. ${MED}</div></div>`;
-    const PH = [[4, 'Digesting'], [12, 'Blood sugar settling'], [16, 'Fat burning picks up'], [24, 'Deeper fasting. Take care.']];
+    const PH = [[4, 'Hours 0-4 of your fast'], [12, 'Hours 4-12 of your fast'], [16, 'Hours 12-16 of your fast'], [24, 'Hours 16-24 of your fast']];
     function paint() {
       const run = !!st, ms = run ? Date.now() - st.start : 0, h = ms / 36e5;
       $('#t', el).textContent = hm(ms); $('#sb', el).textContent = run ? `of ${st.goal} hours` : 'Not fasting'; setRing($('#rg', el), run ? h / st.goal : 0);
       $('#go', el).textContent = run ? 'End fast' : 'Start fast'; $('#go', el).className = run ? 'btn danger' : 'btn';
-      $('#ph', el).textContent = run ? (h >= st.goal ? 'Goal reached' : (PH.find(p => h < p[0]) || PH[3])[1]) : '';
+      $('#ph', el).textContent = run ? (h >= st.goal ? 'Goal reached' : (PH.find(p => h < p[0]) || [0, 'Over 24 hours. Check in with a doctor about long fasts.'])[1]) : '';
       $('#hs', el).innerHTML = hist.slice(0, 8).map(x => `<div class="item"><span class="grow">${esc(new Date(x.start).toLocaleDateString([], { day: 'numeric', month: 'short' }))}</span><b>${hm(x.end - x.start)}</b><span class="muted">${x.end - x.start >= x.goal * 36e5 ? '✅' : ''}</span></div>`).join('') || `<div class="muted center">No fasts yet</div>`;
     }
     $('#go', el).onclick = () => {
@@ -668,10 +715,11 @@
   /* ================================================================== 15. Interval (HIIT) timer */
   Tools.register({ id: 'hiit', name: 'Workout Timer', icon: '🏋️', cat: 'health', desc: 'Interval timer for HIIT and circuits with work, rest and round settings, colour phases, sound and vibration.', keys: ['interval', 'hiit', 'tabata', 'exercise', 'workout', 'circuit'], needs: ['storage'], render(el) {
     const S = Store.get('hiit.s', { work: 30, rest: 10, rounds: 8, prep: 5 });
-    let running = false, iv = 0, t0 = 0, sched = [], lastI = -1, pausedAt = 0;
+    let running = false, iv = 0, t0 = 0, sched = [], lastI = -1, pausedAt = 0, wl = null;
     el.innerHTML = `<div style="${wrap}"><div id="box" class="card center" style="padding:28px 8px;transition:background .3s,color .3s"><div id="ph" style="font-size:20px;font-weight:700;letter-spacing:.08em;text-transform:uppercase">Ready</div><div class="big" id="ct" style="margin:6px 0;font-size:84px">0:30</div><div id="rd" style="font-size:15px;opacity:.8">8 rounds</div><div class="progress" style="margin:14px 20px 0;background:rgba(127,127,127,.3)"><i id="pg" style="width:0;background:currentColor"></i></div></div>
       <div class="row"><button class="btn" id="go" style="min-height:52px">Start</button><button class="btn alt" id="rs" style="min-height:52px">Reset</button></div>
       <div class="card row">${field('w', 'Work (s)', 'min="1" max="3600"')}${field('r', 'Rest (s)', 'min="0" max="3600"')}${field('n', 'Rounds', 'min="1" max="99"')}</div>
+      <div id="aw" style="${NOTE};min-height:16px"></div>
       <div style="${NOTE}">Warm up first and stop if you feel pain or dizziness. ${MED}</div></div>`;
     $('#w', el).value = S.work; $('#r', el).value = S.rest; $('#n', el).value = S.rounds;
     const total = () => sched.reduce((a, s) => a + s.sec, 0);
@@ -686,37 +734,39 @@
     function cue() { if (typeof beep === 'function') safe(beep); else if (navigator.vibrate) navigator.vibrate(200); }
     function idle(txt) { $('#ph', el).textContent = txt; look(''); $('#ct', el).textContent = mmss(S.work); $('#rd', el).textContent = S.rounds + ' rounds · ' + mmss(total()) + ' total'; $('#pg', el).style.width = '0'; }
     function tick() {
-      const t = (performance.now() - t0) / 1000;
+      const t = (Date.now() - t0) / 1000;
       if (t >= total()) { stop(); idle('Done'); cue(); toast('Workout complete'); return; }
       const p = phaseAt(sched, t), ph = sched[p.i];
       if (p.i !== lastI) { lastI = p.i; look(ph.name); $('#ph', el).textContent = ph.name; if (lastI > 0 || ph.name !== 'Get ready') cue(); $('#rd', el).textContent = ph.round ? `Round ${ph.round} of ${S.rounds}` : 'Starting soon'; }
       $('#ct', el).textContent = Math.ceil(p.left); $('#pg', el).style.width = (p.into / ph.sec * 100) + '%';
     }
-    function stop() { clearInterval(iv); running = false; $('#go', el).textContent = 'Start'; }
+    function stop() { clearInterval(iv); running = false; $('#go', el).textContent = 'Start'; if (wl) { wl.off(); wl = null; } cancelNote(9103); $('#aw', el).textContent = ''; }
     $('#go', el).onclick = () => {
-      if (running) { stop(); pausedAt = performance.now(); $('#go', el).textContent = 'Resume'; return; }
-      if (pausedAt && sched.length) { t0 += performance.now() - pausedAt; pausedAt = 0; }
-      else { read(); t0 = performance.now(); lastI = -1; }
+      if (running) { stop(); pausedAt = Date.now(); $('#go', el).textContent = 'Resume'; return; }
+      if (pausedAt && sched.length) { t0 += Date.now() - pausedAt; pausedAt = 0; }
+      else { read(); t0 = Date.now(); lastI = -1; }
       running = true; $('#go', el).textContent = 'Pause'; iv = setInterval(tick, 100); tick();
+      wl = keepAwake(); awakeNote(el, wl, notifyAt(9103, 'Workout complete', 'Nice work.', t0 + total() * 1000 + 1000));
     };
     $('#rs', el).onclick = () => { stop(); pausedAt = 0; read(); idle('Ready'); };
     el.addEventListener('input', () => { if (!running && !pausedAt) { read(); idle('Ready'); } });
     read(); idle('Ready');
-    return () => clearInterval(iv);
+    return () => { clearInterval(iv); if (wl) wl.off(); cancelNote(9103); };
   } });
 
   /* ================================================================== 16. Meditation timer */
   Tools.register({ id: 'meditate', name: 'Meditation', icon: '🧘', cat: 'health', desc: 'Silent meditation timer with a soft bell at the start and end and optional interval bells.', keys: ['mindfulness', 'zen', 'bell', 'calm', 'timer'], needs: [], render(el) {
-    let mins = Store.get('med.mins', 10), running = false, iv = 0, end = 0, ctx = null, nextI = 0, intv = 0, total = 0;
+    let mins = Store.get('med.mins', 10), running = false, iv = 0, end = 0, ctx = null, nextI = 0, intv = 0, total = 0, wl = null;
     el.innerHTML = `<div style="${wrap}">${seg('pr', [['5', '5'], ['10', '10'], ['15', '15'], ['20', '20'], ['30', '30']], String(mins))}
       <div class="card center" style="padding:16px 8px"><div style="position:relative;width:220px;margin:0 auto">${ringSVG('rg', 220)}<div style="position:absolute;inset:0;display:grid;place-content:center"><div class="big" id="t" style="margin:0;font-size:44px">10:00</div><div style="${MUTED}" id="sb">minutes</div></div></div></div>
       <div class="row">${field('mn', 'Custom minutes', 'min="1" max="180"')}<label class="f">Interval bell<select id="ib"><option value="0">None</option><option value="1">Every minute</option><option value="5">Every 5 min</option><option value="10">Every 10 min</option></select></label></div>
       <button class="btn" id="go" style="min-height:52px">Begin</button>
-      <div style="${NOTE}">Sit comfortably, close your eyes, follow your breath. The screen may sleep; the bell still sounds while the app stays open.</div></div>`;
+      <div id="aw" style="${NOTE};min-height:16px"></div>
+      <div style="${NOTE}">Sit comfortably, close your eyes, follow your breath. The screen is kept on during a session; where the app can, it also schedules an end-of-session notification.</div></div>`;
     const draw = () => { $('#t', el).textContent = running ? mmss((end - Date.now()) / 1000) : mmss(mins * 60); };
     const ac = () => { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); return ctx; };
     const ring = n => { const c = safe(ac); if (!c) return; for (let i = 0; i < n; i++) setTimeout(() => { bell(c, 528, 4); bell(c, 1056, 2.5); }, i * 900); if (navigator.vibrate) navigator.vibrate(150); };
-    function stop(done) { clearInterval(iv); running = false; $('#go', el).textContent = 'Begin'; setRing($('#rg', el), done ? 1 : 0); $('#sb', el).textContent = done ? 'Session complete' : 'minutes'; draw(); }
+    function stop(done) { clearInterval(iv); running = false; if (wl) { wl.off(); wl = null; } cancelNote(9102); $('#aw', el).textContent = ''; $('#go', el).textContent = 'Begin'; setRing($('#rg', el), done ? 1 : 0); $('#sb', el).textContent = done ? 'Session complete' : 'minutes'; draw(); }
     function tick() {
       const left = end - Date.now();
       if (left <= 0) { ring(3); stop(true); return; }
@@ -727,12 +777,13 @@
       if (running) { stop(false); return; }
       total = mins * 60000; end = Date.now() + total; intv = +$('#ib', el).value; nextI = total - intv * 60000;
       running = true; $('#go', el).textContent = 'End session'; $('#sb', el).textContent = 'remaining'; ring(1); iv = setInterval(tick, 250); tick();
+      wl = keepAwake(); awakeNote(el, wl, notifyAt(9102, 'Meditation complete', 'Your session has ended.', end + 1000));
     };
     const setM = v => { mins = clamp(Math.round(v) || 10, 1, 180); Store.set('med.mins', mins); if (!running) draw(); };
     segBind(el, 'pr', v => { $('#mn', el).value = ''; setM(+v); });
     $('#mn', el).oninput = () => { if (num(el, '#mn') > 0) setM(num(el, '#mn')); };
     draw();
-    return () => { clearInterval(iv); if (ctx) ctx.close().catch(() => {}); };
+    return () => { clearInterval(iv); if (wl) wl.off(); cancelNote(9102); if (ctx) ctx.close().catch(() => {}); };
   } });
 
   /* ================================================================== 17. Habit streaks */
@@ -747,7 +798,7 @@
         const on = hb.days.includes(t), s = streakOf(hb.days, t);
         return `<div class="card" style="padding:12px"><div class="row"><div style="flex:1"><div style="font-weight:700;font-size:17px">${esc(hb.name)}</div><div style="${MUTED}">🔥 ${s} day${s === 1 ? '' : 's'} · best ${hb.best || s}</div></div>
           <button class="btn tg ${on ? '' : 'alt'}" data-id="${hb.id}" style="flex:0 0 auto;min-width:96px;min-height:48px">${on ? '✓ Done' : 'Mark done'}</button></div>
-          <div class="row" style="margin-top:10px;gap:4px">${week.map(d => `<div style="text-align:center"><div style="width:100%;aspect-ratio:1;max-width:30px;margin:0 auto;border-radius:50%;background:${hb.days.includes(dkey(d)) ? 'var(--ok)' : 'var(--surface2)'}"></div><small class="muted">${DAYL[d.getDay()]}</small></div>`).join('')}
+          <div class="row" style="margin-top:10px;gap:4px">${week.map(d => `<div style="text-align:center"><div role="img" aria-label="${d.toLocaleDateString([], { weekday: 'long' })}: ${hb.days.includes(dkey(d)) ? 'done' : 'not done'}" style="width:100%;aspect-ratio:1;max-width:30px;margin:0 auto;border-radius:50%;background:${hb.days.includes(dkey(d)) ? 'var(--ok)' : 'var(--surface2)'}"></div><small class="muted">${DAYL[d.getDay()]}</small></div>`).join('')}
           <button class="btn alt rm" data-id="${hb.id}" aria-label="Delete habit ${esc(hb.name)}" style="flex:0 0 auto;padding:6px 10px">✕</button></div></div>`;
       }).join('') || `<div class="center muted" style="padding:24px">No habits yet. Add one above.</div>`;
     }
@@ -774,8 +825,8 @@
       <div style="${NOTE}">Carbs and protein give 4 kcal per gram, fat gives 9. Use the Calorie & BMR tool to find a target. ${MED}</div></div>`;
     $('#kc', el).value = Store.get('macro.kc', 2000);
     function calc() {
-      const kc = num(el, '#kc'); if (kc > 0) Store.set('macro.kc', kc);
-      if (key === 'custom') r = [num(el, '#rc') || 0, num(el, '#rp') || 0, num(el, '#rf') || 0];
+      const kc0 = num(el, '#kc'), kc = kc0 >= 500 && kc0 <= 10000 ? kc0 : NaN; if (kc > 0) Store.set('macro.kc', kc);
+      if (key === 'custom') r = [num(el, '#rc'), num(el, '#rp'), num(el, '#rf')].map(v => isFinite(v) ? clamp(v, 0, 100) : 0);
       const sum = r[0] + r[1] + r[2];
       $('#wn', el).textContent = key === 'custom' && Math.abs(sum - 100) > 0.5 ? `Percentages add to ${sum}%, they are scaled to 100%.` : '';
       [['bc', 0], ['bp', 1], ['bf', 2]].forEach(x => $('#' + x[0], el).style.flex = (r[x[1]] || 0.01));
@@ -789,12 +840,14 @@
 
   /* ================================================================== 19. Eye rest 20-20-20 */
   Tools.register({ id: 'eyerest', name: 'Eye Rest 20-20-20', icon: '👀', cat: 'health', desc: 'Reminds you every 20 minutes to look at something 20 feet away for 20 seconds, and counts the breaks you take.', keys: ['eye strain', 'screen break', '20-20-20', 'rest', 'computer'], needs: ['storage'], render(el) {
-    let running = false, phase = 'work', end = 0, iv = 0, work = 20;
+    let running = false, phase = 'work', end = 0, iv = 0, work = 20, wl = null;
     const key = () => 'eye.' + dkey();
+    // keep only the last 30 daily counters
+    safe(() => { const cut = dkey(addDays(new Date(), -30)); Object.keys(localStorage).forEach(k => { const m = /^pk\.eye\.(\d{4}-\d\d-\d\d)$/.exec(k); if (m && m[1] < cut) localStorage.removeItem(k); }); });
     el.innerHTML = `<div style="${wrap}"><div class="card center" style="padding:20px 8px"><div style="position:relative;width:220px;margin:0 auto">${ringSVG('rg', 220)}<div style="position:absolute;inset:0;display:grid;place-content:center"><div class="big" id="t" style="margin:0;font-size:46px">20:00</div><div id="sb" style="${MUTED}">Next break in</div></div></div><div id="ms" style="margin-top:10px;font-weight:700;font-size:18px;min-height:26px"></div></div>
       <button class="btn" id="go" style="min-height:52px">Start</button>
       <div class="row">${stat('br', 'Breaks today', String(Store.get(key(), 0)))}${field('wk', 'Work minutes', 'min="5" max="120" value="20"')}</div>
-      <div style="${NOTE}">Every 20 minutes, look at something about 6 metres (20 feet) away for 20 seconds. Keep this screen on to get the reminders; they sound and vibrate while the app is open. ${MED}</div></div>`;
+      <div style="${NOTE}">Every 20 minutes, look at something about 6 metres (20 feet) away for 20 seconds. The screen is kept on while the timer runs; where the app can, it also schedules a notification for the next break. ${MED}</div><div id="aw" style="${NOTE};min-height:16px"></div></div>`;
     const cue = () => { if (typeof beep === 'function') safe(beep); else if (navigator.vibrate) navigator.vibrate([200, 100, 200]); };
     function paint() {
       const left = Math.max(0, end - Date.now()), tot = (phase === 'work' ? work * 60 : 20) * 1000;
@@ -807,30 +860,32 @@
       if (Date.now() < end) { paint(); return; }
       cue();
       if (phase === 'work') { phase = 'rest'; end = Date.now() + 20000; }
-      else { phase = 'work'; end = Date.now() + work * 60000; Store.set(key(), Store.get(key(), 0) + 1); $('#br', el).textContent = Store.get(key(), 0); }
+      else { phase = 'work'; end = Date.now() + work * 60000; Store.set(key(), Store.get(key(), 0) + 1); $('#br', el).textContent = Store.get(key(), 0); notifyAt(9104, 'Eye break', 'Look 20 feet away for 20 seconds.', end); }
       paint();
     }
     $('#go', el).onclick = () => {
-      if (running) { running = false; clearInterval(iv); $('#go', el).textContent = 'Start'; paint(); return; }
+      if (running) { running = false; clearInterval(iv); if (wl) { wl.off(); wl = null; } cancelNote(9104); $('#aw', el).textContent = ''; $('#go', el).textContent = 'Start'; paint(); return; }
       work = clamp(Math.round(num(el, '#wk')) || 20, 5, 120); phase = 'work'; end = Date.now() + work * 60000; running = true; $('#go', el).textContent = 'Stop'; iv = setInterval(tick, 500); paint();
+      wl = keepAwake(); awakeNote(el, wl, notifyAt(9104, 'Eye break', 'Look 20 feet away for 20 seconds.', end));
     };
     $('#wk', el).oninput = () => { if (!running) { work = clamp(Math.round(num(el, '#wk')) || 20, 5, 120); paint(); } };
     paint();
-    return () => clearInterval(iv);
+    return () => { clearInterval(iv); if (wl) wl.off(); cancelNote(9104); };
   } });
 
   /* ================================================================== 20. Mood log */
   Tools.register({ id: 'mood', name: 'Mood Log', icon: '🙂', cat: 'health', desc: 'Record how you feel each day with one tap and a note, and see your last 14 days at a glance. Stored on this device.', keys: ['mood', 'feelings', 'diary', 'journal', 'wellbeing', 'emotion'], needs: ['storage'], render(el) {
     let days = Store.get('mood.days', {}); let pick = 0;
     const FACES = [['😞', 'Awful', 'var(--danger)'], ['🙁', 'Bad', '#f97316'], ['😐', 'Okay', '#f59e0b'], ['🙂', 'Good', '#84cc16'], ['😄', 'Great', 'var(--ok)']];
+    const fc = m => FACES[m && m.m] || FACES[2]; // tolerate a bad stored value
     el.innerHTML = `<div style="${wrap}"><div class="card center"><div style="${LBL}">How are you today?</div><div class="row" id="fc" style="margin-top:12px;gap:6px">${FACES.map((f, i) => `<button class="btn alt fc" data-i="${i}" aria-label="${f[1]}" style="font-size:30px;padding:10px 0;min-height:60px;border-radius:16px;transition:transform .15s">${f[0]}</button>`).join('')}</div>
         <label class="f" style="margin-top:12px;text-align:left">Note<input id="nt" type="text" maxlength="80" placeholder="optional"></label><button class="btn" id="sv" style="width:100%;margin-top:10px">Save today</button></div>
       <div class="card"><div style="${LBL};margin-bottom:8px">Last 14 days</div><div id="gr" class="row" style="gap:3px;align-items:flex-end;height:90px"></div></div><div id="ls" class="list"></div>
       <div style="${NOTE}">If low mood lasts for weeks, please talk to someone you trust or a health professional. ${MED}</div></div>`;
     const sel = i => { pick = i; $$('.fc', el).forEach((b, j) => { b.style.transform = j === i ? 'scale(1.12)' : ''; b.style.borderColor = j === i ? FACES[i][2] : ''; b.style.opacity = i === -1 || j === i ? 1 : .55; }); };
     function paint() {
-      $('#gr', el).innerHTML = lastDays(14).map(d => { const m = days[dkey(d)]; return `<div style="flex:1;text-align:center"><div title="${m ? FACES[m.m][1] : 'no entry'}" style="height:${m ? 14 + m.m * 14 : 6}px;border-radius:6px;background:${m ? FACES[m.m][2] : 'var(--surface2)'};transition:height .4s"></div><small class="muted" style="font-size:10px">${DAYL[d.getDay()]}</small></div>`; }).join('');
-      $('#ls', el).innerHTML = Object.keys(days).sort().reverse().slice(0, 10).map(k => `<div class="item"><span style="font-size:24px">${FACES[days[k].m][0]}</span><div class="grow"><b>${FACES[days[k].m][1]}</b> <span class="muted">${esc(k)}</span>${days[k].n ? `<div style="${MUTED}">${esc(days[k].n)}</div>` : ''}</div></div>`).join('');
+      $('#gr', el).innerHTML = lastDays(14).map(d => { const m = days[dkey(d)]; return `<div style="flex:1;text-align:center"><div title="${m ? fc(m)[1] : 'no entry'}" style="height:${m ? 14 + (FACES[m.m] ? m.m : 2) * 14 : 6}px;border-radius:6px;background:${m ? fc(m)[2] : 'var(--surface2)'};transition:height .4s"></div><small class="muted" style="font-size:10px">${DAYL[d.getDay()]}</small></div>`; }).join('');
+      $('#ls', el).innerHTML = Object.keys(days).sort().reverse().slice(0, 10).map(k => `<div class="item"><span style="font-size:24px">${fc(days[k])[0]}</span><div class="grow"><b>${fc(days[k])[1]}</b> <span class="muted">${esc(k)}</span>${days[k].n ? `<div style="${MUTED}">${esc(days[k].n)}</div>` : ''}</div></div>`).join('');
     }
     $('#fc', el).onclick = e => { const b = e.target.closest('.fc'); if (b) sel(+b.dataset.i); };
     $('#sv', el).onclick = () => { if (pick < 0) { toast('Pick a face first'); return; } days[dkey()] = { m: pick, n: $('#nt', el).value.trim().slice(0, 80) }; const k = Object.keys(days).sort(); while (k.length > 400) delete days[k.shift()]; Store.set('mood.days', days); paint(); toast('Saved'); };

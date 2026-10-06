@@ -3,12 +3,13 @@
 - category: measure
 - plan: free
 - needs: storage (saves the calibration)
-- what: An on-screen ruler with centimetre and inch scales, horizontal or vertical. Calibrate it by laying a credit card (85.6 mm) on the screen and dragging a line to the card's far edge; the calibration is saved.
+- what: An on-screen ruler with centimetre and inch scales, horizontal or vertical. Calibrate it by laying a credit card (85.6 mm) on the screen and dragging the round handle (only the handle drags, so the page can still scroll) to the card's far edge; Save and Reset sit above the calibration area so they stay visible. The calibration is saved.
 - test:
   1. Open Ruler. The cm scale shows on the top edge and the inch scale on the bottom. Tap Vertical: the ruler turns into a tall strip you can scroll.
   2. Tap "Calibrate with a credit card". Lay a real card lengthwise with its short edge on the top line, drag the handle to the card's other end, tap Save. The info line says "calibrated".
   3. Hold the card against the ruler: it should measure 8.6 cm (3.4 in).
   4. Leave the tool and reopen it: the calibration is still in place. Tap Reset: the info line says "not calibrated yet".
+  5. Open calibration on a small phone: Save and Reset are visible without scrolling past the card area, and swiping on the empty area scrolls the page instead of moving the line.
 
 ## Protractor
 - id: protractor
@@ -21,6 +22,7 @@
   2. Drag to 90: the supplement and complement both read 90.
   3. Tap "Tilt phone": hold the phone upright against a wall, the arm moves as you rotate it in the plane of the screen. Tap "Set current tilt as zero" and the reading becomes 0.
   4. On a device without a motion sensor the tilt mode shows "No motion sensor found".
+  5. In tilt mode lay the phone flat (or nearly): "Hold the phone upright" shows instead of a jumpy reading. Hold it upright and rotate through horizontal (0 and 180): the arm moves smoothly and does not jump to 90.
 
 ## Pendulum Bob
 - id: plumb
@@ -30,7 +32,7 @@
 - what: A plumb line that swings from the top of the screen. It shows the angle from vertical plus the sideways and forward/back tilt, using the gravity vector.
 - test:
   1. Hold the phone upright: the bob hangs straight and the angle is near 0 and turns green when within 1 degree.
-  2. Tilt it sideways: the line swings the same way and the Sideways value changes.
+  2. Tilt it sideways: the line swings away from the lowered side, like a real plumb line hanging in front of the phone (bob moves left when Sideways is positive), and the Sideways value changes.
   3. Tilt the top towards or away from you: the bob grows or shrinks and Forward / back changes.
   4. Lay the phone flat: the angle reads about 90 degrees.
 
@@ -45,6 +47,7 @@
   2. Clear the marks, mark only the top, type a distance of 10: the height shows as eye + d x tan(top).
   3. Switch to feet: the units on the labels and result change.
   4. Mark a base angle that points upward (positive): no result appears (needs a downward base angle or a distance).
+  5. Switch to feet: the eye height converts (1.6 m becomes 5.25 ft). Aim almost straight up (over 85 degrees): the result shows "--" instead of a huge number.
 
 ## Distance Finder
 - id: distancefinder
@@ -57,6 +60,7 @@
   2. Tap "Hold angle", move the phone: the result stays; tap Live to resume.
   3. Aim at or above the horizon: the result shows "--".
   4. Switch units to feet and check the label changes.
+  5. Switch to feet: the eye height converts. Aim almost straight down (over 85 degrees): "--" is shown.
 
 ## Speed Calc
 - id: speedcalc
@@ -81,6 +85,7 @@
   2. Shake the phone: the gauge and graph spike and Peak increases.
   3. Tap Reset peak: peak and graph clear.
   4. Tick "Remove gravity": the total drops to about 0 when still (if the phone provides it).
+  5. On a phone that does not report gravity-free acceleration, tick "Remove gravity": a message says so and the box unticks itself.
 
 ## Vibrometer
 - id: vibrometer
@@ -105,6 +110,7 @@
   2. Tap Reset: taps return to 0 and RPM to "--".
   3. Switch to Microphone and allow access. Hold the phone next to a steadily ticking clock or metronome set to 60 per minute: RPM reads about 60 after a few seconds.
   4. Deny the microphone permission: "Microphone permission denied." shows.
+  5. Switch quickly between Tap and Microphone several times: the microphone indicator in the status bar goes off after you leave Microphone mode (no stream is left running).
 
 ## Screen Info
 - id: pixelinfo
@@ -129,6 +135,7 @@
   2. Tap "Zero here" on a surface to calibrate it to 0.
   3. Tap Hold: the value freezes and the button says Release.
   4. Switch to "Sight along edge" and tilt the top edge upward: the angle reads the elevation.
+  5. Turn the phone face down: the percent stays positive and the angle never exceeds 90. Tap Hold, then switch mode: the button goes back to "Hold".
 
 ## Shadow Height
 - id: shadowheight
@@ -180,19 +187,19 @@
 - category: measure
 - plan: free
 - needs: motion
-- what: Shows magnetic field strength in microtesla with X/Y/Z, peak and a graph, for finding magnets and metal. Shows a clear message when the phone does not expose a magnetometer to apps.
+- what: Shows magnetic field strength in microtesla with X/Y/Z, peak and a graph, for finding magnets and metal. Works only on phones that expose the sensor to apps (the Android WebView often does not); otherwise it shows a clear message.
 - test:
   1. On a phone with the sensor the total reads about 25 to 65 microtesla away from metal.
   2. Move the phone near a speaker or magnet: the value jumps and the gauge fills.
   3. Tap "Zero baseline" to see only the change; tap again to go back to absolute.
-  4. On a device or browser without the API: "does not provide a magnetic field sensor" appears and nothing crashes.
+  4. On a device or browser without the API: "does not expose a magnetic field sensor" appears and nothing crashes.
 
 ## Light Meter
 - id: lightmeter
 - category: measure
 - plan: free
 - needs: motion (ambient light sensor)
-- what: Ambient light in lux with a plain-language label and a graph, using the ambient light sensor when the phone exposes it. Approximate; shows a message instead of guessing when no sensor is available.
+- what: Ambient light in lux with a plain-language label and a graph, using the ambient light sensor when the phone exposes it to apps (many do not). Approximate; shows a message instead of guessing when no sensor is available.
 - test:
   1. On a supported device cover the top of the phone with a hand: lux drops and the label becomes "Almost dark" or "Dim room".
   2. Point at a window: lux rises and the peak updates.
