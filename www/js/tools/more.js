@@ -331,7 +331,7 @@ const fcParse = (text) => {
 };
 const fcExport = (decks) => decks.map((d) => '# ' + d.name + '\n' + d.cards.map((c) => c.q.replace(/\n/g, ' ') + ' :: ' + c.a.replace(/\n/g, ' ')).join('\n')).join('\n\n');
 // ==PURE-END==
-reg({ id: 'flashcards', name: 'Flashcards', icon: '🃏', cat: 'text', desc: 'Make decks of flashcards and study them with Leitner-box spaced repetition, with due dates, stats and import or export as plain text.', keys: ['study', 'learn', 'spaced repetition', 'leitner', 'revision', 'memorise', 'quiz'], needs: ['storage'], render(el) {
+reg({ id: 'flashcards', name: 'Flashcards', icon: '📇', cat: 'text', desc: 'Make decks of flashcards and study them with Leitner-box spaced repetition, with due dates, stats and import or export as plain text.', keys: ['study', 'learn', 'spaced repetition', 'leitner', 'revision', 'memorise', 'quiz'], needs: ['storage'], render(el) {
   let decks = ld('flashcards.decks', []);
   let view = 'home', deckId = null, tab = 'review', queue = [], shown = false, qi = 0;
   const today = () => dayNum(new Date());
@@ -1026,7 +1026,7 @@ const findPattern = (pat, list) => {
   return list.filter((w) => re.test(w));
 };
 // ==PURE-END==
-reg({ id: 'anagram', name: 'Word Finder', icon: '🔡', cat: 'text', desc: 'Offline word helper with a built-in list of common English words: find anagrams, words you can make from letters (blanks allowed), and words matching a pattern like c?t or ab*.', keys: ['anagram', 'scrabble', 'wordle', 'crossword', 'letters', 'unscramble', 'words with friends', 'solver'], needs: [], render(el) {
+reg({ id: 'anagram', name: 'Word Finder', icon: '🪧', cat: 'text', desc: 'Offline word helper with a built-in list of common English words: find anagrams, words you can make from letters (blanks allowed), and words matching a pattern like c?t or ab*.', keys: ['anagram', 'scrabble', 'wordle', 'crossword', 'letters', 'unscramble', 'words with friends', 'solver'], needs: [], render(el) {
   let mode = ld('anagram.mode', 'from');
   const HELP = { anagram: 'Type a word or letters: finds words that use exactly all of them.', from: 'Type your letters (use ? for a blank tile): finds words you can make from some or all of them.', pat: 'Use ? for one unknown letter and * for any run of letters. Example: c?t, ?o?se, un*ing.' };
   el.innerHTML = `${tabBar('tb', [['from', 'From letters'], ['anagram', 'Anagrams'], ['pat', 'Pattern']], mode)}
@@ -1163,7 +1163,7 @@ const mxInv = (A) => {
 };
 const mxParseCell = (s) => { s = String(s).trim(); if (!s) return 0; const m = /^(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)$/.exec(s); if (m) return +m[2] ? m[1] / m[2] : NaN; const n = Number(s.replace(',', '.')); return Number.isFinite(n) ? n : NaN; };
 // ==PURE-END==
-reg({ id: 'matrix', name: 'Matrix Calc', icon: '🧱', desc: 'Add, subtract and multiply matrices up to 4 by 4, and find determinants, inverses and transposes, with fractions accepted in cells.', keys: ['matrix', 'determinant', 'inverse', 'linear algebra', 'multiply', 'transpose', 'maths'], needs: [], render(el) {
+reg({ id: 'matrix', name: 'Matrix Calc', icon: '🔢', desc: 'Add, subtract and multiply matrices up to 4 by 4, and find determinants, inverses and transposes, with fractions accepted in cells.', keys: ['matrix', 'determinant', 'inverse', 'linear algebra', 'multiply', 'transpose', 'maths'], needs: [], render(el) {
   const sz = ld('matrix.sz', { a: [2, 2], b: [2, 2] });
   const vals = { a: [['2', '1'], ['5', '3']], b: [['1', '0'], ['0', '1']] };
   const OPS = [['add', 'A + B'], ['sub', 'A − B'], ['mul', 'A × B'], ['det', 'det(A)'], ['inv', 'A⁻¹'], ['tr', 'Aᵀ'], ['bmul', 'B × A']];
@@ -1228,7 +1228,7 @@ const radLabel = (deg) => {
 };
 const trigVals = (deg) => { const r = deg * Math.PI / 180, s = Math.sin(r), c = Math.cos(r); return { sin: Math.abs(s) < 1e-12 ? 0 : s, cos: Math.abs(c) < 1e-12 ? 0 : c, tan: Math.abs(c) < 1e-12 ? NaN : s / c }; };
 // ==PURE-END==
-reg({ id: 'trig', name: 'Trig Circle', icon: '⭕', desc: 'An interactive unit circle with sine, cosine and tangent for any angle, plus a table of exact values for the common angles in degrees and radians.', keys: ['trigonometry', 'sine', 'cosine', 'tangent', 'unit circle', 'radians', 'degrees', 'maths', 'sin cos tan'], needs: [], render(el) {
+reg({ id: 'trig', name: 'Trig Circle', icon: '♾️', desc: 'An interactive unit circle with sine, cosine and tangent for any angle, plus a table of exact values for the common angles in degrees and radians.', keys: ['trigonometry', 'sine', 'cosine', 'tangent', 'unit circle', 'radians', 'degrees', 'maths', 'sin cos tan'], needs: [], render(el) {
   let deg = 30;
   const R = 100, C = 120;
   el.innerHTML = `<div class="card" style="padding:14px"><svg id="sv" viewBox="0 0 240 240" style="width:100%;max-width:340px;display:block;margin:0 auto;touch-action:none" role="img" aria-label="Unit circle"></svg>
