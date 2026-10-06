@@ -563,17 +563,256 @@ Tools.register({ id: 'mirror', name: 'Mirror', icon: '🪞', cat: 'camera', desc
   return () => cam.stop();
 } });
 
+/* BARDEC-START: self-contained 1D barcode decoder (EAN-13, EAN-8, UPC-A, UPC-E, Code 128). Pure functions, no DOM; tested in Node.
+   Works on run-lengths of bars/spaces, so it does not care about bar colour (inverted codes work) and a reversed run list gives the upside-down read. */
+const BarDec = (() => {
+  const P = (s) => Array.from(s, Number);
+  const C128 = '212222,222122,222221,121223,121322,131222,122213,122312,132212,221213,221312,231212,112232,122132,122231,113222,123122,123221,223211,221132,221231,213212,223112,312131,311222,321122,321221,312212,322112,322211,212123,212321,232121,111323,131123,131321,112313,132113,132311,211313,231113,231311,112133,112331,132131,113123,113321,133121,313121,211331,231131,213113,213311,213131,311123,311321,331121,312113,312311,332111,314111,221411,431111,111224,111422,121124,121421,141122,141221,112214,112412,122114,122411,142112,142211,241211,221114,413111,241112,134111,111242,121142,121241,114212,124112,124211,411212,421112,421211,212141,214121,412121,111143,111341,131141,114113,114311,411113,411311,113141,114131,311141,411131,211412,211214,211232,2331112'.split(',').map(P);
+  const L = '3211,2221,2122,1411,1132,1231,1114,1312,1213,3112'.split(',').map(P);
+  const LG = L.concat(L.map(p => p.slice().reverse()));       // 0-9 = L codes, 10-19 = G codes
+  const PAR = 'LLLLLL,LLGLGG,LLGGLG,LLGGGL,LGLLGG,LGGLLG,LGGGLL,LGLGLG,LGLGGL,LGGLGL'.split(',');
+  const UPE = 'GGGLLL,GGLGLL,GGLLGL,GGLLLG,GLGGLL,GLLGGL,GLLLGG,GLGLGL,GLGLLG,GLLGLG'.split(',');
+  const STOP = C128[106], G1 = [1, 1, 1], G5 = [1, 1, 1, 1, 1], G6 = [1, 1, 1, 1, 1, 1];
+  const BIG = 1e9;
+
+  /* Average deviation of runs r[i..] from a pattern scaled to fit them (after ZXing); 9 means no match. */
+  function vr(r, i, pat) {
+    let tot = 0, pl = 0; const n = pat.length;
+    for (let k = 0; k < n; k++) { tot += r[i + k]; pl += pat[k]; }
+    if (!(tot >= pl * 0.7) || tot > 1e5) return 9;
+    const u = tot / pl, mi = 0.7 * u; let tv = 0;
+    for (let k = 0; k < n; k++) { const d = Math.abs(r[i + k] - pat[k] * u); if (d > mi) return 9; tv += d; }
+    return tv / tot;
+  }
+  const sumOk = (r, i, n, pl, u) => { let t = 0; for (let k = 0; k < n; k++) t += r[i + k]; return t > 0.65 * pl * u && t < 1.35 * pl * u; };
+  function best(r, i, tabs, pl, u, lim) {
+    if (!sumOk(r, i, tabs[0].length, pl, u)) return -1;
+    let bi = -1, bv = lim;
+    for (let k = 0; k < tabs.length; k++) { const v = vr(r, i, tabs[k]); if (v < bv) { bv = v; bi = k; } }
+    return bi;
+  }
+  const guard = (r, s) => {
+    if (s < 1 || s + 4 > r.length) return 0;
+    const u = (r[s] + r[s + 1] + r[s + 2]) / 3;
+    if (!(u >= 0.7 && u < 1e4) || vr(r, s, G1) > 0.3) return 0;
+    if (s > 2 && r[s - 1] < 4 * u) return 0;       // quiet zone (a leading partial run at index 1 counts as quiet)
+    return u;
+  };
+  const quietR = (r, e, u) => e >= r.length - 2 || r[e] >= 4 * u;
+  function digits(r, i, n, tabs, u, lim) {
+    const out = [];
+    for (let k = 0; k < n; k++) { const d = best(r, i + 4 * k, tabs, 7, u, lim || 0.48); if (d < 0) return null; out.push(d); }
+    return out;
+  }
+  const ean13Check = (d) => { let s = 0; for (let i = 0; i < 12; i++) s += d[i] * (i % 2 ? 3 : 1); return (10 - s % 10) % 10; };
+
+  function ean13At(r, s, u) {
+    const c = s + 27, end = c + 29;
+    if (end + 3 > r.length - 1) return null;
+    const left = digits(r, s + 3, 6, LG, u); if (!left) return null;
+    const f = PAR.indexOf(left.map(k => k < 10 ? 'L' : 'G').join('')); if (f < 0) return null;
+    if (vr(r, c, G5) > 0.35 || !sumOk(r, c, 5, 5, u)) return null;
+    const right = digits(r, c + 5, 6, L, u); if (!right) return null;
+    if (vr(r, end, G1) > 0.3 || !sumOk(r, end, 3, 3, u) || !quietR(r, end + 3, u)) return null;
+    const d = [f].concat(left.map(k => k % 10), right);
+    if (ean13Check(d) !== d[12]) return null;
+    return f === 0 ? { type: 'UPC-A', text: d.slice(1).join('') } : { type: 'EAN-13', text: d.join('') };
+  }
+  function ean8At(r, s, u) {
+    const c = s + 19, end = c + 21;
+    if (end + 3 > r.length - 1) return null;
+    const left = digits(r, s + 3, 4, L, u); if (!left) return null;
+    if (vr(r, c, G5) > 0.35 || !sumOk(r, c, 5, 5, u)) return null;
+    const right = digits(r, c + 5, 4, L, u); if (!right) return null;
+    if (vr(r, end, G1) > 0.3 || !sumOk(r, end, 3, 3, u) || !quietR(r, end + 3, u)) return null;
+    const d = left.concat(right); let sum = 0;
+    for (let i = 0; i < 7; i++) sum += d[i] * (i % 2 ? 1 : 3);
+    if ((10 - sum % 10) % 10 !== d[7]) return null;
+    return { type: 'EAN-8', text: d.join('') };
+  }
+  function upceAt(r, s, u) {
+    const end = s + 27;
+    if (end + 6 > r.length - 1) return null;
+    // Short code, so be stricter than for EAN: wider quiet zones, tighter fit, whole-pixel module size.
+    if (u < 1 || (s > 2 && r[s - 1] < 7 * u) || !(end + 6 >= r.length - 2 || r[end + 6] >= 7 * u)) return null;
+    const left = digits(r, s + 3, 6, LG, u, 0.4); if (!left) return null;
+    if (vr(r, end, G6) > 0.3 || !sumOk(r, end, 6, 6, u)) return null;
+    const par = left.map(k => k < 10 ? 'L' : 'G').join('');
+    let sys = 0, chk = UPE.indexOf(par);
+    if (chk < 0) { sys = 1; chk = UPE.indexOf(par.replace(/[LG]/g, (m) => m === 'L' ? 'G' : 'L')); }
+    if (chk < 0) return null;
+    const x = left.map(k => k % 10), last = x[5];
+    let body;     // the 10 digits between number system and check digit, as in UPC-A
+    if (last < 3) body = [x[0], x[1], last, 0, 0, 0, 0, x[2], x[3], x[4]];
+    else if (last === 3) body = [x[0], x[1], x[2], 0, 0, 0, 0, 0, x[3], x[4]];
+    else if (last === 4) body = [x[0], x[1], x[2], x[3], 0, 0, 0, 0, 0, x[4]];
+    else body = [x[0], x[1], x[2], x[3], x[4], 0, 0, 0, 0, last];
+    if (ean13Check([0, sys].concat(body)) !== chk) return null;
+    // Cannot be a plain digit-run noise match: both the parity pattern and the check digit agreed.
+    return { type: 'UPC-E', text: sys + x.join('') + chk };
+  }
+
+  function code128At(r, s) {
+    if (s < 1 || s + 20 > r.length) return null;
+    let st = -1, bv = 0.35;
+    for (let k = 103; k < 106; k++) { const v = vr(r, s, C128[k]); if (v < bv) { bv = v; st = k; } }
+    if (st < 0) return null;
+    const u = (r[s] + r[s + 1] + r[s + 2] + r[s + 3] + r[s + 4] + r[s + 5]) / 11;
+    if (!(u >= 0.7) || (s > 2 && r[s - 1] < 4 * u)) return null;
+    const vals = [st]; let pos = s + 6;
+    for (;;) {
+      if (pos + 7 > r.length - 1 || vals.length > 90) return null;
+      if (sumOk(r, pos, 7, 13, u) && vr(r, pos, STOP) < 0.3) { pos += 7; break; }
+      const k = best(r, pos, C128.slice(0, 106), 11, u, 0.35);
+      if (k < 0) return null;
+      vals.push(k); pos += 6;
+    }
+    if (vals.length < 4 || !quietR(r, pos, u)) return null;
+    const chk = vals[vals.length - 1]; let sum = vals[0];
+    for (let i = 1; i < vals.length - 1; i++) sum += vals[i] * i;
+    if (sum % 103 !== chk) return null;
+    let set = st === 103 ? 'A' : st === 104 ? 'B' : 'C', text = '', shift = false;
+    for (let i = 1; i < vals.length - 1; i++) {
+      const v = vals[i]; let cs = shift ? (set === 'A' ? 'B' : 'A') : set; shift = false;
+      if (cs === 'C') {
+        if (v < 100) text += (v < 10 ? '0' : '') + v; else if (v === 100) set = 'B'; else if (v === 101) set = 'A';
+      } else if (v < 96) {
+        const code = cs === 'A' ? (v < 64 ? v + 32 : v - 64) : v + 32;
+        if (code < 32 || code > 126) return null;      // control characters: treat as a misread
+        text += String.fromCharCode(code);
+      } else if (v === 98) shift = true;
+      else if (v === 99) set = 'C';
+      else if (v === 100 && cs === 'A') set = 'B';
+      else if (v === 101 && cs === 'B') set = 'A';
+    }
+    return text.length >= 2 ? { type: 'Code 128', text } : null;
+  }
+
+  /* Decode one run list (a leading and trailing BIG run are added by lineRuns). Tries both reading directions. */
+  function decodeRuns(r0) {
+    for (let dir = 0; dir < 2; dir++) {
+      const r = dir ? r0.slice().reverse() : r0;
+      for (let s = 1; s < r.length - 4; s++) {
+        const u = guard(r, s);
+        if (u) { const x = ean13At(r, s, u) || ean8At(r, s, u) || upceAt(r, s, u); if (x) return x; }
+        const c = code128At(r, s); if (c) return c;
+      }
+    }
+    return null;
+  }
+
+  /* Turn samples into run-lengths with a local (windowed min/max) threshold, hysteresis, and sub-sample edge positions. */
+  function lineRuns(a, gc) {
+    const n = a.length;
+    if (n < 40) return null;
+    const B = 8, nb = Math.ceil(n / B), bmn = new Float32Array(nb).fill(1e9), bmx = new Float32Array(nb).fill(-1e9);
+    for (let i = 0; i < n; i++) { const b = i >> 3; if (a[i] < bmn[b]) bmn[b] = a[i]; if (a[i] > bmx[b]) bmx[b] = a[i]; }
+    const hb = Math.max(2, Math.min(8, Math.round(n / 6 / B / 2)));
+    const thr = new Float32Array(n), con = new Float32Array(n);
+    for (let b = 0; b < nb; b++) {
+      let mn = 1e9, mx = -1e9;
+      for (let k = Math.max(0, b - hb); k <= Math.min(nb - 1, b + hb); k++) { if (bmn[k] < mn) mn = bmn[k]; if (bmx[k] > mx) mx = bmx[k]; }
+      for (let i = b * B; i < Math.min(n, b * B + B); i++) { thr[i] = (mn + mx) / 2; con[i] = mx - mn; }
+    }
+    const minCon = Math.max(25, 0.3 * gc), pos = [];
+    let state = -1, last = 0;
+    for (let i = 0; i < n; i++) {
+      if (con[i] < minCon) continue;
+      const hy = Math.max(3, 0.12 * con[i]), d = a[i] - thr[i];
+      if (state < 0) { state = d < 0 ? 1 : 0; continue; }       // 1 = dark
+      if ((state === 0 && d < -hy) || (state === 1 && d > hy)) {
+        let j = i;
+        while (j - 1 > last && (state === 0 ? a[j - 1] < thr[j - 1] : a[j - 1] > thr[j - 1])) j--;
+        const d0 = a[j - 1] - thr[j - 1], d1 = a[j] - thr[j];
+        let x = j - 1 + (d0 === d1 ? 0 : d0 / (d0 - d1));
+        if (!(x > last)) x = last + 0.01;
+        pos.push(x); last = j; state = 1 - state;
+      }
+    }
+    if (pos.length < 8) return null;
+    const r = [BIG, pos[0]];
+    for (let i = 1; i < pos.length; i++) r.push(pos[i] - pos[i - 1]);
+    r.push(n - 1 - pos[pos.length - 1], BIG);
+    return r;
+  }
+
+  function sampleLine(g, w, h, cx, cy, ang) {
+    const dx = Math.cos(ang), dy = Math.sin(ang);
+    let t0 = -1e9, t1 = 1e9;
+    if (Math.abs(dx) > 1e-6) { const a = (1 - cx) / dx, b = (w - 2.001 - cx) / dx; t0 = Math.max(t0, Math.min(a, b)); t1 = Math.min(t1, Math.max(a, b)); }
+    if (Math.abs(dy) > 1e-6) { const a = (1 - cy) / dy, b = (h - 2.001 - cy) / dy; t0 = Math.max(t0, Math.min(a, b)); t1 = Math.min(t1, Math.max(a, b)); }
+    const n = Math.floor(t1 - t0);
+    if (!(n >= 40)) return null;
+    const out = new Float32Array(n);
+    for (let k = 0; k < n; k++) {
+      let acc = 0;      // average three parallel lines (1 px apart) to cut sensor noise
+      for (let o = -1; o <= 1; o++) {
+        const x = cx + (t0 + k) * dx - o * dy, y = cy + (t0 + k) * dy + o * dx, xi = x | 0, yi = y | 0, fx = x - xi, fy = y - yi, p = yi * w + xi;
+        acc += (g[p] * (1 - fx) + g[p + 1] * fx) * (1 - fy) + (g[p + w] * (1 - fx) + g[p + w + 1] * fx) * fy;
+      }
+      out[k] = acc / 3;
+    }
+    return out;
+  }
+  function smooth(a, k) {
+    const n = a.length, o = new Float32Array(n);
+    if (k === 1) { for (let i = 0; i < n; i++) o[i] = (a[Math.max(0, i - 1)] + 2 * a[i] + a[Math.min(n - 1, i + 1)]) / 4; }
+    else for (let i = 0; i < n; i++) o[i] = (a[Math.max(0, i - 2)] + 2 * a[Math.max(0, i - 1)] + 3 * a[i] + 2 * a[Math.min(n - 1, i + 1)] + a[Math.min(n - 1, i + 2)]) / 9;
+    return o;
+  }
+  function decodeLine(a) {
+    let mn = 255, mx = 0;
+    for (let i = 0; i < a.length; i++) { if (a[i] < mn) mn = a[i]; if (a[i] > mx) mx = a[i]; }
+    if (mx - mn < 25) return null;
+    for (let v = 0; v < 3; v++) {
+      const b = v === 0 ? a : smooth(a, v - 1), r = lineRuns(b, v === 0 ? mx - mn : (mx - mn) * 0.8);
+      const x = r && decodeRuns(r); if (x) return x;
+    }
+    return null;
+  }
+
+  /* gray: Uint8 / Uint8ClampedArray / Float array of w*h. opt.dense: more scanlines (for pictures). Returns { type, text } or null. */
+  function scanGray(g, w, h, opt) {
+    if (w < 40 || h < 10) return null;
+    const dense = opt && opt.dense, lines = [];
+    const rows = dense ? [] : [0.5, 0.4, 0.6, 0.3, 0.7, 0.2, 0.8, 0.1, 0.9];
+    if (dense) for (let i = 0; i < 25; i++) rows.push(0.5 + (i % 2 ? 1 : -1) * Math.ceil(i / 2) * 0.04);
+    rows.forEach(f => lines.push([w / 2, f * h, 0]));
+    const offs = dense ? [0.5, 0.35, 0.65, 0.2, 0.8] : [0.5, 0.3, 0.7], D = Math.PI / 180;
+    [5, -5, 10, -10, 17, -17].forEach(a => offs.forEach(f => lines.push([w / 2, f * h, a * D])));
+    [90, 85, 95, 80, 100, 73, 107].forEach(a => offs.forEach(f => lines.push([f * w, h / 2, a * D])));
+    // Weak formats (UPC-E, very short Code 128) are only trusted when several scanlines agree and nothing else disagrees.
+    const tally = {};
+    for (const [cx, cy, ang] of lines) {
+      const a = sampleLine(g, w, h, cx, cy, ang), x = a && decodeLine(a);
+      if (!x) continue;
+      if (x.type !== 'UPC-E' && !(x.type === 'Code 128' && x.text.length < 4)) return x;
+      const k = x.type + '|' + x.text; (tally[k] || (tally[k] = { x, n: 0 })).n++;
+    }
+    const t = Object.keys(tally).map(k => tally[k]).sort((p, q) => q.n - p.n);
+    return t.length && t[0].n >= 2 && (t.length < 2 || t[0].n >= 2 * t[1].n) ? t[0].x : null;
+  }
+  function toGray(rgba, w, h) {
+    const g = new Uint8Array(w * h);
+    for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (rgba[j] * 77 + rgba[j + 1] * 150 + rgba[j + 2] * 29) >> 8;
+    return g;
+  }
+  return { scanGray, toGray, decodeRuns, lineRuns, ean13Check };
+})();
+/* BARDEC-END */
+
 /* ---------- 8. Code Scanner ---------- */
-Tools.register({ id: 'codescan', name: 'Code Scanner', icon: '📷', cat: 'camera', desc: 'Scan QR codes with the camera or from a picture (other barcode types only on devices that support barcode detection). Copy the result, or open it if it is a web link.', keys: ['qr', 'barcode', 'scan', 'reader'], needs: ['camera'], render(el) {
+Tools.register({ id: 'codescan', name: 'Code Scanner', icon: '📷', cat: 'camera', desc: 'Scan QR codes and EAN/UPC product barcodes (also Code 128) with the camera or from a picture. Copy the result, or open it if it is a web link.', keys: ['qr', 'barcode', 'scan', 'reader', 'ean', 'upc', 'product', 'isbn'], needs: ['camera'], render(el) {
   el.innerHTML = VIEW('<div style="position:absolute;left:15%;right:15%;top:20%;bottom:20%;border:2px solid rgba(255,255,255,.8);border-radius:16px;box-shadow:0 0 0 9999px rgba(0,0,0,.25);pointer-events:none"></div>') +
     '<div class="muted center" id="qrnote" style="margin-bottom:6px"></div>' +
     '<div class="card" id="res" style="display:none"><div class="muted" id="fmt"></div><div id="txt" style="word-break:break-all;margin:6px 0"></div><div class="row"><button class="btn" id="cp">Copy</button><a class="btn alt" id="op" target="_blank" rel="noopener noreferrer" style="text-align:center;text-decoration:none;display:none">Open link</a></div><button class="btn alt" id="again" style="margin-top:8px">Scan again</button></div>' +
     '<button class="btn alt" id="img">Scan from a picture</button>' +
     '<div class="card"><div class="muted">History</div><div class="list" id="hist"></div><button class="btn alt" id="clr" style="margin-top:8px">Clear history</button></div>';
   const v = $('#v', el), cam = makeCam(v, $('#msg', el)), sc = document.createElement('canvas'), g = sc.getContext('2d', { willReadFrequently: true });
-  let bd = null, timer = null, paused = false, busy = false, hist = Store.get('codescan.history', []), gone = false;
+  let bd = null, timer = null, paused = false, busy = false, lastKey = '', lastAt = 0, hist = Store.get('codescan.history', []), gone = false;
   if ('BarcodeDetector' in window) { try { bd = new BarcodeDetector(); } catch (e) { bd = null; } }
-  $('#qrnote', el).textContent = bd ? 'Scans QR codes and common barcodes.' : 'This device can scan QR codes only (barcode scanning is not available here).';
+  const NOTE = 'Scans QR codes and EAN/UPC product barcodes (also Code 128). Hold the code steady, with a little white space around it.';
+  $('#qrnote', el).textContent = bd ? 'Scans QR codes and common barcodes.' : NOTE;
   const isUrl = (t) => /^https?:\/\/\S+$/i.test(t);
   function drawHist() {
     const box = $('#hist', el); box.innerHTML = hist.length ? '' : '<div class="muted center">No scans yet.</div>';
@@ -585,18 +824,23 @@ Tools.register({ id: 'codescan', name: 'Code Scanner', icon: '📷', cat: 'camer
     $('#cp', el).onclick = () => copyText(text);
     if (add) { hist = [{ t: text, f: fmt }].concat(hist.filter(x => x.t !== text)).slice(0, 20); Store.set('codescan.history', hist); drawHist(); }
   }
-  async function decode(source, w, hh, maxSide) {
-    if (bd) { try { const r = await bd.detect(source); if (r && r.length) return { t: r[0].rawValue, f: r[0].format }; return null; } catch (e) { bd = null; if (!gone) $('#qrnote', el).textContent = 'This device can scan QR codes only (barcode scanning is not available here).'; } }
-    if (typeof jsQR !== 'function') return null;
-    const k = Math.min(1, (maxSide || 640) / Math.max(w, hh)), cw = Math.round(w * k), ch = Math.round(hh * k);
+  async function decode(source, w, hh, maxSide, dense) {
+    if (bd) { try { const r = await bd.detect(source); if (r && r.length) return { t: r[0].rawValue, f: r[0].format }; return null; } catch (e) { bd = null; if (!gone) $('#qrnote', el).textContent = NOTE; } }
+    const k = Math.min(1, (maxSide || 800) / Math.max(w, hh)), cw = Math.round(w * k), ch = Math.round(hh * k);
     sc.width = cw; sc.height = ch; g.drawImage(source, 0, 0, cw, ch);
-    const c = jsQR(g.getImageData(0, 0, cw, ch).data, cw, ch);
-    return c && c.data ? { t: c.data, f: 'QR code' } : null;
+    const px = g.getImageData(0, 0, cw, ch).data, c = typeof jsQR === 'function' ? jsQR(px, cw, ch) : null;
+    if (c && c.data) return { t: c.data, f: 'QR code' };
+    // jsQR found nothing: look for a 1D product barcode in the same pixels.
+    const b = BarDec.scanGray(BarDec.toGray(px, cw, ch), cw, ch, { dense: !!dense });
+    return b ? { t: b.text, f: b.type, oneD: true } : null;
   }
   async function loop() {
     if (gone || paused || busy || !v.videoWidth) return;
     busy = true;
-    try { const r = await decode(v, v.videoWidth, v.videoHeight); if (r && r.t && !gone) { paused = true; if (navigator.vibrate) navigator.vibrate(80); showRes(r.t, r.f, true); } } catch (e) { /* keep scanning */ }
+    try { let r = await decode(v, v.videoWidth, v.videoHeight); if (r && r.t && !gone && r.oneD) { // a 1D read must repeat on a second scan before it is trusted
+        const key = r.f + '|' + r.t, now = Date.now(), ok = key === lastKey && now - lastAt < 2000; lastKey = key; lastAt = now; if (!ok) r = null;
+      }
+      if (r && r.t && !gone) { paused = true; if (navigator.vibrate) navigator.vibrate(80); showRes(r.t, r.f, true); } } catch (e) { /* keep scanning */ }
     busy = false;
   }
   $('#again', el).onclick = () => { $('#res', el).style.display = 'none'; paused = false; };
@@ -604,7 +848,7 @@ Tools.register({ id: 'codescan', name: 'Code Scanner', icon: '📷', cat: 'camer
     try {
       const b = await loadBitmap(f[0], 2400); let r = null;
       // Small codes need a large scale, big or blurry ones a small one: try several.
-      for (const m of [1600, 1000, 640, 400]) { r = await decode(b._img || b, b.width, b.height, m); if (r || gone) break; await sleep(0); }
+      for (const m of [1600, 1000, 640, 400]) { r = await decode(b._img || b, b.width, b.height, m, true); if (r || gone) break; await sleep(0); }
       if (b.close) b.close();
       if (gone) return;
       if (r && r.t) { paused = true; showRes(r.t, r.f, true); } else toast('No code found in that picture');
@@ -1048,5 +1292,5 @@ Tools.register({ id: 'pixelruler', name: 'Pixel Ruler', icon: '🎚️', cat: 'c
   return () => { if (url) URL.revokeObjectURL(url); };
 } });
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { nearestName, quadMap, warpImage, adaptiveBW, exifInfo, dominantColors, fitSize, toHex };
+if (typeof module !== 'undefined' && module.exports) module.exports = { BarDec, nearestName, quadMap, warpImage, adaptiveBW, exifInfo, dominantColors, fitSize, toHex };
 })();

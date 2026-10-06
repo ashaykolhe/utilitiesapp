@@ -63,7 +63,7 @@ vc.on('jsdomError', e => { if (!/Not implemented/.test(e.message)) fail('page er
       await new Promise(r => setTimeout(r, 5));
       if (typeof cleanup === 'function') cleanup();
       rendered++;
-    } catch (e) { fail(`${t.id}: render threw: ${e.message}`); }
+    } catch (e) { fail(`${t.id}: render threw: ${e.message} @ ${String(e.stack).split('\n')[1] || ''}`); }
     host.remove();
   }
 

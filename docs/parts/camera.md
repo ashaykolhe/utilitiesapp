@@ -95,13 +95,13 @@
 - category: camera
 - plan: free
 - needs: camera
-- what: Scans QR codes with the camera using a bundled jsQR, and other barcodes too when the phone has the built-in BarcodeDetector (a note under the viewfinder says which). Scanning a picture tries several sizes. It shows the result, copies it, offers an Open link button only for http and https text, keeps a history, and can also scan a picture from the phone.
+- what: Scans QR codes (bundled jsQR) and EAN-13, EAN-8, UPC-A, UPC-E and Code 128 product barcodes with the camera or from a picture, using its own built-in decoder that works without the browser's BarcodeDetector (when the phone has BarcodeDetector it is used first). The decoder tries many scanlines, slightly tilted and sideways ones, both directions (upside down) and light-on-dark codes, and checks the check digit. Camera 1D reads must repeat on a second scan before they are accepted. The result card shows the type (for example EAN-13 or UPC-A) and the digits, with Copy and, for http/https text, Open link. A history keeps the last 20; scanning a picture tries several sizes.
 - test:
-  1. Open the tool and point at a QR code containing https://example.com. Expected: a result card shows the text, the phone vibrates, and Open link and Copy are available.
-  2. Scan a QR code with plain text. Expected: the text is shown and no Open link button appears.
-  3. Tap Scan again, then Copy. Expected: scanning resumes; copied text can be pasted.
-  4. Tap Scan from a picture and choose a screenshot of a code. Expected: the code is decoded; a picture with no code shows No code found.
-  5. Check History keeps the last 20 scans and Clear history empties it. Denied camera shows a message.
+  1. Open the tool and point at a QR code containing https://example.com. Expected: a result card shows QR code and the text, the phone vibrates, and Open link and Copy are available.
+  2. Point at the EAN-13 barcode on a product, about 15 to 25 cm away with a little white space around it. Expected: within a second or two the card shows EAN-13 and the 13 digits (UPC-A and 12 digits for US products); turn the product upside down or sideways and it still reads. Copy puts the digits on the clipboard.
+  3. Tap Scan again, then scan a Code 128 label or a small EAN-8 code. Expected: scanning resumes and the new type and digits are shown; the history lists them with the newest first.
+  4. Tap Scan from a picture and choose a photo or screenshot of a product barcode and then of a QR code. Expected: each is decoded; a picture with no code shows No code found.
+  5. Point at a barcode with a wrong digit or at a plain textured surface. Expected: nothing is reported (no wrong or made-up numbers). Check History keeps the last 20 scans and Clear history empties it. Denied camera shows a message.
 
 ## Doc Scanner
 - id: docscan

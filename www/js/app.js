@@ -347,12 +347,12 @@ function lockNow() {
   if (!lockCfg() || locked) return;
   locked = true;
   $$('dialog[open]').forEach(d => d.close());
-  $('#app').setAttribute('inert', ''); $('#lock').hidden = false; $('#lockMsg').hidden = true; $('#lockPin').value = '';
+  $('#app').setAttribute('inert', ''); $('#appLock').hidden = false; $('#lockMsg').hidden = true; $('#lockPin').value = '';
   const c = lockCfg(); $('#lockBio').hidden = !(c.bio && NB());
   setTimeout(() => $('#lockPin').focus(), 50);
   if (c.bio && NB()) setTimeout(bioUnlock, 250);
 }
-function unlockNow() { locked = false; $('#lock').hidden = true; $('#app').removeAttribute('inert'); }
+function unlockNow() { locked = false; $('#appLock').hidden = true; $('#app').removeAttribute('inert'); }
 async function bioUnlock() {
   const nb = NB(); if (!nb) return;
   try { await nb.verifyIdentity({ reason: tr('Unlock PocketKit'), title: tr('Unlock PocketKit') }); unlockNow(); } catch (e) { /* cancelled: the PIN still works */ }
