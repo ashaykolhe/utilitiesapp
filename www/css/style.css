@@ -86,3 +86,12 @@ input[type=checkbox],input[type=radio]{width:22px;height:22px;accent-color:var(-
 .item:has(>input[type=checkbox]),.item:has(>input[type=radio]){min-height:48px}
 button.btn,.chip,.tile{min-height:44px}
 .tile{min-height:0}
+.round + .round{margin-left:0}
+.dlg input[type=password],.dlg input[type=text]{margin:0}
+.tour-art{display:grid;place-items:center;height:120px;border-radius:20px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 35%,var(--surface)),var(--surface2));font-size:64px}
+.dots{display:flex;justify-content:center;gap:8px}.dots i{width:8px;height:8px;border-radius:50%;background:var(--line)}.dots i.on{background:var(--accent);width:22px;border-radius:99px}
+.lockscreen{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:var(--bg)}
+.lockbox{width:min(100%,340px);display:flex;flex-direction:column;gap:12px;text-align:center}
+.lockbox h2{margin:4px 0 8px}.lockbox input{text-align:center;font-size:24px;letter-spacing:8px}
+.mark.big{width:72px;height:72px;margin:0 auto;border-radius:22px;padding:14px;gap:5px}
+#collList .item{padding:4px 8px}

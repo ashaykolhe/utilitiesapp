@@ -13,42 +13,88 @@
   <section id="home" class="screen">
     <header class="top">
       <div class="brand"><span class="mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><div><h1>PocketKit</h1><p id="count" class="muted"></p></div></div>
-      <button id="settingsBtn" class="round" aria-label="Settings">⚙︎</button>
+      <button id="settingsBtn" class="round" aria-label="Settings" data-i-label="Settings">⚙︎</button>
     </header>
-    <div class="finder"><input id="search" type="search" placeholder="Find a tool" autocomplete="off" aria-label="Find a tool"><button id="mic" class="round flat" aria-label="Search by voice" hidden>🎤</button></div>
-    <div id="filters" class="chips" role="group" aria-label="Filter tools"></div>
+    <div class="finder"><input id="search" type="search" placeholder="Find a tool" data-i-ph="Find a tool" autocomplete="off" aria-label="Find a tool" data-i-label="Find a tool"><button id="mic" class="round flat" aria-label="Search by voice" data-i-label="Search by voice" hidden>🎤</button></div>
+    <div id="filters" class="chips" role="group" aria-label="Filter tools" data-i-label="Filter tools"></div>
     <div id="sections"></div>
   </section>
   <section id="tool" class="screen" hidden>
-    <header class="bar"><button id="backBtn" class="round flat" aria-label="Back">←</button><h1 id="toolTitle" tabindex="-1"></h1><button id="pinBtn" class="round flat" aria-label="Pin tool">☆</button></header>
+    <header class="bar"><button id="backBtn" class="round flat" aria-label="Back" data-i-label="Back">←</button><h1 id="toolTitle" tabindex="-1"></h1><button id="shareBtn" class="round flat" aria-label="Share what is on screen" data-i-label="Share what is on screen">⤴</button><button id="collBtn" class="round flat" aria-label="Collections" data-i-label="Collections">📁</button><button id="pinBtn" class="round flat" aria-label="Pin tool">☆</button></header>
     <p id="toolDesc" class="tool-desc muted"></p>
     <div id="toolBody" class="tool-body"></div>
   </section>
   <section id="settings" class="screen" hidden>
-    <header class="bar"><button id="setBack" class="round flat" aria-label="Back">←</button><h1 id="settingsTitle" tabindex="-1">Settings</h1></header>
+    <header class="bar"><button id="setBack" class="round flat" aria-label="Back" data-i-label="Back">←</button><h1 id="settingsTitle" tabindex="-1" data-i="Settings">Settings</h1></header>
     <div class="tool-body">
-      <div class="card list"><div class="row"><b>PocketKit Pro</b><span id="proState" class="muted" style="text-align:right"></span></div><button class="btn" id="proOpen">See what Pro includes</button></div>
-      <label class="f">Theme<select id="themeSel"><option value="auto">Follow the phone</option><option value="dark">Dark</option><option value="light">Light</option></select></label>
-      <div class="f">Colour<div class="swatches" id="accents"></div></div>
-      <label class="item"><span class="grow">Haptic feedback</span><input id="hapticsChk" type="checkbox"></label>
-      <div class="card list"><b>Backup</b><p class="muted" style="margin:0;font-size:13px">Saves your settings, notes, lists and other tool data to a file. Recordings, locked files and the Password Vault are not included.</p><div class="row"><button class="btn alt" id="backupBtn">Back up</button><button class="btn alt" id="restoreBtn">Restore</button></div><input id="restoreFile" type="file" accept="application/json,.json" hidden></div>
-      <button class="btn alt" id="clearRecent">Clear recent tools</button>
-      <button class="btn alt" id="clearPins">Clear pinned tools</button>
-      <a class="btn alt linkbtn" href="privacy-policy.html">Privacy policy</a>
+      <div class="card list"><div class="row"><b>PocketKit Pro</b><span id="proState" class="muted" style="text-align:right"></span></div><button class="btn" id="proOpen" data-i="See what Pro includes">See what Pro includes</button></div>
+      <label class="f"><span data-i="Language">Language</span><select id="langSel"></select></label>
+      <label class="f"><span data-i="Theme">Theme</span><select id="themeSel"><option value="auto" data-i="Follow the phone">Follow the phone</option><option value="dark" data-i="Dark">Dark</option><option value="light" data-i="Light">Light</option></select></label>
+      <div class="f"><span data-i="Colour">Colour</span><div class="swatches" id="accents"></div></div>
+      <label class="item"><span class="grow" data-i="Haptic feedback">Haptic feedback</span><input id="hapticsChk" type="checkbox"></label>
+      <div class="card list"><b data-i="App lock">App lock</b><p class="muted" style="margin:0;font-size:13px" data-i="Ask for a PIN (or fingerprint) when PocketKit opens or returns from the background. There is no way to recover a forgotten PIN except clearing the app's data.">Ask for a PIN (or fingerprint) when PocketKit opens or returns from the background. There is no way to recover a forgotten PIN except clearing the app's data.</p>
+        <label class="item"><span class="grow" data-i="Lock PocketKit">Lock PocketKit</span><input id="lockChk" type="checkbox"></label>
+        <div id="lockOpts" hidden>
+          <label class="f"><span data-i="Lock after">Lock after</span><select id="lockDelay"><option value="0" data-i="Leaving the app">Leaving the app</option><option value="30" data-i="30 seconds">30 seconds</option><option value="300" data-i="5 minutes">5 minutes</option></select></label>
+          <label class="item" id="bioRow" hidden><span class="grow" data-i="Use fingerprint or face">Use fingerprint or face</span><input id="bioChk" type="checkbox"></label>
+          <button class="btn alt" id="changePin" data-i="Change PIN">Change PIN</button>
+        </div></div>
+      <div class="card list"><b data-i="Backup">Backup</b><p class="muted" style="margin:0;font-size:13px" data-i="Saves your settings, notes, lists and other tool data to a file. Recordings, locked files and the Password Vault are not included.">Saves your settings, notes, lists and other tool data to a file. Recordings, locked files and the Password Vault are not included.</p><div class="row"><button class="btn alt" id="backupBtn" data-i="Back up">Back up</button><button class="btn alt" id="restoreBtn" data-i="Restore">Restore</button></div><input id="restoreFile" type="file" accept="application/json,.json" hidden></div>
+      <button class="btn alt" id="tourBtn" data-i="Show the tour again">Show the tour again</button>
+      <button class="btn alt" id="clearRecent" data-i="Clear recent tools">Clear recent tools</button>
+      <button class="btn alt" id="clearPins" data-i="Clear pinned tools">Clear pinned tools</button>
+      <a class="btn alt linkbtn" href="privacy-policy.html" data-i="Privacy policy">Privacy policy</a>
       <p class="muted center" id="about"></p>
     </div>
   </section>
 </div>
+
 <dialog id="proDlg"><div class="dlg">
   <h2>PocketKit Pro</h2><p id="proSub" class="muted" style="margin:0"></p>
   <ul id="proFeat" class="feat"></ul>
   <p id="proStatus" class="status" hidden></p>
-  <button class="btn" id="proBuy">Unlock Pro</button><button class="btn alt" id="proRestore">Restore purchase</button>
-  <div id="proCoupon"><label class="f">Have a trial code?<input id="proCode" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="PKT-XXXX-XXXX-XXXX-XXXX"></label><button class="btn alt" id="proRedeem" style="margin-top:8px;width:100%">Redeem code</button></div>
+  <button class="btn" id="proBuy">Unlock Pro</button><button class="btn alt" id="proRestore" data-i="Restore purchase">Restore purchase</button>
+  <div id="proCoupon"><label class="f"><span data-i="Have a trial code?">Have a trial code?</span><input id="proCode" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="PKT-XXXX-XXXX-XXXX-XXXX"></label><button class="btn alt" id="proRedeem" style="margin-top:8px;width:100%" data-i="Redeem code">Redeem code</button></div>
   <button class="btn alt" id="proClose">Not now</button></div></dialog>
+
+<dialog id="collDlg"><div class="dlg">
+  <h2 data-i="Collections">Collections</h2><p class="muted" style="margin:0" id="collSub"></p>
+  <div id="collList" class="list"></div>
+  <div class="row"><input id="collName" type="text" maxlength="30" placeholder="New collection" data-i-ph="New collection" aria-label="New collection" data-i-label="New collection"><button class="btn" id="collAdd" style="flex:none" data-i="Add">Add</button></div>
+  <button class="btn alt" id="collClose" data-i="Done">Done</button></div></dialog>
+
+<dialog id="tourDlg"><div class="dlg">
+  <div class="tour-art" id="tourArt" aria-hidden="true"></div>
+  <h2 id="tourTitle"></h2><p id="tourText" class="muted" style="margin:0"></p>
+  <div class="dots" id="tourDots" aria-hidden="true"></div>
+  <div class="row"><button class="btn alt" id="tourSkip" data-i="Skip">Skip</button><button class="btn" id="tourNext" data-i="Next">Next</button></div></div></dialog>
+
+<dialog id="newsDlg"><div class="dlg">
+  <h2 data-i="What's new">What's new</h2><ul id="newsList" class="feat"></ul>
+  <button class="btn" id="newsClose" data-i="Got it">Got it</button></div></dialog>
+
+<dialog id="pinDlg"><div class="dlg">
+  <h2 id="pinTitle" data-i="Set a PIN">Set a PIN</h2><p class="muted" style="margin:0" id="pinSub" data-i="Choose 4 to 6 digits.">Choose 4 to 6 digits.</p>
+  <input id="pinA" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="PIN" placeholder="PIN">
+  <input id="pinB" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="Repeat PIN" data-i-label="Repeat PIN" placeholder="Repeat PIN" data-i-ph="Repeat PIN">
+  <p id="pinMsg" class="status" hidden></p>
+  <div class="row"><button class="btn alt" id="pinCancel" data-i="Cancel">Cancel</button><button class="btn" id="pinSave" data-i="Save">Save</button></div></div></dialog>
+
+<div id="lock" class="lockscreen" hidden>
+  <div class="lockbox">
+    <span class="mark big" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+    <h2 data-i="PocketKit is locked">PocketKit is locked</h2>
+    <input id="lockPin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" aria-label="PIN" placeholder="PIN">
+    <p id="lockMsg" class="status" hidden></p>
+    <button class="btn" id="lockGo" data-i="Unlock">Unlock</button>
+    <button class="btn alt" id="lockBio" data-i="Use fingerprint or face" hidden>Use fingerprint or face</button>
+  </div>
+</div>
 <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
 <script src="js/vendor/jsQR.js"></script>
 <script src="js/core.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/coupons.js"></script>
 <script src="js/pro.js"></script>
 <script src="js/vendor/qrcode.js"></script>
@@ -74,6 +120,7 @@
 <script src="js/tools/fun.js"></script>
 <script src="js/tools/more.js"></script>
 <script src="js/tools/games2.js"></script>
+<script src="js/i18n/hi.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

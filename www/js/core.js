@@ -63,5 +63,33 @@ const Prefs = {
   },
   recent() { return Store.arr('recent').filter(id => Tools.get(id)); },
   touch(id) { Store.set('recent', [id, ...Store.arr('recent').filter(x => x !== id)].slice(0, 8)); },
-  closed() { return Store.arr('closed'); }
+  closed() { return Store.arr('closed'); },
+  /* Collections: named groups of tools made by the user, shown on Home. */
+  colls() { return Store.arr('colls').filter(x => x && typeof x.id === 'string' && Array.isArray(x.tools)).map(x => ({ id: x.id, name: String(x.name || 'Collection').slice(0, 30), tools: x.tools.filter(id => Tools.get(id)) })); },
+  saveColls(list) { Store.set('colls', list); }
 };
+
+/* Save or share a text file (CSV, JSON, GPX...). On Android it goes through the share sheet; in a browser it downloads. Returns true when it worked. */
+async function saveTextFile(name, text, type) {
+  const C = window.Capacitor && Capacitor.Plugins || {}, FS = C.Filesystem, SH = C.Share;
+  const safe = String(name || 'file.txt').replace(/[\u0000-\u001f‪-‮⁦-⁩\\/:*?"<>|]+/g, '_').replace(/^\.+/, '') || 'file.txt';
+  if (FS && SH) {
+    try {
+      const r = await FS.writeFile({ path: 'pk-share/' + safe, data: btoa(unescape(encodeURIComponent(text))), directory: 'CACHE', recursive: true });
+      await SH.share({ title: safe, url: r.uri }); return true;
+    } catch (e) { if (/cancel/i.test(String(e && e.message))) return false; }
+  }
+  try {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type || 'text/plain' })); a.download = safe;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); return true;
+  } catch (e) { return false; }
+}
+/* Share plain text (Android share sheet, then the Web Share API, then the clipboard). */
+async function shareText(title, text) {
+  const C = window.Capacitor && Capacitor.Plugins || {};
+  try { if (C.Share) { await C.Share.share({ title, text }); return true; } } catch (e) { if (/cancel/i.test(String(e && e.message))) return false; }
+  try { if (navigator.share) { await navigator.share({ title, text }); return true; } } catch (e) { if (e && e.name === 'AbortError') return false; }
+  try { await navigator.clipboard.writeText(text); toast('Copied to the clipboard'); return true; } catch (e) { toast('Could not share'); return false; }
+}
+/* Rows (arrays of cells) to CSV text with correct quoting. */
+const toCSV = (rows) => rows.map(r => r.map(v => { v = v == null ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(',')).join('\r\n');
