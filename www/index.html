@@ -27,7 +27,7 @@
   <section id="settings" class="screen" hidden>
     <header class="bar"><button id="setBack" class="round flat" aria-label="Back" data-i-label="Back">←</button><h1 id="settingsTitle" tabindex="-1" data-i="Settings">Settings</h1></header>
     <div class="tool-body">
-      <div class="card list"><div class="row"><b>PocketKit Pro</b><span id="proState" class="muted" style="text-align:right"></span></div><button class="btn" id="proOpen" data-i="See what Pro includes">See what Pro includes</button></div>
+      <div class="card list" id="proCard"></div>
       <label class="f"><span data-i="Language">Language</span><select id="langSel"></select></label>
       <label class="f"><span data-i="Theme">Theme</span><select id="themeSel"><option value="auto" data-i="Follow the phone">Follow the phone</option><option value="dark" data-i="Dark">Dark</option><option value="light" data-i="Light">Light</option></select></label>
       <div class="f"><span data-i="Colour">Colour</span><div class="swatches" id="accents"></div></div>
@@ -54,7 +54,7 @@
   <ul id="proFeat" class="feat"></ul>
   <p id="proStatus" class="status" hidden></p>
   <button class="btn" id="proBuy">Unlock Pro</button><button class="btn alt" id="proRestore" data-i="Restore purchase">Restore purchase</button>
-  <div id="proCoupon"><label class="f"><span data-i="Have a trial code?">Have a trial code?</span><input id="proCode" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="PKT-XXXX-XXXX-XXXX-XXXX"></label><button class="btn alt" id="proRedeem" style="margin-top:8px;width:100%" data-i="Redeem code">Redeem code</button></div>
+  <div id="proCoupon"><label class="f" for="proCode"><span data-i="Have a trial code?">Have a trial code?</span></label><div class="row"><input id="proCode" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="PKT-XXXX-XXXX-XXXX-XXXX"><button class="btn" id="proRedeem" style="flex:none" data-i="Redeem">Redeem</button></div></div>
   <button class="btn alt" id="proClose">Not now</button></div></dialog>
 
 <dialog id="collDlg"><div class="dlg">
@@ -95,6 +95,7 @@
 <script src="js/vendor/jsQR.js"></script>
 <script src="js/core.js"></script>
 <script src="js/i18n.js"></script>
+<script src="js/validate.js"></script>
 <script src="js/coupons.js"></script>
 <script src="js/pro.js"></script>
 <script src="js/vendor/qrcode.js"></script>

@@ -178,7 +178,7 @@ function openTool(id) {
   Prefs.touch(id); curTool = x;
   $('#toolTitle').textContent = toolName(x); $('#toolDesc').textContent = toolDesc(x);
   $('#pinBtn').dataset.id = id; refreshPin(id);
-  const body = freshBody();
+  const body = freshBody(); attachValidation(body);
   show('tool'); history.pushState({ v: 'tool' }, '');
   try { activeCleanup = x.render(body) || null; } catch (e) { body.textContent = tr('This tool could not start:') + ' ' + e.message; activeCleanup = null; }
 }
@@ -272,7 +272,14 @@ $('#accents').addEventListener('click', e => {
   if (+b.dataset.p && needPro('accents')) return;
   Store.set('accent', b.dataset.c); applyAccent(); renderAccents();
 });
-function renderProState() { $('#proState').textContent = isPro() ? (onTrial() ? tr('Trial until') + ' ' + fmtUntil(coupon.expiresAt) : tr('Unlocked')) : tr('Free'); }
+/* The Pro card in Settings: trial, unlocked or free (with a shortcut to enter a code). */
+function renderProState() {
+  const c = $('#proCard'); if (!c) return;
+  if (onTrial()) c.innerHTML = `<b>PocketKit Pro</b><p class="ok" style="margin:0">✓ ${esc(tr('Pro trial until') + ' ' + fmtUntil(coupon.expiresAt))}</p><button class="btn" id="proSee">${esc(tr('See what Pro includes'))}${proPrice ? ' · ' + esc(proPrice) : ''}</button>`;
+  else if (isPro()) c.innerHTML = `<b>PocketKit Pro</b><p class="ok" style="margin:0">✓ ${esc(tr('Pro unlocked'))}${devPro && !pro ? ' (dev override)' : ''}. ${esc(tr('Thank you for supporting PocketKit!'))}</p><button class="btn alt" id="proSee">${esc(tr("See what's included"))}</button>`;
+  else { loadPrice(); c.innerHTML = `<b>PocketKit Pro</b><p class="muted" style="margin:0;font-size:14px">${esc(tr('One-time payment, no subscription. Extra tools, higher limits and all colour themes.'))}${proPrice ? ' <b>' + esc(proPrice) + '</b>' : ''}</p><button class="btn" id="proSee">${esc(tr('See what Pro includes'))}${proPrice ? ' · ' + esc(proPrice) : ''}</button><button class="btn alt" id="proCodeLink">${esc(tr('Have a code?'))}</button>`; }
+}
+$('#proCard').addEventListener('click', e => { if (e.target.closest('#proSee')) openPro(); else if (e.target.closest('#proCodeLink')) openPro('coupon'); });
 
 /* Pro sheet */
 function setProStatus(text, kind) { const el = $('#proStatus'); el.hidden = !text; el.textContent = text || ''; el.className = 'status' + (kind === 'info' ? ' info' : ''); }
@@ -286,7 +293,7 @@ function renderPro() {
   $('#proClose').textContent = tr(isPro() ? 'Done' : 'Not now');
   $('#proBuy').textContent = tr('Unlock Pro') + (proPrice ? ' · ' + proPrice : '');
 }
-function openPro(focus) { proFocus = focus || null; setProStatus(null); renderPro(); loadPrice(); const d = $('#proDlg'); if (!d.open) d.showModal(); }
+function openPro(focus) { proFocus = focus || null; setProStatus(null); renderPro(); loadPrice(); const d = $('#proDlg'); if (!d.open) d.showModal(); if (focus === 'coupon' && !$('#proCoupon').hidden) setTimeout(() => $('#proCode').focus(), 50); }
 /* Called by pro.js whenever Pro starts, ends or the price arrives. */
 function proChanged() {
   applyAccent(); if ($('#proDlg').open) renderPro(); renderProState(); renderAccents();
@@ -294,16 +301,21 @@ function proChanged() {
   const x = view === 'tool' && Tools.get($('#pinBtn').dataset.id);
   if (x && x.pro && !isPro()) { history.back(); openPro(x.proKey || 'connect'); } // a Pro tool is open and Pro just ended
 }
-$('#proOpen').onclick = () => openPro();
 $('#proClose').onclick = () => $('#proDlg').close();
 $('#proBuy').onclick = async () => { setProStatus(null); const r = await buyPro(); if (r.ok) { renderPro(); proChanged(); toast(tr('PocketKit Pro unlocked 🎉')); } else if (r.msg) setProStatus(tr(r.msg), r.info ? 'info' : undefined); };
 $('#proRestore').onclick = async () => { const r = await restorePro(); renderPro(); proChanged(); setProStatus(r.ok ? null : tr(r.msg), 'info'); };
 $('#proRedeem').onclick = async () => {
+  setProStatus(tr('Checking code…'), 'info');
   const r = await redeemCoupon($('#proCode').value);
-  const msgs = { invalid: "That code isn't valid.", expired: 'That code has expired.', 'not-yet': "That code isn't active yet.", 'already-pro': 'You already have Pro.', error: 'Could not check the code. Try again.' };
-  if (!r.ok) { setProStatus(tr(msgs[r.reason] || msgs.error)); return; }
-  $('#proCode').value = ''; proChanged(); toast(tr('Trial unlocked 🎉'));
+  if (r.ok) {
+    $('#proCode').value = ''; renderPro(); proChanged();
+    setProStatus(r.persisted ? tr('Code accepted. Pro is on until {d}.').replace('{d}', fmtUntil(coupon.expiresAt)) : tr("Code accepted, but it couldn't be saved. Free up some space and enter it again."), r.persisted ? 'info' : undefined);
+    return;
+  }
+  const msgs = { invalid: 'That code is not valid.', expired: 'That code has expired.', 'not-yet': 'That code is not active yet.', 'already-pro': 'You already own Pro, no code needed.', error: "Couldn't check the code on this device." };
+  setProStatus(tr(msgs[r.reason] || msgs.invalid));
 };
+$('#proCode').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('#proCode').blur(); $('#proRedeem').click(); } });
 
 /* Backup and restore of tool settings and saved data. Pro and trial state are never part of a backup.
    Files kept in the File Locker, recordings and the Password Vault live in the phone's database and are not included. */
