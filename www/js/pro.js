@@ -23,8 +23,15 @@ const PRO_FEATURES = [
 ];
 
 let pro = false, devPro = false, debuggable = false, devWanted = false, proPrice = null, priceTried = false, proFocus = null;
-try { pro = localStorage.getItem('pk.pro') === '1'; devWanted = localStorage.getItem('pk.dev') === '1'; } catch (e) {}
-const COUPON_SALT = 'PocketKit/coupon/v1', COUPON_KEY = 'pk.coupon', CLOCK_KEY = 'pk.clock';
+/* Pro state is kept under keys outside the 'pk.' namespace used by tools and backups. The cached flag is only trusted for 14 days
+   without a successful Google Play check, and never when its timestamp is in the future. */
+const PRO_KEY = 'pkx.p', PRO_OFFLINE_MS = 14 * 86400000;
+try {
+  const o = JSON.parse(localStorage.getItem(PRO_KEY) || 'null');
+  pro = !!(o && o.v === 1 && o.t <= Date.now() + 60000 && Date.now() - o.t < PRO_OFFLINE_MS);
+  devWanted = localStorage.getItem('pkx.dev') === '1';
+} catch (e) {}
+const COUPON_SALT = 'PocketKit/coupon/v1', COUPON_KEY = 'pkx.coupon', CLOCK_KEY = 'pkx.clock';
 let coupon = null, clockMax = 0, clockSaved = 0, trialOn = false, trialTimer = null;
 try { coupon = JSON.parse(localStorage.getItem(COUPON_KEY) || 'null'); clockMax = Number(localStorage.getItem(CLOCK_KEY)) || 0; } catch (e) {}
 
@@ -85,7 +92,7 @@ function watchTrial() {
   }
   if (on) trialTimer = setTimeout(watchTrial, Math.min(Math.max(coupon.expiresAt - secureNow(), 0) + 500, 2147000000));
 }
-function setPro(v) { pro = v; try { localStorage.setItem('pk.pro', v ? '1' : '0'); } catch (e) {} }
+function setPro(v) { pro = v; try { if (v) localStorage.setItem(PRO_KEY, JSON.stringify({ v: 1, t: Date.now() })); else localStorage.removeItem(PRO_KEY); } catch (e) {} }
 /* Returns true (and shows the Pro sheet) when the feature is locked. */
 function needPro(key) { if (isPro()) return false; if (typeof openPro === 'function') openPro(key); return true; }
 
@@ -117,7 +124,11 @@ function billingMessage(e) {
 }
 async function buyPro() {
   if (!NP) return { ok: false, msg: 'Purchases are only available in the installed app.' };
-  try { await NP.purchaseProduct({ productIdentifier: PRO_ID, productType: 'inapp' }); setPro(true); return { ok: true }; }
+  try {
+    await NP.purchaseProduct({ productIdentifier: PRO_ID, productType: 'inapp' });
+    await refreshPro(); // unlock only once Google Play lists the purchase as complete (a slow payment can still be pending)
+    return pro ? { ok: true } : { ok: false, info: true, msg: 'Your purchase is pending. Pro unlocks as soon as the payment completes.' };
+  }
   catch (e) { if (/cancel/i.test(String(e && e.message || e))) return { ok: false, msg: null }; return { ok: false, msg: billingMessage(e) }; }
 }
 async function restorePro() {

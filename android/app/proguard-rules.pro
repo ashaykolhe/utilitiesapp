@@ -26,3 +26,6 @@
 # Capacitor finds plugins by annotation at runtime
 -keep @com.getcapacitor.annotation.CapacitorPlugin class * { *; }
 -keepclassmembers class * { @com.getcapacitor.PluginMethod <methods>; }
+# Readable crash traces in Play Console (upload app/build/outputs/mapping/release/mapping.txt with each release)
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile

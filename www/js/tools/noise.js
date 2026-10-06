@@ -4,6 +4,7 @@ Tools.register({ id: 'noise', name: 'Sound Intensity', icon: '📢', cat: 'measu
   el.innerHTML = `<div class="card center"><div class="big" id="db">--</div><div class="muted">dB (approximate)</div><div class="muted" id="msg"></div></div>
     <div class="card row center"><div><div class="mid" id="mn">--</div><small class="muted">Min</small></div><div><div class="mid" id="mx">--</div><small class="muted">Max</small></div></div>`;
   let ctx, stream, raf, alive = true, mn = 999, mx = 0;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $('#msg', el).textContent = 'Microphone is not available on this device'; return () => {}; }
   navigator.mediaDevices.getUserMedia({ audio: true }).then(s => {
     if (!alive) { s.getTracks().forEach(t => t.stop()); return; }
     stream = s; ctx = new (window.AudioContext || window.webkitAudioContext)();

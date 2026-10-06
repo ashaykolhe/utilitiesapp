@@ -19,9 +19,18 @@ const SALT = 'PocketKit/coupon/v1';                  // must match COUPON_SALT i
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I, O, 0, 1: easy to read aloud and type
 
 // Windows open at 00:00Z, so default to YESTERDAY (UTC): a schedule starting "today" is not live yet east of UTC.
+const FORCE = process.argv.includes('--force');
+process.argv = process.argv.filter(a => a !== '--force');
+if (fs.existsSync(path.join(ROOT, 'coupon-codes.txt')) && !FORCE) {
+  console.error('coupon-codes.txt already exists. Generating again makes every code you already handed out stop working.');
+  console.error('Run with --force to replace it (the old file is kept as coupon-codes.<timestamp>.txt).');
+  process.exit(1);
+}
 const startArg = process.argv[2] || new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 const COUNT = Number(process.argv[3] || 52), DAYS = Number(process.argv[4] || 14);
 const start = Date.parse(startArg + 'T00:00:00Z');
+if (!Number.isInteger(COUNT) || COUNT < 1 || !Number.isInteger(DAYS) || DAYS < 1) { console.error('count and days must be positive whole numbers'); process.exit(1); }
+if (FORCE && fs.existsSync(path.join(ROOT, 'coupon-codes.txt'))) fs.renameSync(path.join(ROOT, 'coupon-codes.txt'), path.join(ROOT, 'coupon-codes.' + Date.now() + '.txt'));
 if (!Number.isFinite(start)) { console.error('bad start date:', startArg); process.exit(1); }
 
 const group = n => Array.from({ length: n }, () => ALPHABET[crypto.randomInt(ALPHABET.length)]).join('');

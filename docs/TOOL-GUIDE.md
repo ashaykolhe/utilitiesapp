@@ -93,3 +93,10 @@ so dark and light themes both work. For one-off layout use inline `style=""` ins
 ```
 * Do NOT run `git`. Do not edit `index.html` (except vendor script lines), `app.js`, `core.js`, `pro.js`, CSS or docs other than your notes file.
 * Final message: list each tool (id, name, plan) and anything not finished or limited.
+
+## Added after the first builders
+
+* Wrap your whole file in an IIFE `(() => { ... })();` so helper names never clash with other tool files.
+* Every tool id, name and emoji must be unique across ALL files in www/js/tools/. Before choosing, grep the other files for your candidate icons and ids (`grep -h "icon:" www/js/tools/*.js`). Names should be 16 characters or fewer.
+* Checkboxes/radios and small buttons must still have a hit area of at least 44px (wrap in a label with padding). Every input needs a visible label or aria-label. Use theme variables only, so light and dark both stay readable.
+* Escape user text in innerHTML with esc().

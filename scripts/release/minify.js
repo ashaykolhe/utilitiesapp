@@ -9,7 +9,7 @@
    Only ever run on a COPY: www/ stays the files that are edited and tested.
 
    Classic scripts share globals across files (core.js declares things habits.js uses), so top-level names are NOT
-   mangled -- only names inside functions. Android's R8 stays off (see android/app/build.gradle): the Java side is a
+   mangled -- only names inside functions. Android's R8 shrinker is ON for release (see android/app/build.gradle and proguard-rules.pro): the Java side is a
    few small files and Capacitor loads its plugins reflectively, which is exactly what shrinking breaks. */
 const fs = require('fs');
 const path = require('path');

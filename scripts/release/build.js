@@ -55,6 +55,15 @@ function copyTree(src, dst) {
 (async () => {
   const t0 = Date.now();
   try {
+    /* 0 */
+    require('../copy-privacy.js'); // the in-app privacy policy must match docs/privacy-policy.html
+    const gradleText = fs.readFileSync(path.join(ANDROID, 'app', 'build.gradle'), 'utf8');
+    const vName = (gradleText.match(/versionNames+"([^"]+)"/) || [])[1], vCode = (gradleText.match(/versionCodes+(d+)/) || [])[1];
+    const pkgVer = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+    const appVer = (fs.readFileSync(path.join(WWW, 'js', 'app.js'), 'utf8').match(/APP_VERSION = '([^']+)'/) || [])[1];
+    if (vName !== pkgVer || vName !== appVer) throw new Error('version mismatch: build.gradle versionName ' + vName + ', package.json ' + pkgVer + ', app.js APP_VERSION ' + appVer + '. Make all three the same.');
+    say('version ' + vName + ' (versionCode ' + vCode + ')' + (PHONE_TEST ? '' : ': check that versionCode is higher than the one already on Google Play'));
+
     /* 1 */
     run('copying the web app into the Android project', 'npx', ['cap', 'sync', 'android'], { shell: true });
 

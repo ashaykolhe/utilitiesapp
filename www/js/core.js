@@ -11,6 +11,9 @@ const Store = {
   set(k, v) { try { localStorage.setItem('pk.' + k, JSON.stringify(v)); } catch (e) { toast('Storage is full'); } }
 };
 
+/* A stored list that is always an array, even if something wrote the wrong thing there. */
+Store.arr = (k) => { const v = Store.get(k, []); return Array.isArray(v) ? v : []; };
+
 let toastTimer;
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.hidden = false;
@@ -44,19 +47,21 @@ const Tools = {
     if (!CATS.some(c => c.id === t.cat)) console.warn('unknown category', t.id, t.cat);
     this.list.push(t);
   },
-  get(id) { return this.list.find(t => t.id === id); },
+  _map: null,
+  get(id) { if (!this._map || this._map.size !== this.list.length) this._map = new Map(this.list.map(t => [t.id, t])); return this._map.get(id); },
   matches(t, q) { return (t.name + ' ' + (t.keys || []).join(' ') + ' ' + catOf(t.cat).name).toLowerCase().includes(q); }
 };
 
 /* Pinned tools and recently opened tools, both kept on the device. */
 const Prefs = {
-  pins() { return Store.get('pins', []).filter(id => Tools.get(id)); },
+  pins() { return Store.arr('pins').filter(id => Tools.get(id)); },
   isPinned(id) { return this.pins().includes(id); },
   togglePin(id) {
-    const p = Store.get('pins', []), i = p.indexOf(id);
+    const p = Store.arr('pins'), i = p.indexOf(id);
     if (i >= 0) p.splice(i, 1); else p.push(id);
     Store.set('pins', p); return i < 0;
   },
-  recent() { return Store.get('recent', []).filter(id => Tools.get(id)); },
-  touch(id) { Store.set('recent', [id, ...Store.get('recent', []).filter(x => x !== id)].slice(0, 8)); }
+  recent() { return Store.arr('recent').filter(id => Tools.get(id)); },
+  touch(id) { Store.set('recent', [id, ...Store.arr('recent').filter(x => x !== id)].slice(0, 8)); },
+  closed() { return Store.arr('closed'); }
 };

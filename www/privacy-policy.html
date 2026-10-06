@@ -19,6 +19,8 @@ a{color:var(--accent)}
 </head>
 <body>
 <main>
+<p><a id="back" href="#" onclick="history.back();return false" hidden>&larr; Back</a></p>
+<script>if(history.length>1&&window.Capacitor!==undefined||history.length>1)document.getElementById("back").hidden=false</script>
 <h1>PocketKit Privacy Policy</h1>
 <p class="muted">Last updated: 6 October 2026 &middot; Applies to the PocketKit Android app</p>
 

@@ -10,3 +10,10 @@ release-build/
 *.apk
 
 coupon-codes.txt
+coupon-codes*.txt
+*.aab
+*.pem
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.*.json
+android/app/build/
+android/.gradle/
