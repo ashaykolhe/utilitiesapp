@@ -20,5 +20,5 @@ and `android/keystore.properties` exists (an unsigned bundle is rejected by Play
 - Bump `versionCode` and `versionName` in `android/app/build.gradle`.
 - Run `npm run release:phone-test` and click through `docs/MANUAL-TEST.md` on a phone.
 - Play Console: the in-app product `pocketkit_pro` (one-time purchase), the privacy policy URL (host `docs/privacy-policy.html`, e.g. with GitHub Pages from the `/docs` folder), and the data-safety form (no data collected).
-- Fill in the contact email in `docs/privacy-policy.html`, then run `npm run docs`.
+- The contact email is set in `docs/privacy-policy.html` (run `npm run docs` after changing it).
 - Regenerate coupons with `npm run coupons` when the schedule runs out; hand out the code whose window covers today. Keep `coupon-codes.txt` private.
