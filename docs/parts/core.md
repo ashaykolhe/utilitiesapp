@@ -3,8 +3,9 @@
 - category: daily
 - plan: free
 - needs: notifications
-- what: Count down from 0 to 999 minutes and 0 to 59 seconds with start, pause and reset. A tone and vibration play when time is up, and on Android a notification is scheduled for the end time so it alerts with the screen off (it can be a few minutes late when the phone is idle). A line says so when notifications are blocked.
+- what: Count down from 0 to 999 minutes and 0 to 59 seconds with start, pause and reset. A tone and vibration play when time is up, and on Android a notification is scheduled for the end time so it alerts with the screen off (it can be a few minutes late when the phone is idle). A line says so when notifications are blocked. Quick buttons (1, 3, 5, 10, 15 and 30 minutes) fill in the time while the timer is stopped or paused, and the last time you started is remembered for next time.
 - test:
+  0. Tap the 10m button: the display shows 10:00. Start, then tap 3m: a message says to reset first. Pause, tap 3m: the display shows 03:00 and the button says Start. Leave and reopen: the time you last started is filled in.
   1. Open Timer, set 0 min 5 sec, tap Start. The display counts down and a tone plays at 00:00 with a "Time is up" message.
   2. Start 1 min, tap Pause after 5 s, then Resume. It continues from where it stopped.
   3. Tap Reset. The display shows the entered time again.
@@ -17,9 +18,9 @@
 - category: daily
 - plan: free
 - needs: none
-- what: Time anything to the hundredth of a second, with pause, resume, laps and reset.
+- what: Time anything to the hundredth of a second, with pause, resume, laps and reset. Each lap row shows the lap time in bold (the time since the previous lap) and the running total beside it; up to 500 laps.
 - test:
-  1. Tap Start. The time runs. Tap Lap three times. Three laps appear, newest first.
+  1. Tap Start. The time runs. Tap Lap three times. Three laps appear, newest first, each with its lap time and the total.
   2. Tap Pause, wait, tap Resume. The time continues without jumping.
   3. Tap Reset. Time and laps clear.
 
@@ -28,13 +29,14 @@
 - category: daily
 - plan: free with limit: 3 active reminders (Pro: unlimited)
 - needs: notifications
-- what: Set reminders with a date and time (text up to 80 characters, time within the next 5 years, at most 200 saved; finished ones are trimmed to the newest 20). On Android a notification is scheduled so it appears even when the app is closed; it can be a few minutes late on an idle phone. A line says so when notifications are blocked.
+- what: Set reminders with a date and time (text up to 80 characters, time within the next 5 years, at most 200 saved; finished ones are trimmed to the newest 20, and a Clear finished button removes them at once). On Android a notification is scheduled so it appears even when the app is closed; it can be a few minutes late on an idle phone. A line says so when notifications are blocked.
 - test:
   1. Add a reminder for 2 minutes from now. Allow notifications when asked. Close the app. A notification appears at the time.
   2. Add reminders until there are 3 active ones, then add a fourth. The Pro sheet opens.
   3. Delete a reminder with the cross. It disappears and no notification arrives for it.
   4. Try a time in the past. A message says to enter a future time. The date picker does not offer past dates or dates beyond 5 years.
   5. Deny notifications: the reminder is saved, a toast and a red line say notifications are blocked.
+  6. After a reminder has fired it is struck through and the Clear finished button appears; tap it: finished reminders go and the waiting ones stay.
 
 ## Calculator
 - id: calculator
@@ -55,8 +57,9 @@
 - category: calculate
 - plan: free
 - needs: none
-- what: Convert length, weight, volume, area, speed, data, time and temperature between common units. The value, units and category all have labels; the value is limited to +-1 trillion. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button.
+- what: Convert length, weight, volume, area, speed, data, time and temperature between common units. The value, units and category all have labels; the value is limited to +-1 trillion. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button. The Swap button exchanges the two units, and the last category and units are remembered. Factors are exact (1 knot is 1.852 km/h, 1 oz is 28.349523125 g).
 - test:
+  0. Length: 2 mile to km, tap Swap: the units exchange and the result is 1.242742384 mile. Leave and reopen: the same category and units are selected.
   1. Length: 1 mile to km gives 1.609344.
   2. Temperature: 100 C to F gives 212.
   3. Data: 1 GB to MB gives 1024.
@@ -120,9 +123,9 @@
 - category: daily
 - plan: free
 - needs: none
-- what: Shows screen size, pixel ratio, language, processor cores, memory, online state, touch points, battery and the browser string.
+- what: Shows screen size, pixel ratio, language, processor cores, memory, online state, touch points, battery and the browser string. Copy details puts every row on the clipboard as text.
 - test:
-  1. Open it. All rows have values. Battery matches the phone's level.
+  1. Open it. All rows have values. Battery matches the phone's level. Tap Copy details and paste somewhere: one line per row.
   2. Turn on airplane mode and reopen. Online shows No.
 
 ## Flashlight
@@ -130,7 +133,7 @@
 - category: daily
 - plan: free
 - needs: camera
-- what: Turns the camera torch on and off. Double taps are ignored while the camera is starting, and leaving the tool during the permission prompt does not leave the camera on.
+- what: Turns the camera torch on and off. Double taps are ignored while the camera is starting, and leaving the tool during the permission prompt does not leave the camera on. The permission message says where to allow the camera (Settings, Apps, PocketKit, Permissions).
 - test:
   1. Tap Turn on and allow the camera. The torch lights and the button says Turn off.
   2. Tap Turn off. The torch goes out.
@@ -143,29 +146,31 @@
 - category: measure
 - plan: free
 - needs: microphone
-- what: Approximate sound level in decibels from the microphone with minimum and maximum. Reads the raw microphone (no noise suppression or auto gain) and ignores the first half second so Min does not stick at 0.
+- what: Approximate sound level in decibels from the microphone with minimum and maximum. Reads the raw microphone (no noise suppression or auto gain) and ignores the first half second so Min does not stick at 0. A Reset min and max button clears the extremes. The permission message says where to allow the microphone, and a busy microphone gets its own message.
 - test:
   1. Open it and allow the microphone. After half a second the value changes with the sound around you and Min is above 0.
   2. Clap near the phone. The maximum jumps up.
   3. Deny the permission. A message says it was denied.
+  4. Tap Reset min and max after a clap: both show -- and fill again from the next reading.
 
 ## Text to Speech
 - id: tts
 - category: audio
 - plan: free
 - needs: none
-- what: Reads typed text aloud (up to 5000 characters) with a choice of voice and speed. Speak with empty text shows a message.
+- what: Reads typed text aloud (up to 5000 characters) with a choice of voice and speed. Speak with empty text shows a message. The voice that matches the phone language is chosen at first; the chosen voice and speed are remembered. With no voices installed the box offers Default voice.
 - test:
   1. Type a sentence and tap Speak. It is read aloud.
   2. Change the speed and speak again. The pace changes.
   3. Tap Stop while speaking. It stops. Leaving the tool also stops it.
+  4. Choose another voice and speed, leave and reopen: both are still selected.
 
 ## Speech to Text
 - id: stt
 - category: audio
 - plan: free
 - needs: microphone
-- what: Turns your speech into text that you can copy. Many Android WebViews have no speech recognition; the tool says so up front and disables the button. Errors such as permission denied or no speech heard are explained in plain words.
+- what: Turns your speech into text that you can copy. Many Android WebViews have no speech recognition; the tool says so up front and disables the button. Errors such as permission denied or no speech heard are explained in plain words. The permission message says where to allow the microphone.
 - test:
   1. Tap Start listening, allow the microphone and speak a sentence. The words appear.
   2. Tap Copy and paste elsewhere. The text is pasted.
@@ -177,9 +182,10 @@
 - category: create
 - plan: free
 - needs: storage
-- what: Draw with any colour and brush size, use an eraser, undo, clear and save the picture as an image.
+- what: Draw with any colour and brush size, use an eraser, undo, clear and save the picture as an image. Eight quick colour buttons choose the brush colour in one tap (and switch the eraser off); the colour and brush size are remembered.
 - test:
   1. Draw with a finger in two colours. Lines follow the finger.
   2. Tap Undo. The last stroke disappears. Tap Eraser and erase part of a line.
   3. Tap Save. On the phone the share sheet opens with a PNG; in a browser a PNG downloads and Saved is shown. The word Saved is only shown when the save worked.
   4. Draw a long continuous line with a thick brush. It stays smooth and does not slow down.
+  5. Tap the red quick colour while the eraser is on: the brush is red and the button says Eraser again. Leave and reopen: red and the brush size are still set.

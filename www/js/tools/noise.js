@@ -2,8 +2,10 @@
 /* Sound meter: relative level in dB from the microphone (not a calibrated SPL reading). */
 Tools.register({ id: 'noise', name: 'Sound Intensity', icon: '📢', cat: 'measure', desc: 'Approximate sound level in decibels from the microphone, with minimum and maximum.', needs: ['microphone'], render(el) {
   el.innerHTML = `<div class="card center"><div class="big" id="db">--</div><div class="muted">dB (approximate)</div><div class="muted" id="msg"></div></div>
-    <div class="card row center"><div><div class="mid" id="mn">--</div><small class="muted">Min</small></div><div><div class="mid" id="mx">--</div><small class="muted">Max</small></div></div>`;
+    <div class="card row center"><div><div class="mid" id="mn">--</div><small class="muted">Min</small></div><div><div class="mid" id="mx">--</div><small class="muted">Max</small></div></div>
+    <button class="btn alt" id="rs" style="width:100%">Reset min and max</button>`;
   let ctx, stream, raf, alive = true, mn = 999, mx = 0, t0 = 0;
+  $('#rs', el).onclick = () => { mn = 999; mx = 0; $('#mn', el).textContent = '--'; $('#mx', el).textContent = '--'; };
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $('#msg', el).textContent = 'Microphone is not available on this device'; return () => {}; }
   navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }).then(s => {
     if (!alive) { s.getTracks().forEach(t => t.stop()); return; }
@@ -30,7 +32,7 @@ Tools.register({ id: 'noise', name: 'Sound Intensity', icon: '📢', cat: 'measu
       $('#msg', el).textContent = 'Could not start audio on this device';
     }
   }).catch(e => {
-    $('#msg', el).textContent = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError') ? 'Microphone permission denied. Allow it in your phone settings.' : 'No microphone could be opened on this device';
+    $('#msg', el).textContent = e && (e.name === 'NotAllowedError' || e.name === 'SecurityError') ? 'Microphone permission was denied. Allow the microphone for PocketKit in your phone Settings (Apps, PocketKit, Permissions), then reopen this tool.' : (e && (e.name === 'NotReadableError' || e.name === 'AbortError')) ? 'The microphone is busy. Close other apps that use it, then reopen this tool.' : 'No microphone could be opened on this device';
   });
   return () => { alive = false; cancelAnimationFrame(raf); if (stream) stream.getTracks().forEach(t => t.stop()); if (ctx && ctx.state !== 'closed') { try { ctx.close().catch(() => {}); } catch (e) { /* ignore */ } } };
 } });

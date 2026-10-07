@@ -30,7 +30,9 @@ async function saveBlob(blob, name) {
 }
 
 Tools.register({ id: 'paint', name: 'Paint', icon: '🎨', cat: 'create', desc: 'Draw with colours and brush sizes, undo, and save the picture as an image.', needs: ['storage'], render(el) {
+  const PAL = ['#0f766e', '#000000', '#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ffffff'];
   el.innerHTML = `<canvas id="c" width="800" height="800"></canvas>
+    <div class="row" id="pal" style="gap:6px">${PAL.map(c => `<button class="btn alt" data-c="${c}" aria-label="Colour ${c}" style="flex:1 1 0;min-width:0;min-height:44px;padding:0;background:${c};border:2px solid var(--line)"></button>`).join('')}</div>
     <div class="row"><input id="col" type="color" value="#0f766e" style="height:44px" aria-label="Brush colour"><input id="sz" type="range" min="2" max="40" value="6" aria-label="Brush size"><button class="btn alt" id="er">Eraser</button></div>
     <div class="row"><button class="btn alt" id="un">Undo</button><button class="btn alt" id="cl">Clear</button><button class="btn" id="sv">Save</button></div>`;
   const cv = $('#c', el), x = cv.getContext('2d');
@@ -49,6 +51,13 @@ Tools.register({ id: 'paint', name: 'Paint', icon: '🎨', cat: 'create', desc: 
   cv.onpointermove = e => { if (!down) return; const [a, b] = pt(e); x.lineTo(a, b); x.stroke(); x.beginPath(); x.moveTo(a, b); };
   cv.onpointerup = cv.onpointercancel = () => { down = false; };
   $('#er', el).onclick = e => { erase = !erase; e.target.textContent = erase ? 'Pen' : 'Eraser'; };
+  // Quick colours: one tap picks the colour and switches the eraser off. Colour and size are remembered.
+  const savedCol = Store.get('paint.col', null), savedSz = Store.get('paint.sz', null);
+  if (typeof savedCol === 'string' && /^#[0-9a-f]{6}$/i.test(savedCol)) $('#col', el).value = savedCol;
+  if (typeof savedSz === 'number' && savedSz >= 2 && savedSz <= 40) $('#sz', el).value = savedSz;
+  $$('#pal button', el).forEach(b => b.onclick = () => { $('#col', el).value = b.dataset.c; Store.set('paint.col', b.dataset.c); if (erase) { erase = false; $('#er', el).textContent = 'Eraser'; } });
+  $('#col', el).onchange = () => { Store.set('paint.col', $('#col', el).value); if (erase) { erase = false; $('#er', el).textContent = 'Eraser'; } };
+  $('#sz', el).onchange = () => Store.set('paint.sz', +$('#sz', el).value);
   $('#un', el).onclick = () => { const s = hist.pop(); if (s) x.putImageData(s, 0, 0); };
   $('#cl', el).onclick = () => { snap(); blank(); };
   $('#sv', el).onclick = () => {

@@ -87,7 +87,10 @@ function life() {
 function micFail(el, e, sel) {
   if (e && e.message === 'gone') return;
   const m = $(sel || '#msg', el); if (!m) return;
-  m.textContent = (e && e.name === 'NotAllowedError') ? 'Microphone permission was denied. Allow it in the app settings.' : 'Microphone is not available on this device.';
+  const n = e && e.name;
+  m.textContent = (n === 'NotAllowedError' || n === 'SecurityError' || n === 'PermissionDeniedError') ? 'Microphone permission was denied. Allow the microphone for PocketKit in your phone Settings (Apps, PocketKit, Permissions), then tap Start again.'
+    : (n === 'NotReadableError' || n === 'AbortError') ? 'The microphone is busy. Close other apps that use it (calls, recorders) and tap Start again.'
+    : 'No microphone is available on this device.';
 }
 /* loop: true crossfades the end of the buffer into its start (0.3 s, equal power) so a looped source has no click at the seam. */
 function noiseBuf(ctx, type, secs, loop) {
@@ -148,7 +151,7 @@ function buildKeys(box, startMidi, count) {
   const w = 100 / nw, keys = []; let wi = 0; box.innerHTML = '';
   for (let i = 0; i < count; i++) {
     const pc = i % 12, isW = white.includes(pc), e = document.createElement('div');
-    e.dataset.k = i;
+    e.dataset.k = i; e.setAttribute('role', 'button'); e.setAttribute('aria-label', noteName(startMidi + i));
     if (isW) {
       e.style.cssText = 'position:absolute;top:0;bottom:0;left:' + (wi * w) + '%;width:' + w + '%;box-sizing:border-box;background:#f4f4f4;border:1px solid #888;border-radius:0 0 6px 6px;z-index:1;display:flex;align-items:flex-end;justify-content:center;color:#555;font-size:10px;padding-bottom:3px;touch-action:none;user-select:none';
       if (pc === 0) e.textContent = 'C' + (Math.floor((startMidi + i) / 12) - 1);
@@ -166,6 +169,21 @@ function newMaster(ctx, vol) {
   const g = ctx.createGain(); g.gain.value = vol;
   const c = ctx.createDynamicsCompressor(); g.connect(c); c.connect(ctx.destination);
   return g;
+}
+/* Remember chosen settings between visits: restores the listed controls from Store ('mem.<tool id>') and saves them when changed.
+   Call it at the end of render, after the handlers are attached, so a restore goes through the same code as a tap. */
+function remember(el, id, ids) {
+  const key = 'mem.' + id; let saved = Store.get(key, null); if (!saved || typeof saved !== 'object') saved = {};
+  ids.forEach(i => {
+    const n = $('#' + i, el); if (!n || !(i in saved)) return; const v = saved[i];
+    if (n.type === 'checkbox') { if (typeof v === 'boolean' && n.checked !== v) { n.checked = v; n.dispatchEvent(new Event('change', { bubbles: true })); } return; }
+    if (typeof v !== 'string') return;
+    const old = n.value; n.value = v;
+    if (n.value !== v) { n.value = old; return; }          // no longer allowed here (option removed, outside the range)
+    n.dispatchEvent(new Event('input', { bubbles: true })); n.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const save = () => { const o = {}; ids.forEach(i => { const n = $('#' + i, el); if (n) o[i] = n.type === 'checkbox' ? n.checked : n.value; }); Store.set(key, o); };
+  el.addEventListener('change', save); el.addEventListener('input', save);
 }
 function cssVar(el, name, fb) { return (getComputedStyle(el).getPropertyValue(name) || '').trim() || fb; }
 
@@ -269,9 +287,10 @@ Tools.register({ id: 'tonegen', name: 'Tone Generator', icon: '〰️', cat: 'au
   $('#vol', el).oninput = e => {
     const v = +e.target.value; $('#vv', el).textContent = v + (v > 70 ? ' (loud!)' : '');
     if (v > 70 && playing && loudHigh() && !sure()) { e.target.value = 70; $('#vv', el).textContent = '70'; }
-    if (gain) gain.gain.setTargetAtTime(level(+e.target.value), ctx.currentTime, 0.02);
+    if (gain && ctx) gain.gain.setTargetAtTime(level(+e.target.value), ctx.currentTime, 0.02);
   };
   function start() {
+    show(clamp(Valid.num(num.value) === null ? 440 : Valid.num(num.value), 20, 20000));   // a sweep leaves `freq` at its last value: start from what the box says
     if (loudHigh() && !sure()) return;
     ctx = L.ctx(); osc = ctx.createOscillator(); gain = ctx.createGain();
     osc.type = $('#wf', el).value; osc.frequency.value = freq; gain.gain.value = 0.0001;
@@ -292,7 +311,7 @@ Tools.register({ id: 'tonegen', name: 'Tone Generator', icon: '〰️', cat: 'au
     const f = from * Math.pow(to / from, p);
     osc.frequency.value = f; show(f, true);
   });
-  show(440);
+  show(440); remember(el, 'tonegen', ['num', 'wf']);
   return () => { playing = false; fadeLeave(L, ctx, gain); };
 } });
 
@@ -509,17 +528,19 @@ Tools.register({ id: 'recorder', name: 'Voice Recorder', icon: '📼', cat: 'aud
         rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
         rec.onstop = () => {
           const ms = acc, type = rec.mimeType || mime || 'audio/webm', cs = chunks; chunks = []; release(); state = 'idle'; ui(); ticker();
-          if (!cs.length) { toast('Nothing was recorded'); return; }
+          const closeDb = () => { if (!L.alive && db) { try { db.close(); } catch (e) { /* ignore */ } } };
+          if (!cs.length) { toast('Nothing was recorded'); closeDb(); return; }
           if (!db) { toast('Storage is not available, the recording could not be saved'); return; }
           const blob = new Blob(cs, { type });
           const rd = new Date(), name = 'Recording ' + rd.getFullYear() + '-' + pad(rd.getMonth() + 1, 2) + '-' + pad(rd.getDate(), 2) + ' ' + pad(rd.getHours(), 2) + '.' + pad(rd.getMinutes(), 2);
           // Re-check the free limit now: it may have changed while recording.
           if (list.length >= proLimit('recordings')) {
-            toast('Free recording limit reached, choose where to keep this one'); needPro('recordings');
+            toast('Free recording limit reached, choose where to keep this one'); if (L.alive) needPro('recordings');
             saveBlob(blob, name.replace(/[^\w\- ]+/g, '') + '.' + (/mp4|aac/.test(type) ? 'm4a' : /ogg/.test(type) ? 'ogg' : 'webm')).catch(() => {});
-            return;
+            closeDb(); return;
           }
-          tx('readwrite', st => st.add({ name, blob, ms, mime: type, date: Date.now() })).then(() => { toast('Saved'); return reload(); }).catch(() => toast('Could not save (storage full?)'));
+          // Also reached when the tool was left mid-recording: the memo is kept instead of lost.
+          tx('readwrite', st => st.add({ name, blob, ms, mime: type, date: Date.now() })).then(() => { toast('Saved'); return reload(); }).catch(() => toast('Could not save (storage full?)')).then(closeDb);
         };
         rec.start(1000); state = 'rec'; tStart = performance.now();
       } catch (e) { release(); rec = null; state = 'idle'; throw e; }
@@ -542,8 +563,10 @@ Tools.register({ id: 'recorder', name: 'Voice Recorder', icon: '📼', cat: 'aud
   ui(); draw();
   return () => {
     stopPlay();
-    if (rec && rec.state !== 'inactive') { rec.onstop = null; try { rec.stop(); } catch (e) { } }
-    L.stop(); if (db) db.close();
+    // Leaving mid-recording keeps what was recorded: onstop saves it, then closes the database.
+    const active = !!rec && state !== 'idle' && rec.state !== 'inactive';
+    if (active) stopRec();
+    L.stop(); if (db && !active) db.close();
   };
 } });
 
@@ -585,7 +608,7 @@ Tools.register({ id: 'piano', name: 'Piano', icon: '🎹', cat: 'audio', desc: '
   $('#od', el).onclick = () => { if (oct > -2) { [...voices.keys()].forEach(off); oct--; build(); } };
   $('#ou', el).onclick = () => { if (oct < 2) { [...voices.keys()].forEach(off); oct++; build(); } };
   $('#wf', el).onchange = e => { wave = e.target.value; };
-  build();
+  build(); remember(el, 'piano', ['wf']);
   return () => { L.stop(); };
 } });
 
@@ -727,6 +750,7 @@ Tools.register({ id: 'sleepsounds', name: 'Sleep Sounds', icon: '😴', cat: 'au
     setText(el, '#cd', 'Sleep timer: ' + pad(Math.floor(s / 3600), 2) + ':' + pad(Math.floor(s / 60) % 60, 2) + ':' + pad(s % 60, 2));
     if (left <= 0) { stopPlay(true); setText(el, '#cd', 'Timer finished'); }
   }, 500);
+  remember(el, 'sleepsounds', ['tm']);
   return () => { playing = false; teardown(); L.stop(); };
 } });
 
@@ -772,6 +796,7 @@ Tools.register({ id: 'drumpad', pro: true, proKey: 'audio', name: 'Drum Pad', ic
     const rel = () => { b.style.background = ''; b.style.color = ''; };
     b.onpointerup = rel; b.onpointercancel = rel; b.onpointerleave = rel; b.oncontextmenu = e => e.preventDefault();
   });
+  remember(el, 'drumpad', ['vol']);
   return () => L.stop();
 } });
 
@@ -813,6 +838,7 @@ Tools.register({ id: 'eartest', name: 'Hearing Test', icon: '👂', cat: 'audio'
   $('#no', el).onclick = () => { if (idx >= 0) finish(); };
   $('#rp', el).onclick = () => { if (idx >= 0) play(); };
   $('#vol', el).oninput = e => { setText(el, '#vv', e.target.value); if (osc) g.gain.setTargetAtTime(vol(), ctx.currentTime, 0.02); };
+  remember(el, 'eartest', ['ear']);
   return () => { clearTimeout(stopT); L.stop(); };
 } });
 
@@ -861,7 +887,7 @@ Tools.register({ id: 'binaural', name: 'Binaural Beats', icon: '🧠', cat: 'aud
     const s = Math.max(0, Math.ceil((endAt - Date.now()) / 1000)); setText(el, '#cd', 'Stops in ' + pad(Math.floor(s / 60), 2) + ':' + pad(s % 60, 2));
     if (!s) stop();
   }, 500);
-  upd();
+  upd(); remember(el, 'binaural', ['beat', 'car', 'tm']);
   return () => { playing = false; L.stop(); };
 } });
 
@@ -915,7 +941,7 @@ Tools.register({ id: 'player', pro: true, proKey: 'audio', name: 'Audio Player',
   };
   $('#pl', el).onclick = () => { if (cur < 0) { $('#file', el).click(); return; } au.paused ? go() : au.pause(); };
   $('#bk', el).onclick = () => { au.currentTime = Math.max(0, au.currentTime - 10); };
-  $('#fw', el).onclick = () => { au.currentTime = Math.min(au.duration || 0, au.currentTime + 10); };
+  $('#fw', el).onclick = () => { au.currentTime = isFinite(au.duration) ? Math.min(au.duration, au.currentTime + 10) : au.currentTime + 10; };
   $('#sp', el).oninput = applySpeed; $('#pp', el).onchange = applySpeed;
   $('#vol', el).oninput = e => { au.volume = +e.target.value / 100; };
   $('#sa', el).onclick = () => { A = au.currentTime; if (B !== null && B <= A) B = null; abShow(); };
@@ -970,6 +996,7 @@ Tools.register({ id: 'stereotest', name: 'Stereo Test', icon: '🔈', cat: 'audi
   $('#st', el).onclick = halt;
   $('#snd', el).onchange = () => { if (mode) begin(mode); };
   $('#vol', el).oninput = e => { setText(el, '#vv', e.target.value); if (g) g.gain.value = vol(); };
+  remember(el, 'stereotest', ['snd']);
   return () => { halt(); L.stop(); };
 } });
 
@@ -1002,6 +1029,7 @@ Tools.register({ id: 'speakerclean', name: 'Speaker Cleaner', icon: '💧', cat:
     if ($('#md', el).value === 'sweep') { const ph = ((now - t0) % 4000) / 4000; osc.frequency.value = 100 + 350 * (ph < 0.5 ? ph * 2 : 2 - ph * 2); } else osc.frequency.value = 165;
     if (!left) stop(true);
   });
+  remember(el, 'speakerclean', ['md', 'du']);
   return () => { running = false; fadeLeave(L, ctx, g); };
 } });
 
@@ -1041,6 +1069,7 @@ Tools.register({ id: 'dogwhistle', name: 'Dog Whistle', icon: '🐕', cat: 'audi
   $$('#pre button', el).forEach(b => b.onclick = () => { $('#fr', el).value = b.dataset.f; show(); });
   $('#vol', el).oninput = e => { const v = +e.target.value; setText(el, '#vv', v); if (v > 70 && playing && !sure()) { e.target.value = 70; setText(el, '#vv', 70); } };
   $('#go', el).onclick = () => playing ? stop() : start();
+  remember(el, 'dogwhistle', ['fr', 'md']);
   return () => { playing = false; fadeLeave(L, ctx, g); };
 } });
 
@@ -1092,7 +1121,7 @@ Tools.register({ id: 'clapcounter', name: 'Clap Counter', icon: '👏', cat: 'au
   let ctx = null, an = null, buf = null, on = false, count = 0, last = 0, prev = 0, times = [], pending = false;
   el.innerHTML = `<div class="card center"><div class="big" id="n">0</div><div class="muted"><span id="cpm">0</span> claps per minute</div>
     <div style="position:relative;height:14px;background:var(--surface2);border-radius:7px;margin-top:10px;overflow:hidden"><div id="lv" style="height:100%;width:0;background:var(--ok)"></div><div id="th" style="position:absolute;top:0;bottom:0;width:2px;background:var(--danger)"></div></div></div>
-    <label class="f">Sensitivity<input id="sens" type="range" min="1" max="10" value="5" style="width:100%"></label>
+    <label class="f">Sensitivity (higher hears quieter claps)<input id="sens" type="range" min="1" max="10" value="5" style="width:100%"></label>
     <div class="row"><button class="btn" id="go">Start listening</button><button class="btn alt" id="rs">Reset</button></div><div class="muted center" id="msg"></div>`;
   const thr = () => 0.5 - (+$('#sens', el).value) * 0.045;
   function paintThr() { $('#th', el).style.left = Math.min(100, thr() * 100) + '%'; }
@@ -1122,6 +1151,7 @@ Tools.register({ id: 'clapcounter', name: 'Clap Counter', icon: '👏', cat: 'au
       } catch (e) { L.drop(s); closeCtx(ctx); ctx = an = null; throw e; }
     }).catch(e => micFail(el, e)).then(() => { pending = false; });
   };
+  remember(el, 'clapcounter', ['sens']);
   return () => { on = false; L.stop(); };
 } });
 
@@ -1135,7 +1165,8 @@ Tools.register({ id: 'vocalrange', name: 'Vocal Range', icon: '🎤', cat: 'audi
     <div class="row"><div class="card center"><div class="muted">Lowest</div><div class="mid" id="lo">--</div></div><div class="card center"><div class="muted">Highest</div><div class="mid" id="hi">--</div></div></div>
     <div class="card center"><div id="rg">Sing from your lowest to your highest comfortable note.</div><div class="muted" id="vt"></div></div>
     <div class="row"><button class="btn" id="go">Start</button><button class="btn alt" id="rs">Reset range</button></div><div class="muted center" id="msg"></div>`;
-  function type(mid) { return mid < 50 ? 'Bass' : mid < 55 ? 'Baritone' : mid < 60 ? 'Tenor' : mid < 66 ? 'Alto' : mid < 70 ? 'Mezzo-soprano' : 'Soprano'; }
+  // Boundaries halfway between the midpoints of the classical ranges: bass E2-E4 (52), baritone A2-A4 (57), tenor C3-C5 (60), alto F3-F5 (65), mezzo A3-A5 (69), soprano C4-C6 (72).
+  function type(mid) { return mid < 54.5 ? 'Bass' : mid < 58.5 ? 'Baritone' : mid < 62.5 ? 'Tenor' : mid < 67 ? 'Alto' : mid < 70.5 ? 'Mezzo-soprano' : 'Soprano'; }
   function paint() {
     setText(el, '#lo', lo === null ? '--' : noteName(lo)); setText(el, '#hi', hi === null ? '--' : noteName(hi));
     if (lo !== null && hi !== null && hi > lo) {
@@ -1257,6 +1288,7 @@ Tools.register({ id: 'pitchpipe', name: 'Pitch Pipe', icon: '🎺', cat: 'audio'
   };
   $('#oc', el).onchange = () => silence();
   $('#vol', el).oninput = e => { setText(el, '#vv', e.target.value); if (g && cur >= 0) g.gain.setTargetAtTime(vol(), ctx.currentTime, 0.03); };
+  remember(el, 'pitchpipe', ['oc']);
   return () => L.stop();
 } });
 

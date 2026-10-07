@@ -34,7 +34,7 @@ const tick = () => { if (typeof beep === 'function') { try { beep(); } catch (e)
 
 function camMsg(e) {
   const n = e && e.name;
-  if (n === 'NotAllowedError' || n === 'SecurityError' || n === 'PermissionDeniedError') return 'Camera permission was denied. Allow the camera for PocketKit in your phone settings, then reopen this tool.';
+  if (n === 'NotAllowedError' || n === 'SecurityError' || n === 'PermissionDeniedError') return 'Camera permission was denied. Allow the camera for PocketKit in your phone Settings (Apps, PocketKit, Permissions), then reopen this tool.';
   if (n === 'NotFoundError' || n === 'DevicesNotFoundError' || n === 'OverconstrainedError') return 'No camera was found on this device.';
   if (n === 'NotReadableError' || n === 'AbortError') return 'The camera is busy. Close other apps that use it and try again.';
   return (e && e.message) || 'The camera is not available.';
@@ -247,6 +247,22 @@ function nearestName(r, g, b) {
   return best.n;
 }
 
+/* Remember chosen settings between visits: restores the listed controls from Store ('mem.<tool id>') and saves them when changed.
+   Call it at the end of render, after the handlers are attached, so a restore goes through the same code as a tap. */
+function remember(el, id, ids) {
+  const key = 'mem.' + id; let saved = Store.get(key, null); if (!saved || typeof saved !== 'object') saved = {};
+  ids.forEach(i => {
+    const n = $('#' + i, el); if (!n || !(i in saved)) return; const v = saved[i];
+    if (n.type === 'checkbox') { if (typeof v === 'boolean' && n.checked !== v) { n.checked = v; n.dispatchEvent(new Event('change', { bubbles: true })); } return; }
+    if (typeof v !== 'string') return;
+    const old = n.value; n.value = v;
+    if (n.value !== v) { n.value = old; return; }          // no longer allowed here (option removed, outside the range)
+    n.dispatchEvent(new Event('input', { bubbles: true })); n.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const save = () => { const o = {}; ids.forEach(i => { const n = $('#' + i, el); if (n) o[i] = n.type === 'checkbox' ? n.checked : n.value; }); Store.set(key, o); };
+  el.addEventListener('change', save); el.addEventListener('input', save);
+}
+
 /* Reusable camera viewport markup. */
 const VIEW = (extra) => '<div class="card" style="padding:0;overflow:hidden;position:relative;line-height:0;min-height:160px"><video id="v" playsinline muted autoplay style="width:100%;display:block;border:0;border-radius:0;transform-origin:center;touch-action:pan-y"></video>' + (extra || '') + '</div><div class="muted center" id="msg" style="margin:6px 0;min-height:18px"></div>';
 const SLIDER = (id, label, min, max, step, val) => '<label class="f">' + label + ' <span class="muted" id="' + id + 'L"></span><input type="range" id="' + id + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '"></label>';
@@ -346,6 +362,7 @@ Tools.register({ id: 'nightcam', name: 'Night Cam', icon: '🦉', cat: 'camera',
     busy = true; const out = document.createElement('canvas'); process(out, v.videoWidth, v.videoHeight); busy = false; saveCanvas(out, 'night');
   };
   ['br', 'co', 'ga'].forEach(id => { const u = () => { $('#' + id + 'L', el).textContent = val(id); }; $('#' + id, el).addEventListener('input', u); u(); });
+  remember(el, 'nightcam', ['br', 'co', 'ga', 'gr']);
   return () => { stopped = true; cancelAnimationFrame(raf); cam.stop(); };
 } });
 
@@ -814,12 +831,16 @@ const BarDec = (() => {
 Tools.register({ id: 'codescan', name: 'Code Scanner', icon: '📷', cat: 'camera', desc: 'Scan QR codes and EAN/UPC product barcodes (also Code 128) with the camera or from a picture. Copy the result, or open it if it is a web link.', keys: ['qr', 'barcode', 'scan', 'reader', 'ean', 'upc', 'product', 'isbn'], needs: ['camera'], render(el) {
   el.innerHTML = VIEW('<div style="position:absolute;left:15%;right:15%;top:20%;bottom:20%;border:2px solid rgba(255,255,255,.8);border-radius:16px;box-shadow:0 0 0 9999px rgba(0,0,0,.25);pointer-events:none"></div>') +
     '<div class="muted center" id="qrnote" style="margin-bottom:6px"></div>' +
+    '<button class="btn alt" id="tc" style="display:none;width:100%;margin-bottom:8px">Torch</button>' +
     '<div class="card" id="res" style="display:none"><div class="muted" id="fmt"></div><div id="txt" style="word-break:break-all;margin:6px 0"></div><div class="row"><button class="btn" id="cp">Copy</button><a class="btn alt" id="op" target="_blank" rel="noopener noreferrer" style="text-align:center;text-decoration:none;display:none">Open link</a></div><button class="btn alt" id="again" style="margin-top:8px">Scan again</button></div>' +
     '<button class="btn alt" id="img">Scan from a picture</button>' +
     '<div class="card"><div class="muted">History</div><div class="list" id="hist"></div><button class="btn alt" id="clr" style="margin-top:8px">Clear history</button></div>';
   const v = $('#v', el), cam = makeCam(v, $('#msg', el)), sc = document.createElement('canvas'), g = sc.getContext('2d', { willReadFrequently: true });
   let bd = null, timer = null, paused = false, busy = false, lastKey = '', lastAt = 0, hist = Store.get('codescan.history', []), gone = false;
   if ('BarcodeDetector' in window) { try { bd = new BarcodeDetector(); } catch (e) { bd = null; } }
+  const FMT = { qr_code: 'QR code', ean_13: 'EAN-13', ean_8: 'EAN-8', upc_a: 'UPC-A', upc_e: 'UPC-E', code_128: 'Code 128', code_39: 'Code 39', code_93: 'Code 93', codabar: 'Codabar', itf: 'ITF', data_matrix: 'Data Matrix', aztec: 'Aztec', pdf417: 'PDF417' };
+  let torch = false;
+  $('#tc', el).onclick = async () => { torch = !torch; if (!(await cam.torch(torch))) { torch = false; toast('Torch is not available'); } $('#tc', el).textContent = torch ? 'Torch off' : 'Torch'; };
   const NOTE = 'Scans QR codes and EAN/UPC product barcodes (also Code 128). Hold the code steady, with a little white space around it.';
   $('#qrnote', el).textContent = bd ? 'Scans QR codes and common barcodes.' : NOTE;
   const isUrl = (t) => /^https?:\/\/\S+$/i.test(t);
@@ -834,7 +855,7 @@ Tools.register({ id: 'codescan', name: 'Code Scanner', icon: '📷', cat: 'camer
     if (add) { hist = [{ t: text, f: fmt }].concat(hist.filter(x => x.t !== text)).slice(0, 20); Store.set('codescan.history', hist); drawHist(); }
   }
   async function decode(source, w, hh, maxSide, dense) {
-    if (bd) { try { const r = await bd.detect(source); if (r && r.length) return { t: r[0].rawValue, f: r[0].format }; return null; } catch (e) { bd = null; if (!gone) $('#qrnote', el).textContent = NOTE; } }
+    if (bd) { try { const r = await bd.detect(source); if (r && r.length) return { t: r[0].rawValue, f: FMT[r[0].format] || r[0].format }; return null; } catch (e) { bd = null; if (!gone) $('#qrnote', el).textContent = NOTE; } }
     const k = Math.min(1, (maxSide || 800) / Math.max(w, hh)), cw = Math.round(w * k), ch = Math.round(hh * k);
     sc.width = cw; sc.height = ch; g.drawImage(source, 0, 0, cw, ch);
     const px = g.getImageData(0, 0, cw, ch).data, c = typeof jsQR === 'function' ? jsQR(px, cw, ch) : null;
@@ -865,7 +886,7 @@ Tools.register({ id: 'codescan', name: 'Code Scanner', icon: '📷', cat: 'camer
   });
   $('#clr', el).onclick = () => { hist = []; Store.set('codescan.history', hist); drawHist(); };
   drawHist();
-  cam.start('environment').then(ok => { if (ok) timer = setInterval(loop, 250); });
+  cam.start('environment').then(ok => { if (ok && !gone) { timer = setInterval(loop, 250); show($('#tc', el), !!cam.caps().torch); } });
   return () => { gone = true; clearInterval(timer); cam.stop(); };
 } });
 
@@ -976,6 +997,7 @@ Tools.register({ id: 'docscan', pro: true, proKey: 'camera', name: 'Doc Scanner'
   };
   $('#sj', el).onclick = () => saveCanvas(oc, 'scan', 'image/jpeg', 0.9);
   $('#sp', el).onclick = () => saveCanvas(oc, 'scan', 'image/png');
+  remember(el, 'docscan', ['lk']);
   return () => { gone = true; if (bmp && bmp.close) bmp.close(); };
 } });
 
@@ -993,23 +1015,28 @@ Tools.register({ id: 'gridcam', name: 'Grid Cam', icon: '🔲', cat: 'camera', d
     else if (m === 'd') s = L(0, 0, 100, 100) + L(100, 0, 0, 100);
     $('#gs', el).innerHTML = '<g stroke="rgba(255,255,255,.75)" stroke-width="1">' + s + '</g>';
   }
+  let gotMotion = false, noSensorT = 0;
+  const levelOff = (msg) => { $('#lvm', el).textContent = msg; $('#hz', el).style.display = 'none'; $('#dg', el).style.display = 'none'; };
   function motion(e) {
     const a = e.accelerationIncludingGravity; if (!a || a.x == null || a.y == null) return;
+    if (!gotMotion) { gotMotion = true; clearTimeout(noSensorT); }
     const raw = Math.atan2(a.x, a.y) * 180 / Math.PI;
     ang = ang * 0.8 + raw * 0.2;
     $('#hz', el).style.transform = 'rotate(' + ang.toFixed(1) + 'deg)';
     const lvl = Math.abs(ang) < 1.5; $('#hz', el).style.borderTopColor = lvl ? '#3ddc84' : '#ffd400'; $('#dg', el).textContent = (lvl ? 'Level ' : '') + ang.toFixed(1) + '°';
   }
   async function startMotion() {
-    try { if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') { const r = await DeviceMotionEvent.requestPermission(); if (r !== 'granted') throw new Error('denied'); } } catch (e) { $('#lvm', el).textContent = 'Motion sensor permission was denied, so the level line is off.'; return; }
-    if (!window.DeviceMotionEvent) { $('#lvm', el).textContent = 'No motion sensor on this device, so the level line is off.'; return; }
+    try { if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') { const r = await DeviceMotionEvent.requestPermission(); if (r !== 'granted') throw new Error('denied'); } } catch (e) { levelOff('Motion sensor permission was denied, so the level line is off.'); return; }
+    if (!window.DeviceMotionEvent) { levelOff('No motion sensor on this device, so the level line is off.'); return; }
     window.addEventListener('devicemotion', motion);
+    // Some browsers have the API but no sensor: if no reading arrives, say so instead of showing a level line stuck at 0.
+    noSensorT = setTimeout(() => { if (!gotMotion) levelOff('No motion sensor reading on this device, so the level line is off.'); }, 2500);
   }
   $('#gm', el).onchange = grid;
   $('#sw', el).onclick = () => { facing = facing === 'user' ? 'environment' : 'user'; $('#sw', el).textContent = facing === 'user' ? 'Rear camera' : 'Front camera'; v.style.transform = facing === 'user' ? 'scaleX(-1)' : ''; cam.start(facing); };
   $('#cap', el).onclick = () => { const cv = grab(v, { mirror: facing === 'user' }); if (cv) saveCanvas(cv, 'photo'); else toast('Camera is not ready'); };
-  grid(); cam.start(facing); startMotion();
-  return () => { window.removeEventListener('devicemotion', motion); cam.stop(); };
+  grid(); cam.start(facing); startMotion(); remember(el, 'gridcam', ['gm']);
+  return () => { clearTimeout(noSensorT); window.removeEventListener('devicemotion', motion); cam.stop(); };
 } });
 
 /* ---------- 11. Timer Cam ---------- */
@@ -1041,7 +1068,7 @@ Tools.register({ id: 'timercam', name: 'Timer Cam', icon: '⏲️', cat: 'camera
   }
   $('#go', el).onclick = go;
   $('#sw', el).onclick = () => { facing = facing === 'user' ? 'environment' : 'user'; $('#sw', el).textContent = facing === 'user' ? 'Rear camera' : 'Front camera'; v.style.transform = facing === 'user' ? 'scaleX(-1)' : ''; cam.start(facing); };
-  cam.start(facing);
+  cam.start(facing); remember(el, 'timercam', ['dl', 'sh']);
   return () => { seq += 1e9; cam.stop(); urls.forEach(u => URL.revokeObjectURL(u)); };
 } });
 
@@ -1074,7 +1101,7 @@ Tools.register({ id: 'timelapse', pro: true, proKey: 'camera', name: 'Time-lapse
     } catch (e) { if (!gone) toast(e.message || 'Could not make the video'); }
     making = false; if (!gone) upd();
   };
-  cam.start('environment');
+  cam.start('environment'); remember(el, 'timelapse', ['iv', 'fp']);
   return () => { gone = true; ctl.cancel = true; clearInterval(timer); wl.dispose(); cam.stop(); if (resUrl) URL.revokeObjectURL(resUrl); };
 } });
 /* ---------- picture tools (pick images from the phone) ---------- */
@@ -1091,12 +1118,15 @@ async function encodeImage(bmp, o) {
 
 /* Shared UI for "pick several images, process each, save each" tools. */
 function batchTool(el, opts) {
-  el.innerHTML = '<button class="btn" id="pk">Pick pictures</button>' + opts.controls + '<button class="btn" id="run" style="margin-top:8px">' + opts.run + '</button><div class="muted center" id="st" style="margin:6px 0"></div><div class="list" id="ls"></div>';
+  el.innerHTML = '<button class="btn" id="pk">Pick pictures</button>' + opts.controls + '<button class="btn" id="run" style="margin-top:8px">' + opts.run + '</button><div class="muted center" id="st" style="margin:6px 0">Pick up to 40 pictures, then tap ' + opts.run + '.</div><div class="list" id="ls"></div>';
   let files = [], gone = false, outs = [];
   const ls = $('#ls', el);
   $('#pk', el).onclick = () => pickFiles(true, f => { files = f.slice(0, 40); $('#st', el).textContent = files.length + ' picture' + (files.length === 1 ? '' : 's') + ' selected'; ls.innerHTML = ''; outs = []; });
+  let running = false;
   $('#run', el).onclick = async () => {
     if (!files.length) { toast('Pick pictures first'); return; }
+    if (running) return;     // a second tap while working would run the whole batch again and double the list
+    running = true; $('#run', el).disabled = true; $('#pk', el).disabled = true;
     ls.innerHTML = ''; outs = [];
     for (let i = 0; i < files.length && !gone; i++) {
       const f = files[i]; $('#st', el).textContent = 'Working ' + (i + 1) + ' / ' + files.length + ' ...';
@@ -1108,7 +1138,8 @@ function batchTool(el, opts) {
         $('button', row).onclick = () => saveBlob(r.blob, r.name); ls.appendChild(row);
       } catch (e) { ls.appendChild(h('<div class="item"><div class="grow">' + esc(f.name || 'Picture') + '</div><div class="muted">Could not read this file</div></div>')); }
     }
-    if (!gone) $('#st', el).textContent = 'Done: ' + outs.length + ' of ' + files.length + '. Tap Save on each one.';
+    running = false;
+    if (!gone) { $('#run', el).disabled = false; $('#pk', el).disabled = false; $('#st', el).textContent = 'Done: ' + outs.length + ' of ' + files.length + '. Tap Save on each one.'; }
   };
   return () => { gone = true; };
 }
@@ -1119,7 +1150,7 @@ Tools.register({ id: 'collage', pro: true, proKey: 'camera', name: 'Collage', ic
   el.innerHTML = '<button class="btn" id="pk">Pick pictures (up to 9)</button><canvas id="cv" style="margin-top:8px;display:none"></canvas>' +
     '<label class="f">Layout<select id="ly">' + LAY.map((l, i) => '<option value="' + i + '"' + (i === 2 ? ' selected' : '') + '>' + l[0] + '</option>').join('') + '</select></label>' +
     SLIDER('gp', 'Spacing', 0, 40, 2, 8) + '<label class="f">Background<input type="color" id="bg" value="#ffffff" style="height:44px"></label>' +
-    '<div class="row"><button class="btn alt" id="sh">Shuffle</button><button class="btn" id="sv">Save collage</button></div><div class="muted center" id="st" style="margin-top:6px"></div>';
+    '<div class="row"><button class="btn alt" id="sh">Shuffle</button><button class="btn" id="sv">Save collage</button></div><div class="muted center" id="st" style="margin-top:6px">Pick up to 9 pictures to make a collage.</div>';
   let bmps = [], gone = false; const cv = $('#cv', el);
   function draw() {
     if (!bmps.length) return;
@@ -1137,7 +1168,7 @@ Tools.register({ id: 'collage', pro: true, proKey: 'camera', name: 'Collage', ic
     if (gone) return; $('#st', el).textContent = bmps.length ? bmps.length + ' pictures. Pictures repeat if the layout has more cells.' : 'None of those files could be read.'; draw();
   });
   ['ly', 'gp', 'bg'].forEach(id => $('#' + id, el).addEventListener('input', () => { if (id === 'gp') $('#gpL', el).textContent = $('#gp', el).value + ' px'; draw(); }));
-  $('#gpL', el).textContent = '8 px';
+  $('#gpL', el).textContent = '8 px'; remember(el, 'collage', ['ly', 'gp', 'bg']);
   $('#sh', el).onclick = () => { for (let i = bmps.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [bmps[i], bmps[j]] = [bmps[j], bmps[i]]; } draw(); };
   $('#sv', el).onclick = () => { if (!bmps.length) { toast('Pick pictures first'); return; } saveCanvas(cv, 'collage', 'image/jpeg', 0.92); };
   return () => { gone = true; bmps.forEach(b => b.close && b.close()); };
@@ -1152,7 +1183,7 @@ Tools.register({ id: 'imgshrink', name: 'Image Shrink', icon: '🗜️', cat: 'c
     const diff = f.size ? Math.round((1 - blob.size / f.size) * 100) : 0;
     return { blob, name: baseName(f) + '-small' + (EXT[ty] || '.jpg'), info: kb(f.size) + ' to ' + kb(blob.size) + (diff > 0 ? ' (' + diff + '% smaller)' : ' (no saving)') };
   } });
-  const q = $('#q', el), u = () => { $('#qL', el).textContent = q.value + '%'; }; q.addEventListener('input', u); u();
+  const q = $('#q', el), u = () => { $('#qL', el).textContent = q.value + '%'; }; q.addEventListener('input', u); u(); remember(el, 'imgshrink', ['mx', 'ty', 'q']);
   return stop;
 } });
 
@@ -1164,7 +1195,7 @@ Tools.register({ id: 'imgconvert', name: 'Img Convert', icon: '🔄', cat: 'came
     const ok = blob && blob.type === type;
     return { blob, name: baseName(f) + (EXT[blob && blob.type] || EXT[type]), info: (ok ? '' : 'This device cannot make that format, saved as PNG. ') + bmp.width + ' x ' + bmp.height + ', ' + kb(blob.size) };
   } });
-  const q = $('#q', el), u = () => { $('#qL', el).textContent = q.value + '%'; }; q.addEventListener('input', u); u();
+  const q = $('#q', el), u = () => { $('#qL', el).textContent = q.value + '%'; }; q.addEventListener('input', u); u(); remember(el, 'imgconvert', ['ty', 'q']);
   return stop;
 } });
 
@@ -1174,7 +1205,7 @@ Tools.register({ id: 'photofx', pro: true, proKey: 'camera', name: 'Photo FX', i
   el.innerHTML = '<button class="btn" id="pk">Pick a picture</button><canvas id="cv" style="margin-top:8px;display:none"></canvas>' +
     '<label class="f">Look<select id="lk">' + Object.keys(LOOKS).map(k => '<option>' + k + '</option>').join('') + '</select></label>' +
     SLIDER('br', 'Brightness', 0.4, 1.8, 0.05, 1) + SLIDER('co', 'Contrast', 0.4, 2, 0.05, 1) + SLIDER('sa', 'Saturation', 0, 3, 0.1, 1) +
-    '<div class="row"><button class="btn alt" id="rt">Rotate</button><button class="btn alt" id="fl">Flip</button><button class="btn alt" id="rs">Reset</button></div><div class="row"><button class="btn" id="sj">Save JPEG</button><button class="btn alt" id="sp">Save PNG</button></div><div class="muted center" id="st" style="margin-top:6px"></div>';
+    '<div class="row"><button class="btn alt" id="rt">Rotate</button><button class="btn alt" id="fl">Flip</button><button class="btn alt" id="rs">Reset</button></div><div class="row"><button class="btn" id="sj">Save JPEG</button><button class="btn alt" id="sp">Save PNG</button></div><div class="muted center" id="st" style="margin-top:6px">Pick a picture to start.</div>';
   let bmp = null, rot = 0, flip = false; const cv = $('#cv', el);
   const val = (id) => $('#' + id, el).value;
   function render(target, max) {
@@ -1201,7 +1232,7 @@ Tools.register({ id: 'photofx', pro: true, proKey: 'camera', name: 'Photo FX', i
 function exifInfo(buf) {
   const d = new DataView(buf), n = d.byteLength;
   if (n < 4 || d.getUint16(0) !== 0xFFD8) return { jpeg: false, exif: false, gps: false };
-  let p = 2;
+  let p = 2, other = false;
   while (p + 4 < n) {
     if (d.getUint8(p) !== 0xFF) break;
     const m = d.getUint8(p + 1), len = d.getUint16(p + 2);
@@ -1214,14 +1245,15 @@ function exifInfo(buf) {
       } catch (e) { /* truncated block */ }
       return { jpeg: true, exif: true, gps };
     }
+    if (m === 0xE1 || m === 0xED || m === 0xFE) other = true;   // XMP, Photoshop/IPTC data or a text comment
     p += 2 + len;
   }
-  return { jpeg: true, exif: false, gps: false };
+  return { jpeg: true, exif: false, gps: false, other };
 }
 Tools.register({ id: 'exifclean', name: 'Photo Cleaner', icon: '🧼', cat: 'camera', desc: 'Remove hidden data such as location, camera model and time from photos before you share them. Pictures are re-encoded without metadata; anything larger than 4096 px on its longest side is scaled down to 4096 px.', keys: ['exif', 'metadata', 'privacy', 'gps', 'location', 'strip'], needs: ['storage'], render(el) {
   const controls = '<div class="muted" style="margin:6px 0">Each picture is redrawn and saved fresh, so location, camera details and timestamps are left behind. Pictures keep their size, except that very large ones (over 4096 px on the longest side) are scaled down to 4096 px to avoid running out of memory.</div>';
   const stop = batchTool(el, { controls, run: 'Clean pictures', max: 4096, async process(bmp, f) {
-    let note = 'No metadata found'; try { const e = exifInfo(await f.arrayBuffer()); if (e.exif) note = e.gps ? 'Removed metadata including location' : 'Removed metadata'; else if (!e.jpeg) note = 'Re-encoded without metadata'; } catch (e) { /* unreadable header */ }
+    let note = 'No metadata found'; try { const e = exifInfo(await f.arrayBuffer()); if (e.exif) note = e.gps ? 'Removed metadata including location' : 'Removed metadata'; else if (e.other) note = 'Removed other embedded data'; else if (!e.jpeg) note = 'Re-encoded without metadata'; } catch (e) { /* unreadable header */ }
     const type = f.type === 'image/png' ? 'image/png' : f.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
     const blob = await encodeImage(bmp, { type, q: 0.95 });
     return { blob, name: baseName(f) + '-clean' + (EXT[blob && blob.type] || '.jpg'), info: note + ', ' + kb(blob.size) };
@@ -1247,7 +1279,7 @@ function dominantColors(data, count) {
 }
 Tools.register({ id: 'eyedrop', name: 'Eye Dropper', icon: '🖍️', cat: 'camera', desc: 'Pick a picture, touch any point to read its colour as HEX and RGB with the nearest colour name, and see the main colours of the picture.', keys: ['colour picker', 'color from image', 'palette', 'hex'], needs: ['storage'], render(el) {
   el.innerHTML = '<button class="btn" id="pk">Pick a picture</button><div id="wrap" style="position:relative;line-height:0;margin-top:8px;display:none;touch-action:none"><canvas id="cv" style="display:block"></canvas><div id="ring" style="position:absolute;width:30px;height:30px;margin:-15px 0 0 -15px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #000;pointer-events:none"></div></div>' +
-    '<div class="card"><div class="row" style="align-items:center"><div id="sw" style="height:56px;border-radius:12px;border:1px solid var(--line);flex:0 0 72px;background:var(--surface2)"></div><div style="flex:1 1 auto"><div class="mid" id="hx">-</div><div class="muted" id="rgb">Touch the picture</div><div id="nm"></div></div></div><button class="btn" id="cp" style="margin-top:8px">Copy HEX</button></div>' +
+    '<div class="card"><div class="row" style="align-items:center"><div id="sw" style="height:56px;border-radius:12px;border:1px solid var(--line);flex:0 0 72px;background:var(--surface2)"></div><div style="flex:1 1 auto"><div class="mid" id="hx">-</div><div class="muted" id="rgb">Pick a picture, then touch it</div><div id="nm"></div></div></div><button class="btn" id="cp" style="margin-top:8px">Copy HEX</button></div>' +
     '<div class="card"><div class="muted">Main colours (tap to select)</div><div id="pal" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div></div>';
   const cv = $('#cv', el), g = cv.getContext('2d', { willReadFrequently: true }); let cur = null, bmp = null;
   function setCol(c) { cur = c; const x = toHex(c.r, c.g, c.b); $('#sw', el).style.background = x; $('#hx', el).textContent = x; $('#rgb', el).textContent = 'rgb(' + c.r + ', ' + c.g + ', ' + c.b + ')'; $('#nm', el).textContent = nearestName(c.r, c.g, c.b); }

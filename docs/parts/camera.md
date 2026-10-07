@@ -3,7 +3,7 @@
 - category: camera
 - plan: free
 - needs: camera
-- what: Turns the rear camera into a magnifying glass with a zoom slider (real camera zoom when available, otherwise digital zoom), freeze frame, torch toggle, brightness and contrast sliders, and a button that saves the current view as a picture.
+- what: Turns the rear camera into a magnifying glass with a zoom slider (real camera zoom when available, otherwise digital zoom), freeze frame, torch toggle, brightness and contrast sliders, and a button that saves the current view as a picture. When the camera is blocked the message says where to allow it (Settings, Apps, PocketKit, Permissions); the same wording is used by every camera tool.
 - test:
   1. Open the tool and allow the camera. Expected: a live rear-camera view appears.
   2. Drag Zoom to the right. Expected: the view enlarges and the label shows the factor.
@@ -30,7 +30,7 @@
 - category: camera
 - plan: free
 - needs: camera
-- what: Brightens dark scenes live by boosting brightness, contrast and gamma on a canvas, with an optional green night-vision tint, a torch toggle when supported, and a button to capture a photo at full camera resolution.
+- what: Brightens dark scenes live by boosting brightness, contrast and gamma on a canvas, with an optional green night-vision tint, a torch toggle when supported, and a button to capture a photo at full camera resolution. Brightness, contrast, gamma and the tint are remembered.
 - test:
   1. Open the tool in a dim room. Expected: a live, brightened picture with a green tint.
   2. Untick the green tint. Expected: the picture becomes normal colour.
@@ -95,20 +95,21 @@
 - category: camera
 - plan: free
 - needs: camera
-- what: Scans QR codes (bundled jsQR) and EAN-13, EAN-8, UPC-A, UPC-E and Code 128 product barcodes with the camera or from a picture, using its own built-in decoder that works without the browser's BarcodeDetector (when the phone has BarcodeDetector it is used first). The decoder tries many scanlines, slightly tilted and sideways ones, both directions (upside down) and light-on-dark codes, and checks the check digit. Camera 1D reads must repeat on a second scan before they are accepted. The result card shows the type (for example EAN-13 or UPC-A) and the digits, with Copy and, for http/https text, Open link. A history keeps the last 20; scanning a picture tries several sizes.
+- what: Scans QR codes (bundled jsQR) and EAN-13, EAN-8, UPC-A, UPC-E and Code 128 product barcodes with the camera or from a picture, using its own built-in decoder that works without the browser's BarcodeDetector (when the phone has BarcodeDetector it is used first). The decoder tries many scanlines, slightly tilted and sideways ones, both directions (upside down) and light-on-dark codes, and checks the check digit. Camera 1D reads must repeat on a second scan before they are accepted. The result card shows the type (for example EAN-13 or UPC-A) and the digits, with Copy and, for http/https text, Open link. A history keeps the last 20; scanning a picture tries several sizes. A Torch button appears when the camera has a torch, for scanning in the dark. Phones with their own scanner show plain format names (QR code, EAN-13) instead of raw names.
 - test:
   1. Open the tool and point at a QR code containing https://example.com. Expected: a result card shows QR code and the text, the phone vibrates, and Open link and Copy are available.
   2. Point at the EAN-13 barcode on a product, about 15 to 25 cm away with a little white space around it. Expected: within a second or two the card shows EAN-13 and the 13 digits (UPC-A and 12 digits for US products); turn the product upside down or sideways and it still reads. Copy puts the digits on the clipboard.
   3. Tap Scan again, then scan a Code 128 label or a small EAN-8 code. Expected: scanning resumes and the new type and digits are shown; the history lists them with the newest first.
   4. Tap Scan from a picture and choose a photo or screenshot of a product barcode and then of a QR code. Expected: each is decoded; a picture with no code shows No code found.
   5. Point at a barcode with a wrong digit or at a plain textured surface. Expected: nothing is reported (no wrong or made-up numbers). Check History keeps the last 20 scans and Clear history empties it. Denied camera shows a message.
+  6. On a phone with a torch, tap Torch while scanning in a dim room: the light switches on and off.
 
 ## Doc Scanner
 - id: docscan
 - category: camera
 - plan: pro
 - needs: camera, storage
-- what: Take or pick a photo of a page, drag four corners over it, straighten it with a perspective correction, then choose colour, grey or black-and-white (adaptive threshold for uneven light), rotate and save as JPEG or PNG.
+- what: Take or pick a photo of a page, drag four corners over it, straighten it with a perspective correction, then choose colour, grey or black-and-white (adaptive threshold for uneven light), rotate and save as JPEG or PNG. The Look (colour, grey, black and white) is remembered.
 - test:
   1. Tap Take photo (or Pick image) and choose a photo of a sheet of paper taken at an angle. Expected: the photo shows with four draggable circles.
   2. Drag the circles onto the page corners. Expected: the blue outline follows.
@@ -121,20 +122,21 @@
 - category: camera
 - plan: free
 - needs: camera, motion
-- what: Camera with composition overlays (rule of thirds, 4 by 4 grid, cross, diagonals) and a live horizon line driven by the accelerometer that turns green when the phone is level. Capture a photo with front or rear camera.
+- what: Camera with composition overlays (rule of thirds, 4 by 4 grid, cross, diagonals) and a live horizon line driven by the accelerometer that turns green when the phone is level. Capture a photo with front or rear camera. The chosen grid is remembered. If the phone has no motion sensor (or never sends a reading) the level line is hidden and a message says so, instead of showing a line stuck at 0 degrees.
 - test:
   1. Open the tool. Expected: camera view with thirds lines and a yellow horizon line.
   2. Tilt the phone left and right. Expected: the line rotates against the tilt and the angle badge changes; within 1.5 degrees it turns green and says Level.
   3. Change Grid to Cross and None. Expected: the overlay changes.
   4. Tap Capture photo. Expected: a clean photo (no grid drawn in) is offered for saving.
   5. On a device with no motion sensor or denied permission, a message says the level line is off and the camera still works.
+  6. On a phone or browser with no motion sensor: after about 2.5 seconds the level line and degree badge disappear and a line says there is no sensor reading.
 
 ## Timer Cam
 - id: timercam
 - category: camera
 - plan: free
 - needs: camera
-- what: Self-timer camera: choose a 3, 5, 10 or 15 second delay and take 1, 3 or 5 shots in a row, with a big on-screen countdown and a beep for the last seconds. Photos collect below and a tap saves each.
+- what: Self-timer camera: choose a 3, 5, 10 or 15 second delay and take 1, 3 or 5 shots in a row, with a big on-screen countdown and a beep for the last seconds. Photos collect below and a tap saves each. Delay and number of shots are remembered.
 - test:
   1. Set Delay 3 s, Shots 1 and tap Start timer. Expected: a 3, 2, 1 countdown on screen then a thumbnail appears.
   2. Set Shots 3 and start. Expected: three pictures are taken a couple of seconds apart.
@@ -147,7 +149,7 @@
 - category: camera
 - plan: pro
 - needs: camera
-- what: Captures a frame every 1 to 60 seconds and builds them into a WebM time-lapse video at 8, 12 or 24 fps. Keep the app open and the phone steady; up to 600 frames are kept in memory.
+- what: Captures a frame every 1 to 60 seconds and builds them into a WebM time-lapse video at 8, 12 or 24 fps. Keep the app open and the phone steady; up to 600 frames are kept in memory. Interval and video speed are remembered.
 - test:
   1. Choose Every 1 s and tap Start capturing. Expected: the frame counter climbs once per second.
   2. Tap Stop capturing after about 10 frames, then Make video. Expected: progress text, then a video player and a Save / share video button.
@@ -160,7 +162,7 @@
 - category: camera
 - plan: pro
 - needs: storage
-- what: Combine up to 9 pictures from the phone into one collage using layouts from two side by side up to 3 by 3, with spacing and background colour, a shuffle button, and save as JPEG.
+- what: Combine up to 9 pictures from the phone into one collage using layouts from two side by side up to 3 by 3, with spacing and background colour, a shuffle button, and save as JPEG. Layout, spacing and background colour are remembered. Before pictures are chosen a line says to pick up to 9.
 - test:
   1. Tap Pick pictures and choose 4 photos. Expected: a 2 x 2 collage appears.
   2. Change Layout to 3 across. Expected: the collage re-arranges; with fewer pictures than cells, pictures repeat.
@@ -173,7 +175,7 @@
 - category: camera
 - plan: free
 - needs: storage
-- what: Reduces picture file size by limiting the longest side and setting JPEG or WebP quality, for many pictures at once, showing the before and after sizes and the percentage saved.
+- what: Reduces picture file size by limiting the longest side and setting JPEG or WebP quality, for many pictures at once, showing the before and after sizes and the percentage saved. Size, format and quality are remembered. A second tap on Shrink pictures while it is working is ignored (it used to double the result list).
 - test:
   1. Tap Pick pictures and select 2 large photos. Expected: the count is shown.
   2. Choose 1024 px, JPEG, quality 60 and tap Shrink pictures. Expected: each file is listed with the original and new size and a percentage smaller.
@@ -186,7 +188,7 @@
 - category: camera
 - plan: free
 - needs: storage
-- what: Converts pictures between PNG, JPEG and WebP, for several files at once. Transparent areas become white when saving as JPEG.
+- what: Converts pictures between PNG, JPEG and WebP, for several files at once. Transparent areas become white when saving as JPEG. Format and quality are remembered. A second tap while working is ignored.
 - test:
   1. Pick a PNG and convert to JPEG. Expected: a result named like photo.jpg with its size.
   2. Pick a JPEG and convert to PNG. Expected: a larger .png result with the same pixel size.
@@ -199,7 +201,7 @@
 - category: camera
 - plan: pro
 - needs: storage
-- what: Simple photo editor: look presets (grey, sepia, invert, vivid, cool, warm, soft), brightness, contrast and saturation sliders, rotate and flip, and save at full size as JPEG or PNG.
+- what: Simple photo editor: look presets (grey, sepia, invert, vivid, cool, warm, soft), brightness, contrast and saturation sliders, rotate and flip, and save at full size as JPEG or PNG. Before a picture is chosen a line says to pick one.
 - test:
   1. Tap Pick a picture. Expected: it shows in the preview with its pixel size.
   2. Choose Look grey, then sepia. Expected: the preview changes accordingly.
@@ -212,7 +214,7 @@
 - category: camera
 - plan: free
 - needs: storage
-- what: Removes hidden metadata such as GPS location, camera model and time from photos by re-encoding them (pictures over 4096 px on the longest side are scaled down to 4096 px), and tells you whether metadata was found in each JPEG. Nothing is uploaded.
+- what: Removes hidden metadata such as GPS location, camera model and time from photos by re-encoding them (pictures over 4096 px on the longest side are scaled down to 4096 px), and tells you whether metadata was found in each JPEG. Nothing is uploaded. JPEGs with XMP, Photoshop/IPTC data or an embedded comment (not EXIF) are reported as "Removed other embedded data" instead of "No metadata found". A second tap while working is ignored.
 - test:
   1. Pick a photo taken with the phone camera with location on. Expected: the result says Removed metadata including location.
   2. Tap Save and open the saved file in an EXIF viewer. Expected: no GPS or camera data remains and the picture size is unchanged (unless it was over 4096 px).
@@ -225,7 +227,7 @@
 - category: camera
 - plan: free
 - needs: storage
-- what: Pick a picture, touch or drag over it to read any pixel colour as HEX and RGB with the nearest colour name, copy the HEX, and tap one of the six main colours automatically extracted from the picture.
+- what: Pick a picture, touch or drag over it to read any pixel colour as HEX and RGB with the nearest colour name, copy the HEX, and tap one of the six main colours automatically extracted from the picture. Before a picture is chosen the readout says to pick one.
 - test:
   1. Tap Pick a picture. Expected: the picture and a ring marker appear, with the centre colour read out.
   2. Touch and drag across the picture. Expected: the ring follows and the swatch, HEX, RGB and name update.

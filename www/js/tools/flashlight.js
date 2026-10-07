@@ -29,7 +29,7 @@ Tools.register({ id: 'flashlight', name: 'Flashlight', icon: '🔦', cat: 'daily
     } catch (e) {
       if (s) s.getTracks().forEach(t => t.stop());
       off();
-      say(e && (e.name === 'NotAllowedError' || e.name === 'SecurityError' || e.name === 'PermissionDeniedError') ? 'Camera permission was denied. Allow the camera for PocketKit in your phone settings.' : 'Torch is not available on this device');
+      say(e && (e.name === 'NotAllowedError' || e.name === 'SecurityError' || e.name === 'PermissionDeniedError') ? 'Camera permission was denied. Allow the camera for PocketKit in your phone Settings (Apps, PocketKit, Permissions), then tap Turn on again.' : 'Torch is not available on this device');
     } finally { busy = false; }
   };
   return () => { gone = true; off(); };

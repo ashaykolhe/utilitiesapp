@@ -16,7 +16,7 @@
 - category: audio
 - plan: free
 - needs: none
-- what: Plays a pure tone from 20 Hz to 20 kHz (log slider plus number box) as sine, square, triangle or sawtooth, with a volume control and an optional looping frequency sweep. Shows the nearest note and warns about loud sound. Output is capped at about half amplitude and runs through a limiter; a confirmation appears before playing above 70% volume at more than 1 kHz.
+- what: Plays a pure tone from 20 Hz to 20 kHz (log slider plus number box) as sine, square, triangle or sawtooth, with a volume control and an optional looping frequency sweep. Shows the nearest note and warns about loud sound. Output is capped at about half amplitude and runs through a limiter; a confirmation appears before playing above 70% volume at more than 1 kHz. The frequency and waveform are remembered between visits (the volume always starts at 25%). Playing again after a sweep starts at the frequency in the box.
 - test:
   1. Press Play at the default 440 Hz: a steady tone plays at low volume and the note reads A4. Press Stop: it fades out.
   2. Drag the slider while playing: the pitch changes smoothly and the number box follows. Type 1000 in the box: pitch jumps to 1 kHz. Type 5 or 99999: it clamps to 20 or 20000.
@@ -25,13 +25,14 @@
   5. Set volume above 70% and press Play at 5000 Hz: a confirmation about hearing damage appears; Cancel keeps it stopped.
   6. Leave the tool while playing: sound fades out without a click.
   7. Enter 99999 in Frequency: a message shows and the value is limited to 20000. Clear the field and leave it: it returns to 440.
+  8. Choose Triangle and 1000 Hz, leave and reopen: both are still set and the volume is back at 25%. After a sweep press Stop then Play: the tone starts at the typed frequency, not where the sweep ended.
 
 ## Tuner
 - id: tuner
 - category: audio
 - plan: free
 - needs: microphone
-- what: Chromatic tuner using YIN pitch detection on the microphone. Shows note, frequency, cents off and a needle, and has guitar, ukulele, bass and violin presets that match your note to the nearest string.
+- what: Chromatic tuner using YIN pitch detection on the microphone. Shows note, frequency, cents off and a needle, and has guitar, ukulele, bass and violin presets that match your note to the nearest string. The microphone messages say what to do next (allow it in Settings, close other apps that use it).
 - test:
   1. Press Start tuner and allow the microphone. Play or whistle a steady note (or play a 440 Hz tone from another device): the note shows A, around 0 cents, needle near the centre, green when within 5 cents.
   2. Sing slightly flat or sharp: the cents value goes negative or positive and the hint says tighten or loosen.
@@ -44,7 +45,7 @@
 - category: audio
 - plan: free
 - needs: microphone
-- what: Uses the microphone as a loudspeaker: mic to phone speaker or headphones with a gain control up to 300%, a limiter, an echo-cancellation option and a level meter. Shows a strong feedback warning first.
+- what: Uses the microphone as a loudspeaker: mic to phone speaker or headphones with a gain control up to 300%, a limiter, an echo-cancellation option and a level meter. Shows a strong feedback warning first. The microphone messages say what to do next.
 - test:
   1. The Start button is disabled until the headphone/low-volume checkbox is ticked.
   2. With headphones on, tick it and press Start, allow the microphone, then speak: your voice is heard in the headphones and the level bar moves.
@@ -58,7 +59,7 @@
 - category: audio
 - plan: free with limit: 3 saved recordings (Pro: unlimited)
 - needs: microphone, storage
-- what: Records voice memos with MediaRecorder with pause, resume and stop. Recordings are kept in IndexedDB on the device and listed with play, rename, share or download and delete. The free plan keeps 3 recordings, then shows the Pro sheet. The Record button is disabled until the saved list has loaded and while a recording is starting, a recording stops by itself after 1 hour, and the free limit is checked again when a recording ends.
+- what: Records voice memos with MediaRecorder with pause, resume and stop. Recordings are kept in IndexedDB on the device and listed with play, rename, share or download and delete. The free plan keeps 3 recordings, then shows the Pro sheet. The Record button is disabled until the saved list has loaded and while a recording is starting, a recording stops by itself after 1 hour, and the free limit is checked again when a recording ends. Leaving the tool while recording stops the recording and still saves it (it is never lost). The microphone messages say where to allow it in Settings.
 - test:
   1. Press Record, allow the microphone, speak for a few seconds: the timer counts and status says Recording. Press Pause: the timer freezes; Resume continues; Stop saves a "Recording <date time>" item.
   2. Press play on an item: it plays and the button becomes a stop square. Press it again: playback stops.
@@ -67,13 +68,14 @@
   5. As a free user with 3 recordings, press Record: the Pro sheet opens and nothing records.
   6. Deny the microphone: a permission message shows.
   7. Double tap Record quickly: only one recording starts.
+  8. Start a recording and press the back button without pressing Stop: reopen the tool, the memo is in the list.
 
 ## Piano
 - id: piano
 - category: audio
 - plan: free
 - needs: none
-- what: On-screen piano with 15 wide keys (C to D an octave higher), multi-touch chords, finger sliding between keys, octave shift of two octaves either way and four waveform sounds.
+- what: On-screen piano with 15 wide keys (C to D an octave higher), multi-touch chords, finger sliding between keys, octave shift of two octaves either way and four waveform sounds. Keys are labelled with their note names for screen readers and the chosen sound is remembered.
 - test:
   1. Tap white and black keys: the matching notes sound and the key highlights while pressed.
   2. Press three keys with different fingers: all three sound together (chord) and release independently.
@@ -99,7 +101,7 @@
 - category: audio
 - plan: free
 - needs: none
-- what: Looping relaxing sounds synthesized offline: white, pink and brown noise, rain, ocean waves and wind. Has a volume slider, a sleep timer (15 minutes to 8 hours) and a fade-out when the timer ends.
+- what: Looping relaxing sounds synthesized offline: white, pink and brown noise, rain, ocean waves and wind. Has a volume slider, a sleep timer (15 minutes to 8 hours) and a fade-out when the timer ends. The sleep timer choice is remembered.
 - test:
   1. Tap Rain: it starts playing at once with a fade-in and the button highlights. Tap Ocean: the sound switches and slow waves are heard.
   2. Move the volume slider: loudness changes; reopen the tool and the volume is remembered.
@@ -112,7 +114,7 @@
 - category: audio
 - plan: pro
 - needs: none
-- what: Eight large synthesized drum pads (kick, snare, clap, hi-hat, open hat, tom, rim, cowbell) with multi-touch and a master volume. No sound files are used.
+- what: Eight large synthesized drum pads (kick, snare, clap, hi-hat, open hat, tom, rim, cowbell) with multi-touch and a master volume. No sound files are used. The volume is remembered.
 - test:
   1. Tap each pad: a different drum sound plays instantly and the pad flashes with a short vibration.
   2. Tap two pads at the same time with two fingers: both sounds play.
@@ -125,7 +127,7 @@
 - category: audio
 - plan: free
 - needs: none
-- what: A guided high-frequency hearing test: tones at 4, 8, 10, 12, 14, 15, 16, 17, 18, 19 and 20 kHz in both ears, left or right, and the highest tone you can hear is reported. It is for fun and not a medical test.
+- what: A guided high-frequency hearing test: tones at 4, 8, 10, 12, 14, 15, 16, 17, 18, 19 and 20 kHz in both ears, left or right, and the highest tone you can hear is reported. It is for fun and not a medical test. The chosen ear is remembered; the volume always starts at 20% and cannot go above 60%.
 - test:
   1. With headphones, press Start test: a tone plays for 2.5 seconds and the frequency is shown. Press "I hear it": the next, higher tone plays.
   2. Press "Cannot hear": the test ends and shows the highest frequency you confirmed (or none).
@@ -138,7 +140,7 @@
 - category: audio
 - plan: free
 - needs: none
-- what: Plays a slightly different tone in each ear to create a binaural beat, with presets for delta, theta, alpha, beta and gamma, adjustable beat and carrier frequency, volume and an auto-stop timer. Needs headphones.
+- what: Plays a slightly different tone in each ear to create a binaural beat, with presets for delta, theta, alpha, beta and gamma, adjustable beat and carrier frequency, volume and an auto-stop timer. Needs headphones. Beat, carrier and timer are remembered (the volume always starts at 30%).
 - test:
   1. With headphones press Play: a steady tone is heard and the text shows left and right frequencies (for example left 200 Hz, right 210 Hz).
   2. Tap "Theta 6 Hz": the beat value changes to 6 and the right tone updates live. Move the carrier slider: both tones shift.
@@ -150,7 +152,7 @@
 - category: audio
 - plan: pro
 - needs: storage
-- what: Plays audio files you pick from the device (several at once as a playlist), with seek bar, +/-10 second skip, speed from 0.5x to 2x with optional pitch preservation, an A-B loop and a five-band equalizer with presets.
+- what: Plays audio files you pick from the device (several at once as a playlist), with seek bar, +/-10 second skip, speed from 0.5x to 2x with optional pitch preservation, an A-B loop and a five-band equalizer with presets. The +10 s button never jumps to the start when the length of the file is not known yet.
 - test:
   1. Press "Choose audio files" and pick one or more songs: the first loads; press Play and it plays. The time and seek bar update and dragging the bar seeks.
   2. Set Speed to 0.5x: playback slows. Untick "Keep pitch": the pitch now drops with the speed.
@@ -164,7 +166,7 @@
 - category: audio
 - plan: free
 - needs: none
-- what: Checks speakers or headphones channel by channel with a tone or pink noise on left, right, both or alternating every second, with L and R indicators on screen.
+- what: Checks speakers or headphones channel by channel with a tone or pink noise on left, right, both or alternating every second, with L and R indicators on screen. The chosen sound is remembered.
 - test:
   1. Press Left: sound only comes from the left side and the L box lights up. Press Right: only right.
   2. Press Alternate: the sound switches sides every second and the L/R boxes alternate.
@@ -176,7 +178,7 @@
 - category: audio
 - plan: free
 - needs: none
-- what: Plays a low 165 Hz tone (or a 100 to 450 Hz sweep for dust) for 15 seconds to 2 minutes to help shake water out of a phone speaker, with a countdown and progress bar. Reminds you to unplug headphones; output is limited to about half amplitude.
+- what: Plays a low 165 Hz tone (or a 100 to 450 Hz sweep for dust) for 15 seconds to 2 minutes to help shake water out of a phone speaker, with a countdown and progress bar. Reminds you to unplug headphones; output is limited to about half amplitude. The mode and duration are remembered.
 - test:
   1. Read the instructions (including "Unplug headphones and earbuds first"), turn media volume up and press Start: a low tone plays and the countdown runs down.
   2. Pick the sweep mode and start: the pitch wobbles slowly between low notes.
@@ -188,7 +190,7 @@
 - category: audio
 - plan: free
 - needs: none
-- what: High-pitched tone from 8 to 22 kHz with presets and steady, pulsing or sweeping patterns for attracting or training pets. Warns about volume and that many phone speakers cannot reach the top range. Output is limited to about half amplitude and starting above 70% volume asks for confirmation.
+- what: High-pitched tone from 8 to 22 kHz with presets and steady, pulsing or sweeping patterns for attracting or training pets. Warns about volume and that many phone speakers cannot reach the top range. Output is limited to about half amplitude and starting above 70% volume asks for confirmation. The frequency and pattern are remembered (the volume always starts at 25%).
 - test:
   1. Set 12000 Hz and press Play: a high tone is clearly audible. Raise the frequency: it becomes fainter or inaudible to you.
   2. Tap the 15k, 17k, 19k and 21k presets: the frequency value and slider update, the sound changes live.
@@ -213,7 +215,7 @@
 - category: audio
 - plan: free
 - needs: microphone
-- what: Counts claps or sharp sounds from the microphone with adjustable sensitivity, a level bar with threshold marker and a claps-per-minute rate.
+- what: Counts claps or sharp sounds from the microphone with adjustable sensitivity, a level bar with threshold marker and a claps-per-minute rate. The sensitivity is remembered.
 - test:
   1. Press Start listening and allow the microphone. Clap once: the counter goes to 1 and the phone vibrates briefly.
   2. Clap about 10 times in 5 seconds: the count rises by 10 (not more) and claps per minute shows about 120.
@@ -225,12 +227,13 @@
 - category: audio
 - plan: free
 - needs: microphone
-- what: Sing your lowest and highest comfortable notes; the stable notes are tracked with pitch detection and the range is shown in notes, semitones and octaves with a rough voice type guess. The range is saved on the device.
+- what: Sing your lowest and highest comfortable notes; the stable notes are tracked with pitch detection and the range is shown in notes, semitones and octaves with a rough voice type guess. The range is saved on the device. The voice type guess uses the classical ranges (bass E2 to E4, baritone A2 to A4, tenor C3 to C5, alto F3 to F5, mezzo-soprano A3 to A5, soprano C4 to C6).
 - test:
   1. Press Start, allow the microphone and sing a steady low note: the current note shows, and after about half a second it becomes the Lowest value.
   2. Slide up to a high note and hold: Highest updates; the range text shows semitones and octaves and a voice type guess.
   3. Brief noises or speech do not change the range (only held notes do).
   4. Reopen the tool: the saved range is displayed. Press Reset range: both values clear.
+  5. Sing from about C3 up to C5: the guess says Tenor. From about F3 up to F5 it says Alto.
 
 ## Tone Sequencer
 - id: toneseq
@@ -249,7 +252,7 @@
 - category: audio
 - plan: free
 - needs: none
-- what: Plays a steady reference note for any of the 12 notes in octaves 3, 4 or 5, useful for tuning voice or an instrument by ear. Shows the note name and frequency.
+- what: Plays a steady reference note for any of the 12 notes in octaves 3, 4 or 5, useful for tuning voice or an instrument by ear. Shows the note name and frequency. The octave is remembered.
 - test:
   1. Tap A with octave 4: a steady tone plays, the button is highlighted and the display shows A4 at 440.0 Hz.
   2. Tap another note: the first stops and the new one plays. Tap the same note again: it stops.
