@@ -62,13 +62,23 @@ function renderChips() {
   $('#filters').innerHTML = FILTERS.map(([id, label]) => `<button class="chip${id === filter ? ' on' : ''}" data-f="${id}" aria-pressed="${id === filter}">${id === 'surprise' ? '🎲 ' : ''}${esc(tr(label))}</button>`).join('');
 }
 /* Lower is better: name starts with it, a word in the name starts with it, name contains it, a keyword or category matches. -1 = no match. */
-function searchScore(x, q) {
+function tokenScore(x, q) {
   const names = [x.name.toLowerCase(), toolName(x).toLowerCase()];
   if (names.some(n => n.startsWith(q))) return 0;
-  if (names.some(n => n.split(/[s&-/]+/).some(w => w.startsWith(q)))) return 1;
+  if (names.some(n => n.split(/[\s&\-\/]+/).some(w => w.startsWith(q)))) return 1;
   if (names.some(n => n.includes(q))) return 2;
   if ((x.keys || []).some(k => String(k).toLowerCase().includes(q))) return 3;
   return Tools.matches(x, q) ? 4 : -1;
+}
+/* Every word you type must match (name, keyword or description); the weakest word sets the rank. */
+function searchScore(x, q) {
+  const whole = tokenScore(x, q);
+  if (whole >= 0) return whole;
+  const words = q.split(/\s+/).filter(Boolean);
+  if (words.length < 2) return -1;
+  let worst = 0;
+  for (const w of words) { const s = tokenScore(x, w); if (s < 0) return -1; worst = Math.max(worst, s); }
+  return Math.max(worst, 1);
 }
 function renderHome() {
   const q = $('#search').value.trim().toLowerCase(), el = $('#sections');

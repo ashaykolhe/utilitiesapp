@@ -67,6 +67,10 @@ vc.on('jsdomError', e => { if (!/Not implemented/.test(e.message)) fail('page er
     w.eval(`openTool('calculator'); goHome(); openTool('timer'); goHome(); Store.set('pins', []); Store.set('recent', []); Store.set('colls', []); renderHome();`);
     w.eval(`document.querySelector('#search').value = 'emi'; renderHome();`);
     if (!w.document.querySelector('#sections .tile')) fail('searching for "emi" found nothing');
+    for (const [q, id] of [['wifi scan', 'wifiscan'], ['battery health', 'batteryhealth'], ['loan emi', 'emi'], ['wi-fi', 'wifiscan']]) {
+      w.eval(`document.querySelector('#search').value = ${JSON.stringify(q)}; renderHome();`);
+      if (!w.document.querySelector('#sections [data-id="' + id + '"]')) fail('searching for "' + q + '" did not find ' + id);
+    }
     w.eval(`document.querySelector('#search').value = ''; renderHome();`);
   } catch (e) { fail('home flows threw: ' + e.message); }
 

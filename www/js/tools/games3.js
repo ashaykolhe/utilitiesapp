@@ -394,7 +394,7 @@ const store = {
 
 /* shared board styling for both games (colours of the board itself are fixed, like a real board) */
 const BOARD_CSS = `<style>
-.g3b{display:grid;grid-template-columns:repeat(8,1fr);width:100%;max-width:440px;margin:8px auto;aspect-ratio:1;border:2px solid var(--line);border-radius:6px;overflow:hidden;user-select:none;-webkit-user-select:none}
+.g3b{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:100%;max-width:440px;margin:8px auto;aspect-ratio:1;border:2px solid var(--line);border-radius:6px;overflow:hidden;user-select:none;-webkit-user-select:none}
 .g3c{position:relative;display:flex;align-items:center;justify-content:center;font-size:clamp(26px,9vw,44px);line-height:1;padding:0;margin:0;border:0;border-radius:0;min-width:0;min-height:0;cursor:pointer;color:#111;overflow:hidden}
 .g3c.l{background:#f0d9b5}.g3c.d{background:#b58863}
 .g3c.last{box-shadow:inset 0 0 0 100px rgba(255,230,60,.45)}

@@ -382,7 +382,8 @@ public class PocketDevicePlugin extends Plugin {
         } catch (Exception ignored) { }
         try {
             r.put("appCacheBytes", dirSize(getContext().getCacheDir(), 0));
-            r.put("appDataBytes", dirSize(getContext().getFilesDir(), 0));
+            long cache = dirSize(getContext().getCacheDir(), 0);
+            r.put("appDataBytes", Math.max(0L, dirSize(getContext().getDataDir(), 0) - cache));
         } catch (Exception ignored) { }
         call.resolve(r);
     }
