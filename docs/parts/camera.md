@@ -111,7 +111,7 @@
 - needs: camera, storage
 - what: Take or pick a photo of a page, drag four corners over it, straighten it with a perspective correction, then choose colour, grey or black-and-white (adaptive threshold for uneven light), rotate and save as JPEG or PNG. The Look (colour, grey, black and white) is remembered.
 - test:
-  1. Tap Take photo (or Pick image) and choose a photo of a sheet of paper taken at an angle. Expected: the photo shows with four draggable circles.
+  1. Tap Take photo: the camera opens inside the app (not the file picker) with Cancel, a round shutter button and Flip. Tap the shutter on a sheet of paper held at an angle (or tap Pick image and choose such a photo). Expected: the photo shows with four draggable circles. Cancel closes the camera without a photo.
   2. Drag the circles onto the page corners. Expected: the blue outline follows.
   3. Tap Straighten and crop. Expected: a flat, rectangular page appears in black and white.
   4. Switch Look between Colour, Grey and Black and white, and tap Rotate. Expected: the result updates.
@@ -242,7 +242,7 @@
 - needs: camera, storage
 - what: Take or pick a photo, drag two points over it to measure the distance in image pixels, then calibrate with an object of known length (a coin or card) to show real units such as mm.
 - test:
-  1. Tap Take photo or Pick picture and choose a photo containing a credit card. Expected: the photo shows with two circles and a line.
+  1. Tap Take photo (the camera opens inside the app; tap the round shutter) or Pick picture and choose a photo containing a credit card. Expected: the photo shows with two circles and a line.
   2. Drag the circles apart. Expected: the pixel distance updates live.
   3. Place the points on the card long edge, enter 85.6 with unit mm, tap Set scale. Expected: the big number now shows about 85.60 mm.
   4. Move the points to another object. Expected: the length is shown in mm.

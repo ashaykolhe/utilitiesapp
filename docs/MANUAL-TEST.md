@@ -1671,7 +1671,7 @@ _Free. Needs: camera_
 ### Doc Scanner (Pro)
 _Pro. Needs: camera, storage_
 
-- [ ] Tap Take photo (or Pick image) and choose a photo of a sheet of paper taken at an angle. Expected: the photo shows with four draggable circles.
+- [ ] Tap Take photo: the camera opens inside the app (not the file picker) with Cancel, a round shutter button and Flip. Tap the shutter on a sheet of paper held at an angle (or tap Pick image and choose such a photo). Expected: the photo shows with four draggable circles. Cancel closes the camera without a photo.
 - [ ] Drag the circles onto the page corners. Expected: the blue outline follows.
 - [ ] Tap Straighten and crop. Expected: a flat, rectangular page appears in black and white.
 - [ ] Switch Look between Colour, Grey and Black and white, and tap Rotate. Expected: the result updates.
@@ -1781,7 +1781,7 @@ _Pro. Needs: storage_
 ### Pixel Ruler
 _Free. Needs: camera, storage_
 
-- [ ] Tap Take photo or Pick picture and choose a photo containing a credit card. Expected: the photo shows with two circles and a line.
+- [ ] Tap Take photo (the camera opens inside the app; tap the round shutter) or Pick picture and choose a photo containing a credit card. Expected: the photo shows with two circles and a line.
 - [ ] Drag the circles apart. Expected: the pixel distance updates live.
 - [ ] Place the points on the card long edge, enter 85.6 with unit mm, tap Set scale. Expected: the big number now shows about 85.60 mm.
 - [ ] Move the points to another object. Expected: the length is shown in mm.

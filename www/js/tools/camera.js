@@ -163,6 +163,45 @@ function pickFiles(multi, cb, capture, accept) {
   i.click();
 }
 
+/* Take a picture with the live camera. The "capture" hint on a file input is ignored by the Android WebView (it opens the picker),
+   so this opens the camera itself: preview, shutter, switch camera, cancel. cb gets [File]. Falls back to the picker when there is no camera.
+   owner: the tool's element; the camera closes by itself if the person leaves the tool. */
+async function takePhoto(owner, cb) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { toast('No camera here, choose a picture instead'); pickFiles(false, cb); return; }
+  if (document.getElementById('pkShot')) return;
+  let facing = 'environment', stream = null, closed = false, watch = null;
+  const ov = document.createElement('div'); ov.id = 'pkShot';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#000;display:flex;flex-direction:column;color:#fff';
+  ov.innerHTML = '<video id="pkv" playsinline muted autoplay style="flex:1;min-height:0;width:100%;object-fit:contain;background:#000"></video>' +
+    '<div id="pkm" style="text-align:center;padding:6px 12px;min-height:22px;font-size:14px"></div>' +
+    '<div style="display:flex;justify-content:space-around;align-items:center;padding:12px 8px calc(18px + env(safe-area-inset-bottom,0px))">' +
+    '<button id="pkc" aria-label="Cancel" style="min-width:88px;min-height:48px;border-radius:24px;border:1px solid #fff5;background:#0000;color:#fff;font-size:16px">Cancel</button>' +
+    '<button id="pks" aria-label="Take picture" style="width:72px;height:72px;border-radius:50%;border:5px solid #fff;background:#fff3;min-height:72px"></button>' +
+    '<button id="pkf" aria-label="Switch camera" style="min-width:88px;min-height:48px;border-radius:24px;border:1px solid #fff5;background:#0000;color:#fff;font-size:16px">Flip</button></div>';
+  document.body.appendChild(ov);
+  const v = ov.querySelector('#pkv'), msg = (t) => { ov.querySelector('#pkm').textContent = t || ''; };
+  const close = () => { if (closed) return; closed = true; clearInterval(watch); if (stream) stream.getTracks().forEach(t => t.stop()); v.srcObject = null; ov.remove(); };
+  async function open() {
+    if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; msg('Starting camera...');
+    try {
+      let s;
+      try { s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 2560 }, height: { ideal: 1440 } }, audio: false }); }
+      catch (e) { if (e && e.name === 'OverconstrainedError') s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); else throw e; }
+      if (closed) { s.getTracks().forEach(t => t.stop()); return; }
+      stream = s; v.srcObject = s; try { await v.play(); } catch (e) { /* autoplay covers it */ } msg('');
+    } catch (e) { if (!closed) msg(camMsg(e)); }
+  }
+  ov.querySelector('#pkc').onclick = close;
+  ov.querySelector('#pkf').onclick = () => { facing = facing === 'environment' ? 'user' : 'environment'; open(); };
+  ov.querySelector('#pks').onclick = () => {
+    if (!stream || !v.videoWidth) { msg('Camera is not ready yet'); return; }
+    const cv = document.createElement('canvas'); cv.width = v.videoWidth; cv.height = v.videoHeight; cv.getContext('2d').drawImage(v, 0, 0);
+    cv.toBlob(b => { if (!b) { msg('Could not take the picture'); return; } close(); cb([new File([b], 'photo-' + Date.now() + '.jpg', { type: 'image/jpeg' })]); }, 'image/jpeg', 0.92);
+  };
+  watch = setInterval(() => { if (owner && !owner.isConnected) close(); }, 400);
+  open();
+}
+
 /* Natural size of an image file without decoding it into a bitmap (the browser decodes lazily). */
 async function imageSize(file) {
   const url = URL.createObjectURL(file);
@@ -986,7 +1025,7 @@ Tools.register({ id: 'docscan', pro: true, proKey: 'camera', name: 'Doc Scanner'
     if (m !== 'c') adaptiveBW(img, m === 'g');
     oc.width = img.width; oc.height = img.height; oc.style.width = '100%'; oc.getContext('2d').putImageData(img, 0, 0);
   }
-  $('#take', el).onclick = () => pickFiles(false, load, 'environment');
+  $('#take', el).onclick = () => takePhoto(el, load);
   $('#pick', el).onclick = () => pickFiles(false, load);
   $('#cut', el).onclick = cut; $('#lk', el).onchange = look;
   $('#ed2', el).onclick = () => { $('#ed', el).style.display = ''; $('#out', el).style.display = 'none'; };
@@ -1324,7 +1363,7 @@ Tools.register({ id: 'pixelruler', name: 'Pixel Ruler', icon: '🎚️', cat: 'c
     im.onload = () => { nat = { w: im.naturalWidth, h: im.naturalHeight }; $('#wrap', el).style.display = ''; upd(); };
     im.onerror = () => { toast('Could not open that picture'); }; im.src = url;
   }
-  $('#take', el).onclick = () => pickFiles(false, load, 'environment'); $('#pick', el).onclick = () => pickFiles(false, load);
+  $('#take', el).onclick = () => takePhoto(el, load); $('#pick', el).onclick = () => pickFiles(false, load);
   $('#cal', el).onclick = () => {
     const len = Valid.num($('#kl', el).value); if (!nat || !(len > 0) || len > 1e9) { toast('Pick a photo and enter a length above 0 (up to 1,000,000,000)'); return; }
     const px = Math.hypot((A.x - B.x) * nat.w, (A.y - B.y) * nat.h); if (px < 1) { toast('Move the two points apart first'); return; }
