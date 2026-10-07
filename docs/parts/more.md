@@ -18,11 +18,11 @@
 - category: calculate
 - plan: free
 - needs: storage
-- what: Scales an ingredient list from the original servings to the number you want to serve. It understands amounts such as 1 1/2, 2.5, 3/4, unicode fractions and ranges like 2-3, keeps the units and prints results as kitchen fractions. Recipes can be saved and reopened from a list on the device. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button.
+- what: Scales an ingredient list from the original servings to the number you want to serve. It understands amounts such as 1 1/2, 2.5, 3/4, unicode fractions and ranges like 2-3, keeps the units (and their spacing: 200g becomes 400g, 2 cups becomes 4 cups) and prints results as kitchen fractions. Recipes can be saved and reopened from a list on the device. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button.
 - test:
   1. Open the tool with the sample recipe (serves 4). Set "I want to serve" to 8: 2 cups flour becomes 4 cups, 1 1/2 tsp becomes 3 tsp, 3/4 cup becomes 1 1/2 cup, 2.5 tbsp becomes 5 tbsp and "Pinch of salt" is unchanged.
   2. Tap Half: servings become 2 and amounts halve (3/4 cup becomes 3/8 cup).
-  3. Type "2-3 cloves garlic" and "1/3 cup oil" and scale to triple: results are "6-9 cloves garlic" and "1 cup oil".
+  3. Type "2-3 cloves garlic", "1/3 cup oil" and "200g flour" and scale to triple: results are "6-9 cloves garlic", "1 cup oil" and "600g flour".
   4. Enter 0 in either servings box: the result says to enter servings above zero. Tap Save recipe with empty ingredients: a message asks for ingredients.
   5. Name the recipe and tap Save recipe, tap New, then open it from Saved recipes: name, servings and text return. The bin icon deletes it. Copy scaled copies the scaled text.
   6. Enter 0 or 5000 in a servings box: a message shows and the value is limited to the range 0.5 to 1000. At most 100 recipes can be saved.
@@ -61,7 +61,7 @@
 - category: audio
 - plan: free
 - needs: none
-- what: Plays a Morse code letter or digit as beeps using Web Audio and the user taps (or types) what they heard. Five levels grow from 4 letters to letters plus digits, speed is adjustable from 5 to 25 words per minute, and it tracks correct answers, accuracy and streak. The audio context is closed when leaving the tool.
+- what: Plays a Morse code letter or digit as beeps using Web Audio and the user taps (or types) what they heard. Five levels grow from 4 letters to letters plus digits, speed is adjustable from 5 to 25 words per minute, and it tracks correct answers, accuracy and streak (changing the level starts the score again). The audio context is closed when leaving the tool.
 - test:
   1. Open the tool and tap Play next: a short beep pattern plays and the display shows "?". Tap Repeat: the same letter plays again.
   2. Tap the correct letter: the letter shows in green with its dots and dashes, "Correct!" appears, counters update and the next letter plays after about a second.

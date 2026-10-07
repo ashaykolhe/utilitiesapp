@@ -193,6 +193,15 @@ const note = (t) => `<div class="card" style="font-size:13px;line-height:1.5;col
 const empty = (icon, t) => `<div class="center muted" style="padding:26px 10px"><div style="font-size:40px;margin-bottom:6px">${icon}</div>${t}</div>`;
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+/* Saved data can be wrong (a backup restored from another version, a hand-edited file). Lists keep only well-formed entries and settings fall back
+   to defaults, so a tool always opens instead of failing on one bad value. */
+const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+const fin = (v) => typeof v === 'number' && Number.isFinite(v);
+const str = (v, max) => (typeof v === 'string' ? v.slice(0, max || 200) : '');
+const listOf = (key, ok) => Store.arr(key).filter((x) => isObj(x) && (!ok || ok(x)));
+const objOf = (key, def) => { const v = Store.get(key, null); return isObj(v) ? v : def; };
+const numOf = (key, def, lo, hi) => { const v = Store.get(key, def); return fin(v) ? clamp(v, lo, hi) : def; };
+const zonesOf = (key, def, max) => { const v = Store.get(key, null); return Array.isArray(v) ? v.filter((c) => isObj(c) && typeof c.n === 'string' && typeof c.z === 'string').slice(0, max).map((c) => ({ n: c.n.slice(0, 40), z: c.z.slice(0, 60) })) : def; };
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const dayKey = (d) => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 
@@ -390,7 +399,9 @@ async function torchOpen() {
 /* ---------- 1. Screen Light ---------- */
 Tools.register({ id: 'screenlight', name: 'Screen Light', icon: '💡', cat: 'daily', desc: 'Turn the whole screen into a coloured lamp with presets, a colour picker and a brightness slider.', keys: ['lamp', 'night light', 'colour', 'color', 'torch', 'mood'], needs: [], render(el) {
   const PRE = [['Warm lamp', '#ffb35c'], ['Candle', '#ff8a3d'], ['White', '#ffffff'], ['Cool', '#cfe6ff'], ['Night red', '#ff2a1f'], ['Green', '#3dff7a'], ['Blue', '#3d7bff'], ['Pink', '#ff5fb0']];
-  const st = Object.assign({ color: '#ffb35c', bright: 100, awake: true }, Store.get('daily.light', {}));
+  const st = Object.assign({ color: '#ffb35c', bright: 100, awake: true }, objOf('daily.light', {}));
+  if (!/^#[0-9a-f]{6}$/i.test(String(st.color))) st.color = '#ffb35c';
+  st.bright = fin(st.bright) ? clamp(Math.round(st.bright), 5, 100) : 100; st.awake = st.awake !== false;
   const wake = keepAwake();
   let ov = null;
   const sw = (id) => PRE.map(([n, c]) => `<button class="sw ${id}" data-c="${c}" aria-label="${n}" title="${n}" style="background:${c};width:44px;height:44px;border:3px solid ${c === st.color ? 'var(--text)' : 'var(--line)'}"></button>`).join('');
@@ -455,8 +466,8 @@ Tools.register({ id: 'routerec', name: 'Route Recorder', icon: '🥾', cat: 'nav
   let alive = true, tab = 'rec', stopGps = null, tick = null, sel = null;
   const R = { pts: [], dist: 0, max: 0, start: 0, end: 0, running: false, msg: 'Press Start to begin recording.' };
   let awake = true;
-  const draft = Store.get('daily.routedraft', null);
-  if (draft && draft.pts && draft.pts.length > 1) {
+  const draft = objOf('daily.routedraft', null);
+  if (draft && Array.isArray(draft.pts) && draft.pts.length > 1 && draft.pts.every((p) => isObj(p) && fin(p.lat) && fin(p.lon) && fin(p.t)) && fin(draft.dist) && fin(draft.max) && fin(draft.start)) {
     Object.assign(R, draft, { running: false, msg: 'An unsaved recording was recovered. Save or discard it.' });
     /* A draft written while recording has no end time yet: use the last point, otherwise the duration would be hugely negative. */
     if (!R.end) R.end = R.pts[R.pts.length - 1].t || R.start;
@@ -490,7 +501,7 @@ Tools.register({ id: 'routerec', name: 'Route Recorder', icon: '🥾', cat: 'nav
   };
   const statGrid = (r) => `<div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:14px 8px;text-align:center">${stats(r).map(([v, l]) => `<div><div style="font-size:24px;font-weight:700;font-variant-numeric:tabular-nums">${v}</div><small class="muted">${l}</small></div>`).join('')}</div>`;
 
-  function persistDraft() { if (R.pts.length > 1 && R.pts.length < 8000) Store.set('daily.routedraft', { pts: R.pts, dist: R.dist, max: R.max, start: R.start, end: R.end }); }
+  function persistDraft() { if (R.pts.length > 1 && R.pts.length <= 20000) Store.set('daily.routedraft', { pts: R.pts, dist: R.dist, max: R.max, start: R.start, end: R.end }); }
   function onPos(p) {
     if (!R.running) return;
     R.msg = '';
@@ -504,7 +515,8 @@ Tools.register({ id: 'routerec', name: 'Route Recorder', icon: '🥾', cat: 'nav
     }
     if (R.pts.length >= 20000) { R.msg = 'Recording is full (20000 points). Stop and save it.'; refreshRec(); return; }
     R.pts.push({ lat: p.lat, lon: p.lon, t: p.t });
-    if (R.pts.length % 10 === 0) persistDraft();
+    /* The draft is rewritten often for short recordings and every 100 points for long ones (up to 20000 points, about 1 MB). */
+    if (R.pts.length % (R.pts.length < 2000 ? 10 : 100) === 0) persistDraft();
     refreshRec();
   }
   function startRec() {
@@ -585,7 +597,7 @@ Tools.register({ id: 'routerec', name: 'Route Recorder', icon: '🥾', cat: 'nav
 
 /* ---------- 3. My PIN Code ---------- */
 Tools.register({ id: 'pincode', name: 'My PIN Code', icon: '📍', cat: 'navigate', desc: 'Your exact coordinates and Plus Code, a map-app-free geo link, and named places you can find your way back to.', keys: ['location', 'coordinates', 'plus code', 'olc', 'where am i', 'latitude', 'longitude', 'share location', 'home'], needs: ['location', 'storage'], render(el) {
-  let places = Store.get('daily.places', []), pos = null, heading = null, alive = true;
+  let places = listOf('daily.places', (p) => typeof p.id === 'string' && typeof p.name === 'string' && fin(p.lat) && fin(p.lon)), pos = null, heading = null, alive = true;
   el.innerHTML = `
     <div class="card" style="${GRAD};text-align:center;padding:20px 14px">
       <div class="muted" style="font-size:12px;letter-spacing:.08em;text-transform:uppercase">Your Plus Code</div>
@@ -657,7 +669,9 @@ Tools.register({ id: 'pincode', name: 'My PIN Code', icon: '📍', cat: 'navigat
 
 /* ---------- 9. Parking Saver ---------- */
 Tools.register({ id: 'parking', name: 'Parking Saver', icon: '🅿️', cat: 'navigate', desc: 'Remember where you parked, with a meter countdown alert and the way back.', keys: ['car', 'meter', 'park', 'find my car', 'garage'], needs: ['location', 'notifications', 'storage'], render(el) {
-  let spot = Store.get('daily.parking', null), pos = null, heading = null, alive = true, iv = null, noteBlocked = false;
+  let spot = objOf('daily.parking', null), pos = null, heading = null, alive = true, iv = null, noteBlocked = false;
+  if (spot && !(fin(spot.lat) && fin(spot.lon) && fin(spot.at))) spot = null;
+  if (spot) { spot.acc = fin(spot.acc) ? spot.acc : 0; spot.exp = fin(spot.exp) ? spot.exp : 0; spot.note = str(spot.note, 60); spot.warned = spot.warned === true; }
   const IDS = [730001, 730002];
   const root = document.createElement('div'); root.className = 'list'; root.style.gap = '12px'; el.appendChild(root);
   const stopG = watchGps(p => { pos = p; refresh(); }, e => { const m = $('#gm', el); if (m) m.textContent = gpsMsg(e); });
@@ -735,7 +749,7 @@ Tools.register({ id: 'parking', name: 'Parking Saver', icon: '🅿️', cat: 'na
 /* ---------- 4. World Clock ---------- */
 Tools.register({ id: 'worldclock', name: 'World Clock', icon: '🌍', cat: 'daily', desc: 'Keep the time in cities around the world, with date, UTC offset and the difference from your own time.', keys: ['time zone', 'timezone', 'utc', 'cities', 'abroad'], needs: ['storage'], render(el) {
   const defaults = [{ n: 'London', z: 'Europe/London' }, { n: 'New York', z: 'America/New_York' }, { n: 'Tokyo', z: 'Asia/Tokyo' }];
-  let list = Store.get('daily.clocks', defaults), h24 = Store.get('daily.clock24', false);
+  let list = zonesOf('daily.clocks', defaults, 60), h24 = Store.get('daily.clock24', false) === true;
   const localName = (Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local').replace(/_/g, ' ');
   el.innerHTML = `<div class="card" style="${GRAD};text-align:center;padding:18px"><div class="muted" style="font-size:12px;letter-spacing:.08em;text-transform:uppercase">Your time · ${esc(localName)}</div><div id="me" style="font-size:44px;font-weight:800;font-variant-numeric:tabular-nums"></div><div id="md" class="muted"></div></div>
     <div class="row"><input id="cs" type="text" list="cl" placeholder="Search a city to add" aria-label="City" maxlength="40" autocomplete="off"><button class="btn" id="add" style="flex:0 0 auto">Add</button></div>
@@ -792,12 +806,19 @@ Tools.register({ id: 'worldclock', name: 'World Clock', icon: '🌍', cat: 'dail
 /* ---------- 5. Pomodoro ---------- */
 Tools.register({ id: 'pomodoro', name: 'Pomodoro', icon: '🍅', cat: 'daily', desc: 'Focus and break cycles with adjustable lengths, an alert when each one ends, and a count of sessions today.', keys: ['focus', 'study', 'work timer', 'break', 'productivity'], needs: ['notifications', 'storage'], render(el) {
   const MODES = { focus: ['Focus', '🎯'], short: ['Short break', '☕'], long: ['Long break', '🌴'] };
-  const S = Object.assign({ mins: { focus: 25, short: 5, long: 15 }, mode: 'focus', endAt: 0, left: 0, cycle: 0, auto: false }, Store.get('daily.pomo', {}));
+  const S = Object.assign({ mins: { focus: 25, short: 5, long: 15 }, mode: 'focus', endAt: 0, left: 0, cycle: 0, auto: false }, objOf('daily.pomo', {}));
+  { const m = isObj(S.mins) ? S.mins : {}, mn = (v, d) => (fin(v) ? clamp(Math.floor(v), 1, 180) : d);
+    S.mins = { focus: mn(m.focus, 25), short: mn(m.short, 5), long: mn(m.long, 15) };
+    if (!['focus', 'short', 'long'].includes(S.mode)) S.mode = 'focus';
+    S.endAt = fin(S.endAt) && S.endAt > 0 ? S.endAt : 0; S.left = fin(S.left) && S.left > 0 ? Math.min(S.left, S.mins[S.mode] * 60000) : 0;
+    S.cycle = fin(S.cycle) && S.cycle >= 0 ? Math.floor(S.cycle) : 0; S.auto = S.auto === true; }
+  const dayCount = () => { const t = objOf('daily.pomoday', {}); return t.d === dayKey(new Date()) && fin(t.n) && t.n > 0 ? Math.floor(t.n) : 0; };
+  const totalCount = () => numOf('daily.pomototal', 0, 0, 1e9);
   const NID = 740001;
   let iv = null, alive = true, cfg = false;
   const dur = (m) => S.mins[m] * 60000;
   if (!S.left) S.left = dur(S.mode);
-  const todayN = () => { const t = Store.get('daily.pomoday', {}); return t.d === dayKey(new Date()) ? t.n : 0; };
+  const todayN = dayCount;
   const save = () => Store.set('daily.pomo', S);
   const remain = () => S.endAt ? Math.max(0, S.endAt - Date.now()) : S.left;
   el.innerHTML = `<div id="tabs">${segHtml([['focus', 'Focus'], ['short', 'Short break'], ['long', 'Long break']], S.mode)}</div>
@@ -819,7 +840,7 @@ Tools.register({ id: 'pomodoro', name: 'Pomodoro', icon: '🍅', cat: 'daily', d
     $('#cy', el).textContent = [0, 1, 2, 3].map(i => i < n ? '🍅' : '⚪').join(' ');
     $('#cyn', el).textContent = `Session ${n + 1} of 4 before a long break`;
     $('#go', el).textContent = S.endAt ? 'Pause' : (S.left < dur(S.mode) ? 'Resume' : 'Start');
-    $('#td', el).textContent = todayN(); $('#to', el).textContent = Store.get('daily.pomototal', 0);
+    $('#td', el).textContent = todayN(); $('#to', el).textContent = totalCount();
   }
   function setMode(m, autostart) {
     S.mode = m; S.endAt = 0; S.left = dur(m); save(); cancelNotes([NID]);
@@ -841,8 +862,8 @@ Tools.register({ id: 'pomodoro', name: 'Pomodoro', icon: '🍅', cat: 'daily', d
     webNote(MODES[was][0] + ' finished', was === 'focus' ? 'Time for a break.' : 'Back to focus.');
     toast(was === 'focus' ? 'Focus session done. Take a break.' : 'Break over.');
     if (was === 'focus') {
-      S.cycle++; const t = Store.get('daily.pomoday', {}), n = (t.d === dayKey(new Date()) ? t.n : 0) + 1;
-      Store.set('daily.pomoday', { d: dayKey(new Date()), n }); Store.set('daily.pomototal', Store.get('daily.pomototal', 0) + 1);
+      S.cycle++; const n = dayCount() + 1;
+      Store.set('daily.pomoday', { d: dayKey(new Date()), n }); Store.set('daily.pomototal', totalCount() + 1);
     }
     const next = was === 'focus' ? (S.cycle % 4 === 0 ? 'long' : 'short') : 'focus';
     setMode(next, S.auto);
@@ -866,7 +887,9 @@ Tools.register({ id: 'pomodoro', name: 'Pomodoro', icon: '🍅', cat: 'daily', d
 
 /* ---------- 6. Alarm Clock ---------- */
 Tools.register({ id: 'alarmclock', name: 'Alarm Clock', icon: '⏰', cat: 'daily', desc: 'Alarms with a label and weekday repeat, scheduled as Android notifications so they ring with the app closed.', keys: ['wake', 'wake up', 'morning', 'repeat', 'clock'], needs: ['notifications', 'storage'], render(el) {
-  let alarms = Store.get('daily.alarms', []), seq = Store.get('daily.alarmseq', 1), draftDays = [1, 2, 3, 4, 5], timers = [];
+  let alarms = listOf('daily.alarms', (a) => fin(a.n) && Number.isInteger(a.h) && a.h >= 0 && a.h <= 23 && Number.isInteger(a.m) && a.m >= 0 && a.m <= 59)
+    .map((a) => Object.assign(a, { days: (Array.isArray(a.days) ? a.days : []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6), label: str(a.label, 40), on: a.on === true, set: fin(a.set) ? a.set : 0 }));
+  let seq = Math.max(numOf('daily.alarmseq', 1, 1, 1e9), ...alarms.map((a) => a.n + 1)), draftDays = [1, 2, 3, 4, 5], timers = [];
   const DN = ['S', 'M', 'T', 'W', 'T', 'F', 'S'], DF = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const baseOf = (a) => a.nb != null ? a.nb : 750000 + a.n * 10; // alarms made before the id blocks keep their old ids
   const idsOf = (a) => [0, 1, 2, 3, 4, 5, 6, 7].map(k => baseOf(a) + k);
@@ -1000,7 +1023,7 @@ Tools.register({ id: 'signallight', name: 'Signal Light', icon: '🚨', cat: 'da
 /* ---------- 8. To-do List ---------- */
 Tools.register({ id: 'todo', name: 'To-do List', icon: '✅', cat: 'daily', desc: 'Tasks with due dates and categories, search, and one tap to clear what is done.', keys: ['tasks', 'checklist', 'list', 'chores', 'deadline'], needs: ['storage'], render(el) {
   const CATS_T = ['Personal', 'Work', 'Home', 'Shopping', 'Other'];
-  let items = Store.get('daily.todo', []), filter = 'all', q = '';
+  let items = listOf('daily.todo', (t) => typeof t.text === 'string').map((t, i) => ({ id: typeof t.id === 'string' && t.id ? t.id : uid() + i, text: t.text.slice(0, 100), due: /^\d{4}-\d{2}-\d{2}$/.test(t.due) ? t.due : '', cat: str(t.cat, 20) || 'Other', done: t.done === true, at: fin(t.at) ? t.at : 0 })), filter = 'all', q = '';
   const save = () => Store.set('daily.todo', items);
   el.innerHTML = `<div class="card list" style="gap:10px"><input id="tx" type="text" maxlength="100" placeholder="What needs doing?" aria-label="New task">
       <div class="row"><input id="du" type="date" aria-label="Due date" min="2000-01-01" max="2100-12-31"><select id="ct" aria-label="Category">${CATS_T.map(c => `<option>${c}</option>`).join('')}</select></div>
@@ -1101,7 +1124,7 @@ Tools.register({ id: 'devstatus', name: 'Battery & Network', icon: '🔋', cat: 
 /* ---------- Quick Timers ---------- */
 Tools.register({ id: 'quicktimers', name: 'Quick Timers', icon: '🥚', cat: 'daily', desc: 'One-tap countdowns for eggs, tea, naps and workouts. Run several at once and get a notification when each ends.', keys: ['egg', 'tea', 'cooking', 'kitchen', 'countdown', 'preset', 'workout', 'nap'], needs: ['notifications', 'storage'], render(el) {
   const PRE = [['🥚', 'Soft egg', 6], ['🥚', 'Hard egg', 10], ['🍵', 'Tea', 3], ['☕', 'Coffee', 4], ['🍝', 'Pasta', 10], ['💪', 'Plank', 1], ['🏋️', 'Workout', 45], ['😴', 'Power nap', 20]];
-  let run = Store.get('daily.qt', []), seq = Store.get('daily.qtseq', 1), alive = true;
+  let run = listOf('daily.qt', (t) => typeof t.id === 'string' && fin(t.endAt) && fin(t.total) && t.total > 0).map((t) => Object.assign(t, { label: str(t.label, 24) || 'Timer', done: t.done === true })), seq = numOf('daily.qtseq', 1, 1, 1e9), alive = true;
   el.innerHTML = `<div class="grid" style="grid-template-columns:repeat(4,1fr);gap:10px">${PRE.map((p, i) => `<button class="btn alt" data-p="${i}" style="padding:12px 2px;display:flex;flex-direction:column;gap:4px;align-items:center;font-size:12px"><span style="font-size:26px">${p[0]}</span>${p[1]}<small class="muted">${p[2]} min</small></button>`).join('')}</div>
     <div class="card row" style="gap:8px"><input id="lb" type="text" maxlength="24" placeholder="Label" aria-label="Label"><input id="mn" type="number" min="1" max="999" inputmode="numeric" placeholder="min" aria-label="Minutes" style="flex:0 0 76px"><button class="btn" id="go" style="flex:0 0 auto">Start</button></div>
     <div style="${H2}">Running</div><div class="list" id="ls"></div>${sub(notesLine())}${blockedHtml()}`;
@@ -1145,7 +1168,7 @@ Tools.register({ id: 'quicktimers', name: 'Quick Timers', icon: '🥚', cat: 'da
 
 /* ---------- Clipboard Pad ---------- */
 Tools.register({ id: 'clipboard', name: 'Clipboard Pad', icon: '📋', cat: 'daily', desc: 'Keep snippets you copy often, pin the important ones and copy them back with one tap.', keys: ['paste', 'snippets', 'copy', 'text', 'scratchpad', 'clips'], needs: ['storage'], render(el) {
-  let clips = Store.get('daily.clips', []);
+  let clips = listOf('daily.clips', (c) => typeof c.id === 'string' && typeof c.t === 'string').map((c) => ({ id: c.id, t: c.t.slice(0, 2000), at: fin(c.at) ? c.at : 0, pin: c.pin === true }));
   const save = () => { const pinned = clips.filter(c => c.pin), rest = clips.filter(c => !c.pin).slice(0, 50 - pinned.length); clips = clips.filter(c => c.pin || rest.includes(c)); Store.set('daily.clips', clips); };
   el.innerHTML = `<div class="card list" style="gap:10px"><textarea id="tx" rows="4" maxlength="2000" placeholder="Type or paste something to keep..." aria-label="Clip text"></textarea>
       <div class="row"><button class="btn alt" id="ps">Paste</button><button class="btn" id="sv">Save clip</button></div></div>
@@ -1168,7 +1191,7 @@ Tools.register({ id: 'clipboard', name: 'Clipboard Pad', icon: '📋', cat: 'dai
 
 /* ---------- Shopping List ---------- */
 Tools.register({ id: 'shopping', name: 'Shopping List', icon: '🛒', cat: 'daily', desc: 'A shopping list with quantities, check-off while you shop and a quick clear for what is in the basket.', keys: ['groceries', 'buy', 'supermarket', 'list', 'market'], needs: ['storage'], render(el) {
-  let items = Store.get('daily.shop', []);
+  let items = listOf('daily.shop', (i) => typeof i.id === 'string' && typeof i.n === 'string' && fin(i.q)).map((i) => ({ id: i.id, n: i.n.slice(0, 40), q: clamp(Math.floor(i.q), 1, 99), done: i.done === true, at: fin(i.at) ? i.at : 0 }));
   const save = () => Store.set('daily.shop', items);
   el.innerHTML = `<div class="card list" style="gap:10px"><div class="row"><input id="nm" type="text" maxlength="40" placeholder="Add an item" aria-label="Item"><input id="qt" type="number" min="1" max="99" value="1" inputmode="numeric" aria-label="Quantity" style="flex:0 0 64px"><button class="btn" id="add" style="flex:0 0 auto">Add</button></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${['Milk', 'Bread', 'Eggs', 'Rice', 'Fruit', 'Water'].map(n => `<button class="btn alt" data-q="${n}" style="padding:6px 12px;font-size:13px;border-radius:99px">+ ${n}</button>`).join('')}</div></div>
@@ -1205,11 +1228,12 @@ Tools.register({ id: 'shopping', name: 'Shopping List', icon: '🛒', cat: 'dail
 /* ---------- Expense Tracker ---------- */
 Tools.register({ id: 'expenses', pro: true, proKey: 'trackers', name: 'Expense Tracker', icon: '💸', cat: 'daily', desc: 'Log spending with categories and see the month total with a bar chart by category and by month.', keys: ['money', 'budget', 'spending', 'cost', 'finance', 'chart'], needs: ['storage'], render(el) {
   const EC = [['Food', '🍔', '#f59e0b'], ['Transport', '🚌', '#3b82f6'], ['Home', '🏠', '#22c55e'], ['Fun', '🎉', '#ec4899'], ['Health', '💊', '#ef4444'], ['Shopping', '🛍️', '#a855f7'], ['Bills', '🧾', '#06b6d4'], ['Other', '📦', '#84cc16']];
-  let list = Store.get('daily.exp', []), cur = Store.get('daily.expcur', ''), vm = new Date(); vm.setDate(1);
+  let list = listOf('daily.exp', (e) => typeof e.id === 'string' && fin(e.amt) && e.amt >= 0 && /^\d{4}-\d{2}-\d{2}$/.test(e.date)).map((e) => ({ id: e.id, amt: e.amt, cat: str(e.cat, 20) || 'Other', note: str(e.note, 40), date: e.date, at: fin(e.at) ? e.at : 0 }));
+  let cur = str(Store.get('daily.expcur', ''), 4), vm = new Date(); vm.setDate(1);
   const save = () => Store.set('daily.exp', list);
   const money = (n) => (cur ? cur + ' ' : '') + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const moneyH = (n) => esc(money(n)); // the user's currency text must be escaped before it goes into innerHTML
-  el.innerHTML = `<div class="card list" style="gap:10px"><div class="row"><input id="am" type="number" min="0.01" max="1000000000" step="0.01" inputmode="decimal" placeholder="Amount" aria-label="Amount"><select id="ct" aria-label="Category">${EC.map(c => `<option>${c[0]}</option>`).join('')}</select></div>
+  el.innerHTML = `<div class="card list" style="gap:10px"><div class="row"><input id="am" type="number" min="0" max="1000000000" step="0.01" inputmode="decimal" placeholder="Amount" aria-label="Amount"><select id="ct" aria-label="Category">${EC.map(c => `<option>${c[0]}</option>`).join('')}</select></div>
       <div class="row"><input id="nt" type="text" maxlength="40" placeholder="Note (optional)" aria-label="Note"><input id="dt" type="date" aria-label="Date" min="2000-01-01" max="2100-12-31" value="${dayKey(new Date())}"></div>
       <div class="row"><button class="btn" id="add">Add expense</button><input id="cu" type="text" maxlength="4" placeholder="Currency" aria-label="Currency symbol" value="${esc(cur)}" style="flex:0 0 88px"></div></div>
     <div class="row" style="gap:8px"><button class="btn alt" id="pv" aria-label="Previous month" style="flex:0 0 52px">‹</button><div id="mh" class="center" style="font-weight:700;font-size:17px"></div><button class="btn alt" id="nx" aria-label="Next month" style="flex:0 0 52px">›</button></div>
@@ -1254,6 +1278,8 @@ Tools.register({ id: 'expenses', pro: true, proKey: 'trackers', name: 'Expense T
     sendFile('expenses-' + dayKey(new Date()) + '.csv', '\uFEFF' + toCSV(expenseRows(list)), 'text/csv', 'Exported ' + list.length + ' expense' + (list.length === 1 ? '' : 's'));
   };
   $('#cu', el).oninput = (e) => { cur = e.target.value.trim(); Store.set('daily.expcur', cur); draw(); };
+  /* The category used last is selected again next time. */
+  { const ct = $('#ct', el), sc = Store.get('daily.expcat', ''); if (EC.some(c => c[0] === sc)) ct.value = sc; ct.onchange = () => Store.set('daily.expcat', ct.value); }
   $('#pv', el).onclick = () => { vm.setMonth(vm.getMonth() - 1); draw(); };
   $('#nx', el).onclick = () => { vm.setMonth(vm.getMonth() + 1); draw(); };
   $('#ls', el).onclick = (e) => { const x = e.target.closest('[data-x]'); if (x) { list = list.filter(z => z.id !== x.dataset.x); save(); draw(); } };
@@ -1312,7 +1338,7 @@ Tools.register({ id: 'calendar', name: 'Calendar', icon: '🗓️', cat: 'daily'
       const dn = k - lead + 1;
       if (dn < 1 || dn > dim) { cells += '<div></div>'; continue; }
       const d = new Date(vm.getFullYear(), vm.getMonth(), dn), isT = dayKey(d) === dayKey(now), isS = dayKey(d) === dayKey(sel);
-      cells += `<button data-d="${dn}" aria-label="${d.toDateString()}" style="height:42px;border:2px solid ${isS ? 'var(--accent)' : 'transparent'};border-radius:12px;background:${isT ? 'var(--accent)' : 'none'};color:${isT ? 'var(--accent-t)' : 'var(--text)'};font-weight:${isT ? 700 : 500}">${dn}</button>`;
+      cells += `<button data-d="${dn}" aria-label="${d.toDateString()}" aria-pressed="${isS}"${isT ? ' aria-current="date"' : ''} style="height:42px;border:2px solid ${isS ? 'var(--accent)' : 'transparent'};border-radius:12px;background:${isT ? 'var(--accent)' : 'none'};color:${isT ? 'var(--accent-t)' : 'var(--text)'};font-weight:${isT ? 700 : 500}">${dn}</button>`;
     }
     $('#gr', el).innerHTML = `<div style="display:grid;grid-template-columns:30px repeat(7,1fr);gap:3px">${cells}</div>`;
     const dd = Math.round((new Date(sel.getFullYear(), sel.getMonth(), sel.getDate()) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
@@ -1321,7 +1347,8 @@ Tools.register({ id: 'calendar', name: 'Calendar', icon: '🗓️', cat: 'daily'
   function diff() {
     const a = $('#d1', el).value, b = $('#d2', el).value; if (!a || !b) { $('#df', el).textContent = 'Pick two dates'; return; }
     const n = Math.round((new Date(b + 'T00:00') - new Date(a + 'T00:00')) / 86400000), ab = Math.abs(n);
-    $('#df', el).textContent = `${ab} day${ab === 1 ? '' : 's'} (${Math.floor(ab / 7)} weeks${ab % 7 ? ' and ' + ab % 7 + ' days' : ''})${n < 0 ? ' earlier' : ''}`;
+    const wk = Math.floor(ab / 7), rd = ab % 7, plural = (k, w) => k + ' ' + w + (k === 1 ? '' : 's');
+    $('#df', el).textContent = plural(ab, 'day') + (wk ? ' (' + plural(wk, 'week') + (rd ? ' and ' + plural(rd, 'day') : '') + ')' : '') + (n < 0 ? ' earlier' : '');
   }
   $('#pv', el).onclick = () => { vm.setMonth(vm.getMonth() - 1); draw(); }; $('#nx', el).onclick = () => { vm.setMonth(vm.getMonth() + 1); draw(); };
   $('#tdy', el).onclick = () => { vm = new Date(now.getFullYear(), now.getMonth(), 1); sel = new Date(now.getFullYear(), now.getMonth(), now.getDate()); draw(); };
@@ -1333,7 +1360,9 @@ Tools.register({ id: 'calendar', name: 'Calendar', icon: '🗓️', cat: 'daily'
 
 /* ---------- Birthdays ---------- */
 Tools.register({ id: 'birthdays', name: 'Birthdays', icon: '🎂', cat: 'daily', desc: 'Remember birthdays and anniversaries, see who is next and get a yearly morning reminder.', keys: ['anniversary', 'reminder', 'party', 'age', 'celebrate'], needs: ['notifications', 'storage'], render(el) {
-  let list = Store.get('daily.bdays', []), seq = Store.get('daily.bseq', 1);
+  let list = listOf('daily.bdays', (b) => typeof b.id === 'string' && typeof b.name === 'string' && Number.isInteger(b.m) && b.m >= 1 && b.m <= 12 && Number.isInteger(b.d) && b.d >= 1 && b.d <= daysInMonth(2024, b.m - 1))
+    .map((b) => Object.assign(b, { name: b.name.slice(0, 30), y: fin(b.y) ? b.y : 0, rem: b.rem === true, n: fin(b.n) ? b.n : 0 }));
+  let seq = numOf('daily.bseq', 1, 1, 1e9);
   const save = () => Store.set('daily.bdays', list);
   el.innerHTML = `<div class="card list" style="gap:10px"><input id="nm" type="text" maxlength="30" placeholder="Name" aria-label="Name">
       <div class="row"><select id="mo" aria-label="Month">${MONTHS.map((m, i) => `<option value="${i + 1}">${m}</option>`).join('')}</select><input id="dy" type="number" min="1" max="31" inputmode="numeric" placeholder="Day" aria-label="Day" style="flex:0 0 72px"><input id="yr" type="number" min="1900" max="2100" inputmode="numeric" placeholder="Year?" aria-label="Birth year (optional)" style="flex:0 0 88px"></div>
@@ -1477,7 +1506,7 @@ Tools.register({ id: 'suntimes', name: 'Sunrise & Sunset', icon: '🌅', cat: 'n
 /* ---------- Meeting Planner ---------- */
 Tools.register({ id: 'meetingplanner', name: 'Meeting Planner', icon: '🤝', cat: 'daily', desc: 'Compare working hours across time zones side by side and find the hours that suit everyone.', keys: ['time zone', 'call', 'schedule', 'overlap', 'remote', 'international'], needs: ['storage'], render(el) {
   const localZ = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  let zones = Store.get('daily.mzones', [{ n: 'London', z: 'Europe/London' }, { n: 'Tokyo', z: 'Asia/Tokyo' }]), day = dayKey(new Date());
+  let zones = zonesOf('daily.mzones', [{ n: 'London', z: 'Europe/London' }, { n: 'Tokyo', z: 'Asia/Tokyo' }], 5), day = dayKey(new Date());
   el.innerHTML = `<div class="row"><input id="cs" type="text" list="cl" placeholder="Add a city" aria-label="City" maxlength="40" autocomplete="off"><button class="btn" id="add" style="flex:0 0 auto">Add</button></div>
     <datalist id="cl">${CITIES.map(c => `<option value="${esc(c[0])}"></option>`).join('')}</datalist>
     <input id="dt" type="date" aria-label="Day" min="1970-01-01" max="2100-12-31" value="${day}"><div class="card list" style="gap:12px" id="gr"></div>
@@ -1514,7 +1543,7 @@ Tools.register({ id: 'typingtest', name: 'Typing Speed', icon: '⌨️', cat: 'f
   const TXT = ['The quick brown fox jumps over the lazy dog while the sun sets slowly behind the quiet hills.', 'Good habits are built one small step at a time, and every step forward counts more than waiting for a perfect start.',
     'A clear desk and a calm mind make it easier to finish the work in front of you before the day is over.', 'Travel light, ask for directions, and remember that the best stories often begin with a wrong turn.',
     'Water the plants, send that message, take a short walk, and leave a little time for doing nothing at all.', 'Practice makes progress, and progress makes patience easier, so keep your eyes on the next word and keep typing.'];
-  let target = '', t0 = 0, secs = 30, iv = null, over = false, best = Store.get('daily.typebest', 0), prev = '';
+  let target = '', t0 = 0, secs = 30, iv = null, over = false, best = numOf('daily.typebest', 0, 0, 1e4), prev = '';
   el.innerHTML = `<div id="tabs">${segHtml([['30', '30 seconds'], ['60', '60 seconds']], '30')}</div>
     <div class="card row center" style="gap:0"><div><div class="mid" id="wp">0</div><small class="muted">WPM</small></div><div><div class="mid" id="ac">100%</div><small class="muted">Accuracy</small></div><div><div class="mid" id="tl">30</div><small class="muted">Seconds</small></div></div>
     <div class="card" id="ps" style="font-size:19px;line-height:1.7;letter-spacing:.2px;word-break:break-word"></div>

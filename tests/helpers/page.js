@@ -42,7 +42,7 @@ async function boot(opts) {
       if (opts.beforeParse) opts.beforeParse(w);
     }
   });
-  process.on('unhandledRejection', () => {});
+  process.on('unhandledRejection', (e) => { console.error('UNHANDLED REJECTION: ' + ((e && e.stack) || e)); process.exitCode = 1; });
   const w = dom.window;
   await new Promise(r => w.addEventListener('load', r));
   await new Promise(r => setTimeout(r, 250));

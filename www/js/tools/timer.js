@@ -17,8 +17,11 @@ Tools.register({ id: 'timer', name: 'Timer', icon: '⌛', cat: 'daily', desc: 'C
   const root = document.createElement('div'); root.style.cssText = 'display:flex;flex-direction:column;gap:12px'; el.appendChild(root);
   const ln = () => window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.LocalNotifications;
   const NID = 710001; /* Timer owns 710001; other tools use their own blocks (see daily.js) */
+  const lastT = Store.get('timer.last', null);
+  const last = lastT && Number.isFinite(lastT.m) && Number.isFinite(lastT.s) ? { m: Math.max(0, Math.min(999, Math.floor(lastT.m))), s: Math.max(0, Math.min(59, Math.floor(lastT.s))) } : { m: 5, s: 0 };
   root.innerHTML = `<div class="card"><div class="big" id="d" role="timer" aria-live="off">00:00</div>
-    <div class="row"><input id="m" type="number" min="0" max="999" step="1" placeholder="min" aria-label="Minutes" value="5"><input id="s" type="number" min="0" max="59" step="1" placeholder="sec" aria-label="Seconds" value="0"></div></div>
+    <div class="row"><input id="m" type="number" min="0" max="999" step="1" placeholder="min" aria-label="Minutes" value="${last.m}"><input id="s" type="number" min="0" max="59" step="1" placeholder="sec" aria-label="Seconds" value="${last.s}"></div></div>
+    <div class="row" id="pr" style="gap:6px">${[1, 3, 5, 10, 15, 30].map(m => `<button class="btn alt" data-pm="${m}" aria-label="Set ${m} minutes" style="padding:10px 2px;min-height:44px;font-size:14px">${m}m</button>`).join('')}</div>
     <div class="row"><button class="btn" id="go">Start</button><button class="btn alt" id="rs">Reset</button></div>
     <div class="card" id="nb" hidden role="status" style="font-size:13px;line-height:1.5;color:var(--danger);border-color:var(--danger)">Notifications are blocked: the alert only sounds while PocketKit is open. Allow them in Android settings.</div>
     <div class="muted" style="font-size:13px;line-height:1.45;margin:0 4px">${ln() ? 'When the time is up you get a notification, even with the screen off. It can arrive a few minutes late when the phone is idle or battery saver is on.' : 'This browser cannot notify while closed, so the alert only sounds while PocketKit is open.'}</div>`;
@@ -51,15 +54,23 @@ Tools.register({ id: 'timer', name: 'Timer', icon: '⌛', cat: 'daily', desc: 'C
     end = Date.now() + left; running = true; iv = setInterval(tick, 200); $('#go', root).textContent = 'Pause'; store({ end }); tick();
   }
   $('#go', root).onclick = () => {
-    if (iv) { stop(); running = false; store(null); cancelNote(); $('#go', root).textContent = 'Resume'; return; }
-    if (!left) left = read();
+    if (iv) { left = Math.max(0, end - Date.now()); stop(); running = false; store(null); cancelNote(); draw(); $('#go', root).textContent = 'Resume'; return; }
+    const fresh = !left;
+    if (fresh) left = read();
     if (!left) return;
+    if (fresh) Store.set('timer.last', { m: Math.floor(left / 60000), s: Math.round(left % 60000 / 1000) % 60 });
     run();
     const my = end;
     schedule(my).then(ok => { if (!running || end !== my) { cancelNote(); return; } showBlocked(ok === false); });
   };
   $('#rs', root).onclick = () => { stop(); running = false; store(null); cancelNote(); left = 0; showBlocked(false); $('#go', root).textContent = 'Start'; draw(); };
   root.addEventListener('input', () => { if (!iv && !left) draw(); });
+  /* The quick buttons fill in the minutes while the timer is not running (a paused timer is replaced). */
+  $('#pr', root).onclick = (e) => {
+    const b = e.target.closest('[data-pm]'); if (!b) return;
+    if (iv) { toast('Reset the timer first'); return; }
+    left = 0; $('#m', root).value = b.dataset.pm; $('#s', root).value = 0; $('#go', root).textContent = 'Start'; draw();
+  };
   /* A timer that was running when the user left the tool carries on (its notification is still scheduled). */
   try {
     const saved = Store.get('timer.run', null);
@@ -87,7 +98,9 @@ Tools.register({ id: 'stopwatch', name: 'Stopwatch', icon: '⏱️', cat: 'daily
     if (!iv) return;
     if (laps.length >= 500) return;
     laps.unshift(now());
-    $('#laps', el).innerHTML = laps.map((l, i) => `<div class="item"><span class="grow">Lap ${laps.length - i}</span><b>${fmt(l, true)}</b></div>`).join('');
+    /* Laps are kept as running totals; each row shows the lap time (split) in bold and the total beside it. */
+    $('#laps', el).innerHTML = '<div class="muted" style="display:flex;font-size:12px;margin:0 6px"><span class="grow">Lap</span><span style="width:90px;text-align:right">Lap time</span><span style="width:96px;text-align:right">Total</span></div>' +
+      laps.map((l, i) => `<div class="item"><span class="grow">Lap ${laps.length - i}</span><b style="width:90px;text-align:right">${fmt(l - (laps[i + 1] || 0), true)}</b><span class="muted" style="width:96px;text-align:right">${fmt(l, true)}</span></div>`).join('');
   };
   $('#rs', el).onclick = () => { clearInterval(iv); iv = null; acc = 0; laps = []; $('#laps', el).innerHTML = ''; $('#go', el).textContent = 'Start'; draw(); };
   return () => clearInterval(iv);

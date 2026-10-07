@@ -16,7 +16,7 @@
 - category: navigate
 - plan: free with limit: 1 saved route (Pro: unlimited routes and GPX export)
 - needs: location, storage
-- what: Records a GPS track with watchPosition and draws it live on a canvas (auto-scaled line, green start and red end markers) with distance, duration, average and max speed. Routes are saved in IndexedDB; GPX export is Pro. Recording works in the foreground only (app open, screen on) and the screen says so; an unsaved recording is recovered if you leave the tool.
+- what: Records a GPS track with watchPosition and draws it live on a canvas (auto-scaled line, green start and red end markers) with distance, duration, average and max speed. Routes are saved in IndexedDB; GPX export is Pro. Recording works in the foreground only (app open, screen on) and the screen says so; an unsaved recording (up to 20,000 points, several hours) is recovered if you leave the tool.
 - test:
   1. Open the tool, allow location and tap Start recording: the status says it is looking for a fix, then the line and numbers update as you walk a few hundred metres outdoors.
   2. Tap Stop recording, edit the name and tap Save route: a toast confirms and the Saved routes tab lists it with distance and time.
@@ -177,13 +177,13 @@
 - category: daily
 - plan: pro
 - needs: storage
-- what: Logs spending with category, note and date. Shows the month total, a bar for each category and a six-month column chart, with month navigation and a currency symbol. Stored locally. All expenses can be exported as a CSV file (date, category, amount, note); notes that start with = + - or @ are quoted so a spreadsheet never runs them as a formula.
+- what: Logs spending with category, note and date. Shows the month total, a bar for each category and a six-month column chart, with month navigation and a currency symbol; the category you used last is selected again next time. Stored locally. All expenses can be exported as a CSV file (date, category, amount, note); notes that start with = + - or @ are quoted so a spreadsheet never runs them as a formula.
 - test:
   1. Add 12.50 as Food and 40 as Transport: the month total shows 52.50 and two category bars appear.
   2. The "Last 6 months" chart shows a bar for the current month. Set the currency to "EUR": amounts show it.
   3. Add an expense dated last month: the view jumps to that month; use the arrows to return.
   4. Delete an entry: totals and charts update.
-  5. Add with an empty or zero amount: a toast asks for an amount. The amount is limited to 0.01 to 1,000,000,000 and the list to 5000 entries.
+  5. Add with an empty or zero amount: a toast asks for an amount. The amount is limited to 0 to 1,000,000,000 (0 is refused with a message) and the list to 5000 entries.
   6. Export: with no expenses tap "Export all as CSV": a message says there is nothing to export. Add two expenses (one with the note =1+1), tap Export: the share sheet opens with expenses-YYYY-MM-DD.csv that opens in a spreadsheet with columns Date, Category, Amount, Note; the note shows as '=1+1 (text), never as a formula.
 
 ## Tip of the Day
@@ -203,7 +203,7 @@
 - category: daily
 - plan: free
 - needs: none
-- what: A month grid with ISO week numbers, today highlighted, tap-a-day details (weekday, week, day of year, days from today), Monday or Sunday start, and a days-between-dates calculator.
+- what: A month grid with ISO week numbers, today highlighted, tap-a-day details (weekday, week, day of year, days from today), Monday or Sunday start, and a days-between-dates calculator that says for example "1 day" or "10 days (1 week and 3 days)".
 - test:
   1. Open the tool: the current month shows with today filled in the accent colour and week numbers on the left (check one against a printed calendar).
   2. Use the arrows to go to next month and tap a day: the card shows weekday, week number, day of year and "in N days".

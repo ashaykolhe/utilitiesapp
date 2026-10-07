@@ -6,6 +6,14 @@ const reg = (o) => Tools.register(Object.assign({ cat: 'calculate', needs: [] },
 const num = (v) => { const n = parseFloat(String(v).replace(',', '.')); return Number.isFinite(n) ? n : NaN; };
 const fmtN = (n, d = 2) => (Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: d }) : '—');
 const ld = (k, d) => Store.get(k, d);
+/* Saved data can be wrong (a backup restored from another version, a hand-edited file): readers below keep only well-formed values and fall back to defaults. */
+const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
+const fin = (v) => typeof v === 'number' && Number.isFinite(v);
+const ldInt = (k, d, lo, hi) => { const v = Store.get(k, d); return fin(v) && Math.floor(v) === v && v >= lo && v <= hi ? v : d; };
+const ldNum = (k, d, lo, hi) => { const v = Store.get(k, d); return fin(v) ? Math.min(hi, Math.max(lo, v)) : d; };
+const ldStr = (k, d, max) => { const v = Store.get(k, d); return typeof v === 'string' ? v.slice(0, max || 100) : d; };
+const ldOne = (k, d, allowed) => { const v = Store.get(k, d); return allowed.includes(v) ? v : d; };
+const ldList = (k, ok) => Store.arr(k).filter((x) => ok(x));
 const sv = (k, v) => { try { Store.set(k, v); } catch (e) { toast('Could not save (storage full?)'); } };
 const p2 = (n) => String(n).padStart(2, '0');
 const dstr = (y, m, d) => y + '-' + p2(m + 1) + '-' + p2(d);
@@ -77,11 +85,13 @@ const curDigits = (n) => (Math.abs(n) >= 1000 ? 2 : Math.abs(n) >= 1 ? 4 : 6);
 reg({ id: 'currency', name: 'Currency', icon: '💱', desc: 'Convert between about 35 major currencies offline using rates you can edit and save yourself, with favourites and a swap button.', keys: ['exchange', 'forex', 'money', 'rupee', 'dollar', 'euro', 'rates'], needs: ['storage'], render(el) {
   const saved = ld('currency.data', null);
   const rates = {};
-  CUR.forEach(([c, , r]) => { rates[c] = saved && saved.rates && saved.rates[c] > 0 ? saved.rates[c] : r; });
+  CUR.forEach(([c, , r]) => { rates[c] = isObj(saved) && isObj(saved.rates) && fin(saved.rates[c]) && saved.rates[c] > 0 ? saved.rates[c] : r; });
   const committed = Object.assign({}, rates);
-  let edited = saved && saved.edited ? saved.edited : CUR_DATE + ' (built-in, approximate)';
-  let favs = ld('currency.favs', ['USD', 'EUR', 'INR']);
-  let from = ld('currency.from', 'USD'), to = ld('currency.to', 'INR'), editing = false;
+  let edited = isObj(saved) && typeof saved.edited === 'string' && saved.edited ? saved.edited.slice(0, 60) : CUR_DATE + ' (built-in, approximate)';
+  const codes = CUR.map((c) => c[0]);
+  let favs = Store.get('currency.favs', null);
+  favs = Array.isArray(favs) ? favs.filter((c) => codes.includes(c)) : ['USD', 'EUR', 'INR'];
+  let from = ldOne('currency.from', 'USD', codes), to = ldOne('currency.to', 'INR', codes), editing = false;
   const names = {}; CUR.forEach(([c, n]) => { names[c] = n; });
   const hk = kit('currency');
   let lastRes = null; // [label, value] of the conversion on screen
@@ -150,12 +160,12 @@ const toNum = (s) => {
 };
 // Parse leading quantity (or range) of a line: { lo, hi|null, rest } or null.
 const parseQty = (line) => {
-  const re = new RegExp('^\\s*(' + NUMRE + ')(?:\\s*(?:-|–|to)\\s*(' + NUMRE + '))?(?![\\d/])\\s*(.*)$', 'i');
+  const re = new RegExp('^\\s*(' + NUMRE + ')(?:\\s*(?:-|–|to)\\s*(' + NUMRE + '))?(?![\\d/])(\\s*)(.*)$', 'i');
   const m = re.exec(line);
   if (!m) return null;
   const lo = toNum(m[1]), hi = m[2] ? toNum(m[2]) : null;
   if (!Number.isFinite(lo) || (m[2] && !Number.isFinite(hi))) return null;
-  return { lo, hi, rest: m[3] };
+  return { lo, hi, sep: m[3], rest: m[4] };
 };
 // Format a quantity with kitchen fractions when close, else up to 2 decimals.
 const fmtQty = (n) => {
@@ -177,7 +187,8 @@ const scaleLine = (line, k) => {
   const q = parseQty(line);
   if (!q) return line;
   const a = fmtQty(q.lo * k), b = q.hi !== null ? fmtQty(q.hi * k) : '';
-  return (b ? a + '-' + b : a) + (q.rest ? ' ' + q.rest : '');
+  /* Keep the original spacing, so "200g flour" stays "400g flour" while "2 cups" stays "4 cups". */
+  return (b ? a + '-' + b : a) + (q.rest ? (q.sep ? ' ' : '') + q.rest : '');
 };
 const scaleRecipe = (text, from, to) => {
   const k = from > 0 && to > 0 ? to / from : NaN;
@@ -186,7 +197,7 @@ const scaleRecipe = (text, from, to) => {
 };
 // ==PURE-END==
 reg({ id: 'recipescale', name: 'Recipe Scaler', icon: '🍲', desc: 'Scale a recipe ingredient list to any number of servings, understanding amounts like 1 1/2, 2.5 or 3/4 cup, and save recipes on your device.', keys: ['cooking', 'servings', 'ingredients', 'portion', 'double', 'halve'], needs: ['storage'], render(el) {
-  let recipes = ld('recipescale.list', []);
+  let recipes = ldList('recipescale.list', (r) => isObj(r) && typeof r.id === 'string' && typeof r.text === 'string' && fin(r.from) && fin(r.to)).map((r) => ({ id: r.id, name: typeof r.name === 'string' ? r.name.slice(0, 60) : '', from: r.from, to: r.to, text: r.text.slice(0, 4000) }));
   let cur = { id: null, name: '', from: 4, to: 4, text: '2 cups flour\n1 1/2 tsp baking powder\n3/4 cup sugar\n2.5 tbsp butter\n1 egg\n1/2 cup milk\nPinch of salt' };
   el.innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px;padding:18px">
     <label class="f">Recipe name<input id="nm" type="text" maxlength="60" placeholder="e.g. Pancakes"></label>
@@ -264,8 +275,9 @@ const holidaysOf = (y) => {
 reg({ id: 'holidays', name: 'Holiday Calendar', icon: '🎉', cat: 'daily', desc: 'Month calendar with fixed Indian and international holidays plus computed Easter and Good Friday, and your own dated events saved on the device.', keys: ['festival', 'republic day', 'independence day', 'easter', 'events', 'public holiday'], needs: ['storage'], render(el) {
   const now = new Date();
   let y = now.getFullYear(), mo = now.getMonth(), sel = dstr(y, mo, now.getDate());
-  let events = ld('holidays.events', []);
-  let show = ld('holidays.show', { in: true, world: true, easter: true });
+  let events = ldList('holidays.events', (e) => isObj(e) && typeof e.id === 'string' && typeof e.title === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.date)).map((e) => ({ id: e.id, date: e.date, title: e.title.slice(0, 60), yearly: e.yearly === true }));
+  const shown = Store.get('holidays.show', null);
+  let show = { in: !isObj(shown) || shown.in !== false, world: !isObj(shown) || shown.world !== false, easter: !isObj(shown) || shown.easter !== false };
   const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const kindDot = { in: '#f59e0b', world: '#3b82f6', easter: '#a855f7', mine: 'var(--accent)' };
   const kindName = { in: 'India', world: 'International', easter: 'Easter', mine: 'Mine' };
@@ -353,7 +365,10 @@ const fcParse = (text) => {
 const fcExport = (decks) => decks.map((d) => '# ' + d.name + '\n' + d.cards.map((c) => c.q.replace(/\n/g, ' ') + ' :: ' + c.a.replace(/\n/g, ' ')).join('\n')).join('\n\n');
 // ==PURE-END==
 reg({ id: 'flashcards', pro: true, proKey: 'study', name: 'Flashcards', icon: '📇', cat: 'text', desc: 'Make decks of flashcards and study them with Leitner-box spaced repetition, with due dates, stats and import or export as plain text.', keys: ['study', 'learn', 'spaced repetition', 'leitner', 'revision', 'memorise', 'quiz'], needs: ['storage'], render(el) {
-  let decks = ld('flashcards.decks', []);
+  const intIn = (v, d, lo, hi) => (fin(v) && Math.floor(v) === v && v >= lo && v <= hi ? v : d);
+  let decks = ldList('flashcards.decks', (d) => isObj(d) && typeof d.id === 'string' && typeof d.name === 'string').map((d) => ({ id: d.id, name: d.name.slice(0, 40),
+    cards: (Array.isArray(d.cards) ? d.cards : []).filter((c) => isObj(c) && typeof c.id === 'string' && typeof c.q === 'string' && typeof c.a === 'string')
+      .map((c) => ({ id: c.id, q: c.q.slice(0, 300), a: c.a.slice(0, 300), box: intIn(c.box, 1, 1, 5), due: fin(c.due) ? c.due : 0, seen: intIn(c.seen, 0, 0, 1e9), right: intIn(c.right, 0, 0, 1e9) })) }));
   let view = 'home', deckId = null, tab = 'review', queue = [], shown = false, qi = 0;
   const today = () => dayNum(new Date());
   const save = () => sv('flashcards.decks', decks);
@@ -451,7 +466,7 @@ const mtSegments = (code, unit) => {
 const mtUnit = (wpm) => 1.2 / Math.max(5, wpm); // PARIS standard: 50 units per word
 // ==PURE-END==
 reg({ id: 'morsetrainer', name: 'Morse Trainer', icon: '🎶', cat: 'audio', desc: 'Learn to hear Morse code: it plays a letter as beeps, you tap or type what you heard, with five levels, adjustable speed and an accuracy score.', keys: ['morse', 'cw', 'ham radio', 'telegraph', 'learn', 'listen'], needs: [], render(el) {
-  let ctx = null, level = ld('morsetrainer.level', 0), wpm = ld('morsetrainer.wpm', 12), cur = '', answered = true, ok = 0, tot = 0, streak = 0, best = ld('morsetrainer.best', 0);
+  let ctx = null, level = ldInt('morsetrainer.level', 0, 0, MT_LEVELS.length - 1), wpm = ldInt('morsetrainer.wpm', 12, 5, 25), cur = '', answered = true, ok = 0, tot = 0, streak = 0, best = ldInt('morsetrainer.best', 0, 0, 1e9);
   const timers = [];
   el.innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px;padding:18px">
     <label class="f">Level<select id="lv">${MT_LEVELS.map((l, i) => `<option value="${i}"${i === level ? ' selected' : ''}>${l[0]}</option>`).join('')}</select></label>
@@ -502,7 +517,7 @@ reg({ id: 'morsetrainer', name: 'Morse Trainer', icon: '🎶', cat: 'audio', des
   }
   const onKey = (e) => { if (e.ctrlKey || e.metaKey || e.altKey) return; const k = e.key.toUpperCase(); if (k.length === 1 && MT_LEVELS[level][1].includes(k)) answer(k); };
   window.addEventListener('keydown', onKey);
-  $m('#lv').onchange = (e) => { level = +e.target.value; sv('morsetrainer.level', level); cur = ''; answered = true; ok = tot = streak = 0; pad(); };
+  $m('#lv').onchange = (e) => { level = +e.target.value; sv('morsetrainer.level', level); timers.forEach(clearTimeout); cur = ''; answered = true; ok = tot = streak = 0; $m('#s1').textContent = 0; $m('#s2').textContent = '—'; $m('#s3').textContent = 0; $m('#big').textContent = '?'; $m('#big').style.color = ''; $m('#pat').textContent = ''; $m('#msg').textContent = 'Press Play to hear a letter'; pad(); };
   $m('#wp').oninput = (e) => { wpm = +e.target.value; $m('#wv').textContent = wpm; sv('morsetrainer.wpm', wpm); };
   $m('#pl').onclick = () => { timers.forEach(clearTimeout); next(); };
   $m('#rp').onclick = () => { if (cur) playChar(cur); };
@@ -552,7 +567,8 @@ const palettes = (hex) => ({
 });
 // ==PURE-END==
 reg({ id: 'colourmix', name: 'Paint Mixer', icon: '🪣', cat: 'create', desc: 'Mix two or three colours by ratio to see the resulting HEX code, then generate complementary, analogous, triadic and other matching palettes.', keys: ['colour mix', 'color mix', 'blend', 'palette', 'hex', 'complementary', 'triadic', 'analogous', 'swatch'], needs: [], render(el) {
-  let cols = ld('colourmix.cols', [{ hex: '#E63946', w: 1 }, { hex: '#1D3557', w: 1 }, { hex: '#F1FA3B', w: 0 }]);
+  const DEF = [{ hex: '#E63946', w: 1 }, { hex: '#1D3557', w: 1 }, { hex: '#F1FA3B', w: 0 }], savedCols = Store.get('colourmix.cols', null);
+  let cols = Array.isArray(savedCols) && savedCols.length >= 3 ? savedCols.slice(0, 3).map((c, i) => ({ hex: isObj(c) && typeof c.hex === 'string' && hex2rgb(c.hex) ? rgb2hex(hex2rgb(c.hex)) : DEF[i].hex, w: isObj(c) && fin(c.w) ? Math.min(10, Math.max(0, Math.round(c.w))) : DEF[i].w })) : DEF;
   const row = (c, i) => `<div class="item" style="flex-wrap:wrap"><input type="color" data-p="${i}" value="${esc(rgb2hex(hex2rgb(c.hex) || [0, 0, 0]).toLowerCase())}" aria-label="Colour ${i + 1}" style="width:54px;height:48px;padding:2px;border:0;background:none;flex:0 0 54px"><input type="text" data-h="${i}" value="${esc(c.hex)}" maxlength="7" aria-label="HEX of colour ${i + 1}" style="flex:1;min-width:90px;font-family:monospace"><label class="f" style="flex:1 1 100%">Parts: <b data-wv="${i}">${c.w}</b><input type="range" data-w="${i}" min="0" max="10" step="1" value="${c.w}" style="min-height:44px"></label></div>`;
   el.innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:10px;padding:18px"><b>Colours to mix</b><div class="list">${cols.map(row).join('')}</div><div class="muted" style="font-size:12px">Set parts to 0 to leave a colour out. Mixing 2 : 1 gives the first colour twice as much weight.</div></div>
     <div class="card center"><div class="muted" style="font-size:13px">Result</div><div id="rs" style="height:110px;border-radius:16px;margin:8px 0;border:1px solid var(--line)"></div><div class="mid" id="rh" style="font-family:monospace"></div><div id="rr" class="muted" style="font-size:13px"></div><button class="btn alt" id="cp" style="margin-top:10px;min-height:44px">Copy HEX</button></div>
@@ -720,7 +736,7 @@ const meetingCost = (people, hourly, ms) => (people > 0 && hourly >= 0 && ms >= 
 const clock = (ms) => { const s = Math.floor(ms / 1000); return (s >= 3600 ? Math.floor(s / 3600) + ':' : '') + p2(Math.floor(s / 60) % 60) + ':' + p2(s % 60); };
 // ==PURE-END==
 reg({ id: 'meetingcost', name: 'Meeting Cost', icon: '🪑', cat: 'daily', desc: 'A running clock that shows what a meeting is costing in real money, from the number of people and their average hourly rate.', keys: ['meeting', 'cost', 'salary', 'hourly rate', 'time is money', 'timer', 'office'], needs: [], render(el) {
-  let people = ld('meetingcost.people', 6), rate = ld('meetingcost.rate', 25), sym = ld('meetingcost.sym', '$');
+  let people = ldInt('meetingcost.people', 6, 1, 1000), rate = ldNum('meetingcost.rate', 25, 0, 1e6), sym = ldStr('meetingcost.sym', '$', 3);
   let accMs = 0, accCost = 0, last = 0, running = false, tm = 0;
   el.innerHTML = `<div class="card" style="padding:22px" ><div class="center muted" style="font-size:13px">Meeting has cost</div><div id="cost" class="big" style="font-size:54px;word-break:break-all">0</div><div id="clk" class="mid" style="font-variant-numeric:tabular-nums;color:var(--muted)">00:00</div><div id="pm" class="center muted" style="font-size:13px;margin-top:6px"></div></div>
     <div class="row"><button class="btn" id="go" style="min-height:56px;font-size:18px">Start</button><button class="btn alt" id="rs" style="min-height:56px">Reset</button></div>
@@ -754,7 +770,7 @@ const weeksLived = (birthDay, todayDay) => (todayDay >= birthDay ? Math.floor((t
 const dayFromStr = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m && +m[1] >= 1900 ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 864e5 : NaN; };
 // ==PURE-END==
 reg({ id: 'lifecal', name: 'Life Calendar', icon: '🟦', cat: 'daily', desc: 'See your life as a grid of weeks from your birth date to an expected lifespan, with the weeks already lived filled in.', keys: ['weeks', 'lifetime', 'birthday', 'age', 'memento mori', 'life in weeks'], needs: ['storage'], render(el) {
-  let dob = ld('lifecal.dob', ''), span = ld('lifecal.span', 80);
+  let dob = ldStr('lifecal.dob', '', 10), span = ldInt('lifecal.span', 80, 1, 120);
   el.innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:12px"><div class="row"><label class="f">Date of birth<input id="db" type="date" min="1900-01-01" max="${dstr(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())}" value="${esc(dob)}"></label><label class="f">Expected years<input id="sp" type="number" inputmode="numeric" min="1" max="120" step="1" value="${span}"></label></div></div>
     <div id="st"></div><div class="card" style="padding:10px"><canvas id="cv" style="background:var(--surface);border:0;border-radius:8px" aria-label="Life in weeks grid"></canvas><div class="muted" style="font-size:12px;margin-top:6px">Each row is one year of 52 weeks, starting from your birth. Filled squares are weeks you have lived; the outlined square is this week.</div></div>`;
   const cv = $('#cv', el), g = cv.getContext('2d');
@@ -1048,7 +1064,7 @@ const findPattern = (pat, list) => {
 };
 // ==PURE-END==
 reg({ id: 'anagram', name: 'Word Finder', icon: '🪧', cat: 'text', desc: 'Offline word helper with a built-in list of common English words: find anagrams, words you can make from letters (blanks allowed), and words matching a pattern like c?t or ab*.', keys: ['anagram', 'scrabble', 'wordle', 'crossword', 'letters', 'unscramble', 'words with friends', 'solver'], needs: [], render(el) {
-  let mode = ld('anagram.mode', 'from');
+  let mode = ldOne('anagram.mode', 'from', ['from', 'anagram', 'pat']);
   const HELP = { anagram: 'Type a word or letters: finds words that use exactly all of them.', from: 'Type your letters (use ? for a blank tile): finds words you can make from some or all of them.', pat: 'Use ? for one unknown letter and * for any run of letters. Example: c?t, ?o?se, un*ing.' };
   el.innerHTML = `${tabBar('tb', [['from', 'From letters'], ['anagram', 'Anagrams'], ['pat', 'Pattern']], mode)}
     <div class="card" style="display:flex;flex-direction:column;gap:10px;padding:18px"><label class="f"><span id="lb"></span><input id="q" type="text" maxlength="20" autocapitalize="none" autocomplete="off" spellcheck="false" style="font-size:22px;letter-spacing:2px"></label><div id="hp" class="muted" style="font-size:13px"></div><label class="f" id="mlw">Minimum word length: <b id="mv">3</b><input id="ml" type="range" min="2" max="8" value="3" style="min-height:44px"></label></div>
@@ -1090,7 +1106,7 @@ const collatz = (n, maxLen) => {
 const factorise = (n) => { const f = []; for (let p = 2; p * p <= n; p++) while (n % p === 0) { f.push(p); n /= p; } if (n > 1) f.push(n); return f; };
 // ==PURE-END==
 reg({ id: 'sequences', name: 'Number Patterns', icon: '🌀', desc: 'Explore number sequences visually: Fibonacci with the golden ratio, a prime sieve grid with factorisation, triangular numbers and a Collatz path chart.', keys: ['fibonacci', 'prime', 'sieve', 'triangular', 'collatz', 'golden ratio', 'sequence', 'maths'], needs: [], render(el) {
-  let mode = ld('sequences.mode', 'fib');
+  let mode = ldOne('sequences.mode', 'fib', ['fib', 'prime', 'tri', 'col']);
   el.innerHTML = `${tabBar('tb', [['fib', 'Fibonacci'], ['prime', 'Primes'], ['tri', 'Triangular'], ['col', 'Collatz']], mode)}<div id="pane" style="display:flex;flex-direction:column;gap:12px"></div>`;
   const pane = $('#pane', el);
   const inp = (id, label, v, mn, mx) => `<label class="f">${label}<input id="${id}" type="number" inputmode="numeric" min="${mn}" max="${mx}" step="1" value="${v}"></label>`;
@@ -1185,10 +1201,11 @@ const mxInv = (A) => {
 const mxParseCell = (s) => { s = String(s).trim(); if (!s) return 0; const m = /^(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)$/.exec(s); if (m) return +m[2] ? m[1] / m[2] : NaN; const n = Number(s.replace(',', '.')); return Number.isFinite(n) ? n : NaN; };
 // ==PURE-END==
 reg({ id: 'matrix', pro: true, proKey: 'study', name: 'Matrix Calc', icon: '📑', desc: 'Add, subtract and multiply matrices up to 4 by 4, and find determinants, inverses and transposes, with fractions accepted in cells.', keys: ['matrix', 'determinant', 'inverse', 'linear algebra', 'multiply', 'transpose', 'maths'], needs: [], render(el) {
-  const sz = ld('matrix.sz', { a: [2, 2], b: [2, 2] });
+  const rawSz = Store.get('matrix.sz', null), okDim = (d) => Array.isArray(d) && d.length === 2 && d.every((n) => Number.isInteger(n) && n >= 1 && n <= 4);
+  const sz = isObj(rawSz) && okDim(rawSz.a) && okDim(rawSz.b) ? { a: rawSz.a.slice(), b: rawSz.b.slice() } : { a: [2, 2], b: [2, 2] };
   const vals = { a: [['2', '1'], ['5', '3']], b: [['1', '0'], ['0', '1']] };
   const OPS = [['add', 'A + B'], ['sub', 'A − B'], ['mul', 'A × B'], ['det', 'det(A)'], ['inv', 'A⁻¹'], ['tr', 'Aᵀ'], ['bmul', 'B × A']];
-  let op = ld('matrix.op', 'mul');
+  let op = ldOne('matrix.op', 'mul', OPS.map((o) => o[0]));
   const dimSel = (k) => `<div class="row"><label class="f">Rows<select data-k="${k}" data-d="0">${[1, 2, 3, 4].map((n) => `<option${n === sz[k][0] ? ' selected' : ''}>${n}</option>`).join('')}</select></label><label class="f">Columns<select data-k="${k}" data-d="1">${[1, 2, 3, 4].map((n) => `<option${n === sz[k][1] ? ' selected' : ''}>${n}</option>`).join('')}</select></label></div>`;
   el.innerHTML = `<div class="card" style="display:flex;flex-direction:column;gap:10px"><b>Matrix A</b>${dimSel('a')}<div id="ga"></div></div>
     <div class="card" style="display:flex;flex-direction:column;gap:10px"><b>Matrix B</b>${dimSel('b')}<div id="gb"></div></div>
@@ -1318,7 +1335,7 @@ const elPos = (z) => {
 const ELEMENTS = EL_DATA.split('|').map((s, i) => { const [sym, name, mass] = s.split(' '); return Object.assign({ z: i + 1, sym, name, mass: parseFloat(mass), cat: elCat(i + 1), state: elState(i + 1) }, elPos(i + 1)); });
 // ==PURE-END==
 reg({ id: 'periodic', name: 'Periodic Table', icon: '⚛️', cat: 'text', desc: 'All 118 elements in a colour-coded periodic table with symbol, name, atomic number and mass, a searchable list and a detail card for each element.', keys: ['chemistry', 'elements', 'atomic number', 'atomic mass', 'science', 'symbol', 'noble gas', 'metal'], needs: [], render(el) {
-  let sel = ld('periodic.sel', 6), hi = '';
+  let sel = ldInt('periodic.sel', 6, 1, 118), hi = '';
   const cell = (e) => `<button data-z="${e.z}" aria-label="${esc(e.name)}, atomic number ${e.z}" style="grid-row:${e.r};grid-column:${e.c};min-height:42px;padding:2px 0;border:2px solid ${e.z === sel ? 'var(--text)' : 'transparent'};border-radius:8px;background:color-mix(in srgb,${EL_CATS[e.cat][1]} 28%,var(--surface));color:var(--text);line-height:1.05;display:flex;flex-direction:column;align-items:center;justify-content:center"><span style="font-size:8px;color:var(--muted)">${e.z}</span><b style="font-size:14px">${e.sym}</b></button>`;
   el.innerHTML = `<div class="card" style="padding:14px"><label class="f">Search by name, symbol or number<input id="q" type="search" maxlength="20" autocomplete="off" placeholder="e.g. gold, Fe, 26"></label><div id="hits" class="list" style="margin-top:8px"></div></div>
     <div id="det"></div>
@@ -1490,7 +1507,7 @@ const genName = (kind, rnd) => {
 };
 // ==PURE-END==
 reg({ id: 'namegen', name: 'Silly Names', icon: '🤪', cat: 'fun', desc: 'Generate silly names, funny nicknames, team names and story starters from built-in word lists, and keep the ones you love.', keys: ['random', 'name generator', 'story starter', 'team name', 'writing prompt', 'nickname', 'funny'], needs: ['storage'], render(el) {
-  let kind = ld('namegen.kind', 'nick'), favs = ld('namegen.favs', []), items = [];
+  let kind = ldOne('namegen.kind', 'nick', ['nick', 'silly', 'team', 'story']), favs = ldList('namegen.favs', (t) => typeof t === 'string').map((t) => t.slice(0, 300)).slice(0, 100), items = [];
   const KINDS = [['nick', 'Nicknames'], ['silly', 'Silly names'], ['team', 'Team names'], ['story', 'Story starters']];
   el.innerHTML = `${tabBar('tb', KINDS, kind)}<button class="btn" id="go" style="min-height:56px;font-size:18px">🎲 Generate</button><div id="ls" class="list"></div>
     <div class="card"><b>Favourites</b><div id="fv" class="list" style="margin-top:8px"></div></div>`;

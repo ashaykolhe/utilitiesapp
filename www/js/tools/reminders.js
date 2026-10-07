@@ -5,11 +5,12 @@ Tools.register({ id: 'reminders', name: 'Reminders', icon: '🔔', cat: 'daily',
   el.innerHTML = `<div class="card list"><label class="f" for="t">Remind me to</label><input id="t" type="text" maxlength="80" required placeholder="Remind me to..."><label class="f" for="w">When</label><input id="w" type="datetime-local" required><button class="btn" id="add">Add reminder</button></div>
     <div class="card" id="nb" hidden role="status" style="font-size:13px;line-height:1.5;color:var(--danger);border-color:var(--danger)">Notifications are blocked: the alert only sounds while PocketKit is open. Allow them in Android settings.</div>
     <div class="muted" style="font-size:13px;line-height:1.45;margin:0 4px">${LN ? 'Each reminder is an Android notification. It can arrive a few minutes late when the phone is idle or battery saver is on, so do not rely on it for anything time-critical.' : 'This browser cannot notify while closed, so reminders only sound while PocketKit is open.'}</div>
-    <div class="list" id="l"></div>`;
+    <div class="list" id="l"></div><button class="btn alt" id="clr" hidden>Clear finished</button>`;
   const KEEP_DONE = 20, MAX_ITEMS = 200;
   const lt = (d) => { const z = new Date(d.getTime() - d.getTimezoneOffset() * 60000); return z.toISOString().slice(0, 16); };
   { const w = $('#w', el), now = new Date(), far = new Date(now.getTime()); far.setFullYear(far.getFullYear() + 5); w.min = lt(now); w.max = lt(far); }
-  let items = Store.get('reminders', []), timers = [];
+  /* Only well-formed saved reminders are kept, so wrong stored data cannot stop the tool from opening. */
+  let items = Store.arr('reminders').filter(r => r && typeof r === 'object' && typeof r.text === 'string' && Number.isFinite(r.at) && Number.isFinite(r.id)).map(r => ({ id: r.id, text: r.text.slice(0, 80), at: r.at, done: r.done === true, nat: r.nat === true })), timers = [];
   /* Keep only the newest finished reminders so the list and storage cannot grow forever. */
   const trim = () => {
     const done = items.filter(r => r.done).sort((a, b) => b.at - a.at), drop = new Set(done.slice(KEEP_DONE));
@@ -18,7 +19,7 @@ Tools.register({ id: 'reminders', name: 'Reminders', icon: '🔔', cat: 'daily',
   const save = () => { trim(); Store.set('reminders', items); };
   const showBlocked = (on) => { $('#nb', el).hidden = !on; };
   /* New ids come from a counter in their own block (100000000+); older reminders keep the id they were saved with. */
-  const nextId = () => { const n = Store.get('reminders.seq', 0) + 1; Store.set('reminders.seq', n); return 100000000 + n % 900000000; };
+  const nextId = () => { const sq = Store.get('reminders.seq', 0), n = (Number.isFinite(sq) && sq >= 0 ? Math.floor(sq) : 0) + 1; Store.set('reminders.seq', n); return 100000000 + n % 900000000; };
   const fire = (r, quiet) => {
     if (!quiet) { beep(); toast('🔔 ' + r.text); }
     if (!LN && window.Notification && Notification.permission === 'granted') try { new Notification('Reminder', { body: r.text }); } catch (x) {}
@@ -38,6 +39,7 @@ Tools.register({ id: 'reminders', name: 'Reminders', icon: '🔔', cat: 'daily',
   };
   function draw() {
     items.sort((a, b) => a.at - b.at);
+    $('#clr', el).hidden = !items.some(r => r.done);
     $('#l', el).innerHTML = items.map(r => `<div class="item"><span class="grow"${r.done ? ' style="opacity:.5;text-decoration:line-through"' : ''}>${esc(r.text)}<br><small class="muted">${new Date(r.at).toLocaleString()}</small></span><button class="btn alt" data-id="${r.id}" aria-label="Delete reminder: ${esc(r.text)}" style="min-width:44px">✕</button></div>`).join('') || '<p class="muted center">No reminders yet.</p>';
   }
   $('#l', el).onclick = async (e) => {
@@ -45,6 +47,7 @@ Tools.register({ id: 'reminders', name: 'Reminders', icon: '🔔', cat: 'daily',
     items = items.filter(r => String(r.id) !== id); save(); draw(); arm();
     if (LN) try { await LN.cancel({ notifications: [{ id: +id }] }); } catch (x) {}
   };
+  $('#clr', el).onclick = () => { items = items.filter(r => !r.done); save(); draw(); };
   $('#add', el).onclick = async () => {
     const text = $('#t', el).value.trim(), at = new Date($('#w', el).value).getTime();
     if (!text || isNaN(at) || at <= Date.now()) { toast('Enter text and a future time'); return; }
