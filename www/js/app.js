@@ -237,7 +237,7 @@ function renderHist() {
 $('#histBtn').onclick = () => { renderHist(); $('#histDlg').showModal(); };
 $('#histClose').onclick = () => $('#histDlg').close();
 $('#histClear').onclick = () => { if (curTool) Hist.clear(curTool.id); renderHist(); $('#histDlg').close(); toast(tr('Cleared')); };
-$('#histList').addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (!b || !curTool) return; const x = Hist.list(curTool.id)[+b.dataset.i]; if (x) navigator.clipboard.writeText(x.l + ' = ' + x.v).then(() => toast(tr('Copied to the clipboard')), () => toast(tr('Could not share'))); });
+$('#histList').addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (!b || !curTool) return; const x = Hist.list(curTool.id)[+b.dataset.i]; if (x) copyToClipboard(x.l + ' = ' + x.v).then(ok => toast(ok ? tr('Copied to the clipboard') : tr('Could not share'))); });
 
 /* Collections (Pro): named groups of tools shown on Home. */
 function renderColl() {

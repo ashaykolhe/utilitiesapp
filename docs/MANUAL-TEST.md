@@ -3,7 +3,7 @@
 Tick each box on a real phone. Test on a debug build first (`cd android && ./gradlew assembleDebug`, then `adb install -r app/build/outputs/apk/debug/app-debug.apk`).
 Allow each permission when the app asks, and also try denying it once: the tool must show a message and not crash.
 
-_Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06._
+_Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-07._
 
 ## 0. App-level checks
 
@@ -174,6 +174,19 @@ _Free. Needs: notifications, storage_
 - [ ] Enter "Test" and 1 minute and press Start; at zero a beep and notification fire and the card shows Done with a Dismiss button.
 - [ ] Cancel a running timer: it disappears and its notification does not arrive.
 - [ ] Leave the tool and return before it ends: the timer is still running with the right time.
+
+### Real Quotes
+_Free. Needs: storage_
+
+- [ ] Open Real Quotes: a quote with its author shows. Tap "Next quote" several times: quotes change and do not repeat until all in the category have been shown. Tap the back arrow: the previous quote returns.
+- [ ] Swipe the card left and right: next and previous quote.
+- [ ] Tap a category chip (for example Courage): only quotes of that category come up and the list below shows them; tap "All" to return.
+- [ ] Type a word or an author's name in the search box: matching quotes are listed; tapping one shows it. Search for "zzzz": "No quote matches that."
+- [ ] Tap the star: the quote is saved and the "Saved" chip count grows. Open the "Saved" chip: it lists your saved quotes. Tap the star again: it is removed. Leave and reopen the tool: saved quotes are still there.
+- [ ] "Quote of the day" shows the same quote all day. "Copy" puts the quote and author on the clipboard.
+- [ ] "Share text" opens the share sheet with the quote, the author and "via PocketKit".
+- [ ] "Share as picture": a preview card appears. Tap the colour dots: the style changes. "Share picture" opens the share sheet with a square PNG; choose an app and check the picture shows the whole quote and the author. "Close" returns to the tool.
+- [ ] A very long quote still fits on the picture (smaller text, nothing cut off).
 
 ### Reminders
 _Free (limit: 3 active reminders (Pro: unlimited)). Needs: notifications_
@@ -2119,6 +2132,16 @@ _Free. Needs: storage_
 - [ ] Edge case: swap two gems that make no match: they swap back with a shake and no move is used.
 - [ ] Tap Hint: two gems pulse. A chain reaction shows "Combo x2!".
 - [ ] Use all 30 moves: "Out of moves" with the final score and Best updates. New game resets, even while gems are still moving.
+
+### Goofy Quotes
+_Free. Needs: storage_
+
+- [ ] Open Goofy Quotes: a funny quote shows. "Next quote" shuffles without repeating until the category is used up; the back arrow and swiping the card go back and forward.
+- [ ] Tap "Mix a brand new one" several times: each tap gives a different, grammatical sentence, labelled "Freshly mixed". Tap the star on one you like: it is saved and still shows (with the same words) under the "Saved" chip after you leave and reopen the tool.
+- [ ] Category chips filter the quotes; the search box finds words in quotes; "No quote matches that." appears for nonsense.
+- [ ] "Quote of the day", "Copy" and "Share text" work as in Real Quotes (no author line).
+- [ ] "Share as picture": preview, eight colour styles, "Share picture" opens the share sheet with a square PNG that shows the whole quote and the "PocketKit · Goofy Quotes" footer.
+- [ ] Everything is family friendly: no swearing and no insults in any quote or mixed sentence.
 
 ### Hangman
 _Free_

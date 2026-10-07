@@ -1,9 +1,9 @@
 # PocketKit: features
 
-PocketKit has 271 tools in 11 categories. Everything works offline and all data stays on the phone.
+PocketKit has 273 tools in 11 categories. Everything works offline and all data stays on the phone.
 **Free** = every everyday utility. **Pro** = a one-time purchase (no subscription) for the heavier features and higher limits.
 
-_Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the parts files, not this file._
+_Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-07. Edit the parts files, not this file._
 
 ## App features
 
@@ -27,7 +27,7 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Haptics** | Optional vibration feedback, switchable in Settings. |
 | **Privacy** | No accounts, no ads, no analytics. See privacy-policy.html. |
 
-## Daily (25)
+## Daily (26)
 
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
@@ -47,6 +47,7 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Multi Stopwatch** | Free | - | One clock for several runners: start it, tap a runner to record a lap, and see each runner's last lap, best lap and total. Up to 12 runners. |
 | **Pomodoro** | Free | notifications, storage | Focus, short break and long break timers with adjustable lengths, a four-session cycle indicator, and daily and all-time session counts. Uses end timestamps so it stays accurate when the screen is off; a notification and beep fire when a period ends. |
 | **Quick Timers** | Free | notifications, storage | One-tap countdown presets (soft egg, hard egg, tea, coffee, pasta, plank, workout, nap) plus a custom label and minutes. Several timers can run at once; each schedules a notification so it still alerts with the screen off. |
+| **Real Quotes** | Free | storage | A large collection of genuine motivational quotes from real people, always with the author (and the source where it is well documented). Shuffle with Next and Back (or swipe the card), pick a category, search quotes and authors, save favourites, get a quote of the day, copy, share as text, or share as a picture card with a choice of eight colour styles. |
 | **Reminders** | Free (limit: 3 active reminders (Pro: unlimited)) | notifications | Set reminders with a date and time (text up to 80 characters, time within the next 5 years, at most 200 saved; finished ones are trimmed to the newest 20). On Android a notification is scheduled so it appears even when the app is closed; it can be a few minutes late on an idle phone. A line says so when notifications are blocked. |
 | **Screen Light** | Free | - | Turns the whole screen into a coloured lamp. Eight presets including a warm lamp, a custom colour picker, a brightness slider and an optional keep-awake (Screen Wake Lock). Tap the screen to hide or show the controls. |
 | **Shopping List** | Free | storage | A shopping list with quantity steppers, quick-add chips, check-off while you shop and one tap to remove everything in the basket. The list can be shared as a plain text checklist. |
@@ -294,7 +295,7 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Pixel Art** | Pro | storage | A pixel drawing board with a 16 by 16 or 32 by 32 grid, a 16 colour palette plus custom colour, pen, eraser, fill bucket and colour picker, plus undo and a grid toggle. Exports the artwork as a sharp, enlarged PNG (512 pixels wide) and automatically keeps the current drawing on the device. |
 | **Signature Pad** | Pro | - | A smooth finger or mouse drawing pad for signing, with four ink colours and adjustable pen thickness. It exports the signature as a transparent PNG tightly cropped to the ink, ready to place on documents, and saves or shares it through the system share sheet. |
 
-## Fun (54)
+## Fun (55)
 
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
@@ -316,6 +317,7 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-06. Edit the
 | **Finger Chooser** | Free | - | Everyone holds a finger on the screen; after a 3 second countdown the phone picks 1, 2 or 3 random fingers as the winners. |
 | **Flappy Tap** | Free | - | Tap to flap a bird between pipes. Canvas animation with gravity, scoring per pipe and a saved best. |
 | **Gem Match** | Free | storage | A match-3 puzzle on an 8x8 fruit board: swap neighbours (tap two, or swipe) to line up three or more. Matches clear, gems fall, new ones drop in and cascades score combo bonuses. 30 moves per game, hint button, automatic reshuffle when no moves are left and a saved best. |
+| **Goofy Quotes** | Free | storage | Silly, original motivational quotes to make you smile, in categories such as work, food, fitness and Mondays, plus a Mixer that invents brand new ones from templates every time you tap it. Shuffle, search, save favourites (generated ones too), quote of the day, copy, share as text, or share as a picture card in eight colour styles. |
 | **Hangman** | Free | - | Guess a hidden word from a built-in list of 80 words with a category hint. A gallows drawing builds up with each miss (6 lives). Win/loss and streaks saved. |
 | **Higher or Lower** | Free | storage | Will the next card be higher or lower? Build the longest streak you can through a shuffled 52-card deck. Aces are high and equal values are a push. Saved best streak. |
 | **Lights Out** | Free | - | Tap a light to toggle it and its four neighbours; turn them all off. Three difficulty levels, every level is solvable, best moves saved. |

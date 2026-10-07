@@ -103,7 +103,35 @@ async function shareText(title, text) {
   const C = window.Capacitor && Capacitor.Plugins || {};
   try { if (C.Share) { await C.Share.share({ title, text }); return true; } } catch (e) { if (/cancel/i.test(String(e && e.message))) return false; }
   try { if (navigator.share) { await navigator.share({ title, text }); return true; } } catch (e) { if (e && e.name === 'AbortError') return false; }
-  try { await navigator.clipboard.writeText(text); toast('Copied to the clipboard'); return true; } catch (e) { toast('Could not share'); return false; }
+  if (await copyToClipboard(text)) { toast('Copied to the clipboard'); return true; } toast('Could not share'); return false;
+}
+/* Copy text to the clipboard. Uses the clipboard API when there is one, otherwise a hidden text box. Returns true when it worked. */
+async function copyToClipboard(text) {
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(String(text)); return true; } } catch (e) { /* fall through to the old way */ }
+  try {
+    const t = document.createElement('textarea'); t.value = String(text); t.setAttribute('readonly', ''); t.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.appendChild(t); t.select(); const ok = document.execCommand && document.execCommand('copy'); t.remove(); return !!ok;
+  } catch (e) { return false; }
+}
+/* Share an image Blob (PNG) through the Android share sheet, then the Web Share API with a file, then a download. Returns true when it worked. */
+async function shareImageBlob(name, blob, title) {
+  const C = window.Capacitor && Capacitor.Plugins || {}, FS = C.Filesystem, SH = C.Share;
+  const safe = String(name || 'image.png').replace(/[^\w.\-]+/g, '_').replace(/^\.+/, '') || 'image.png';
+  if (FS && SH) {
+    try {
+      const data = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
+      const w = await FS.writeFile({ path: 'pk-share/' + safe, data, directory: 'CACHE', recursive: true });
+      await SH.share({ title: title || safe, url: w.uri }); return true;
+    } catch (e) { if (/cancel/i.test(String(e && e.message))) return false; }
+  }
+  try {
+    const f = new File([blob], safe, { type: blob.type || 'image/png' });
+    if (navigator.canShare && navigator.share && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: title || safe }); return true; }
+  } catch (e) { if (e && e.name === 'AbortError') return false; }
+  try {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = safe; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000); return true;
+  } catch (e) { return false; }
 }
 /* Rows (arrays of cells) to CSV text with correct quoting. */
 const toCSV = (rows) => rows.map(r => r.map(v => { v = v == null ? '' : String(v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(',')).join('\r\n');
