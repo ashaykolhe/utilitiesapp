@@ -1294,38 +1294,54 @@ reg('breakout', 'Breakout', '\u{1F3B3}', 'Bounce the ball off your paddle to sma
 /* =====================================================================
    8. Pong vs AI
    ===================================================================== */
-reg('pong', 'Pong', '\u{1F3D3}', 'Table tennis against the phone: drag your paddle at the bottom, beat the AI to seven points. Three AI levels and a saved win count.',
-  ['ping pong', 'table tennis', 'paddle', 'ai', 'arcade', 'classic'], function (el) {
+reg('pong', 'Pong', '\u{1F3D3}', 'Table tennis: drag your paddle at the bottom against the phone (three AI levels), or play 2 humans on one phone with a finger each, first to seven. Saved win count against the phone.',
+  ['ping pong', 'table tennis', 'paddle', 'ai', 'arcade', 'classic', '2 player', 'two players', 'multiplayer'], function (el) {
     const T = tracker(), W = 360, H = 520, PW = 70, PH = 12, R = 8, WIN = 7;
     const LV = { 0: { sp: 150, err: 55 }, 1: { sp: 230, err: 28 }, 2: { sp: 320, err: 10 } };
-    let lv = hsGet('pong.lv', 1), st = hsGet('pong', { wins: 0, played: 0 });
+    let lv = hsGet('pong.lv', 1), mode = hsGet('pong.md', 'ai') === 'two' ? 'two' : 'ai', st = hsGet('pong', { wins: 0, played: 0 });
     let me, ai, ball, sc, state = 'idle', wait = 0, aimErr = 0;
+    const owners = new Map();          // pointerId -> 'me' (bottom paddle) | 'op' (top paddle); a finger keeps the paddle it first touched
     const root = mount(el, `
-      ${seg('lv', [[0, 'Easy'], [1, 'Normal'], [2, 'Hard']], lv)}
+      ${seg('md', [['ai', 'vs Phone'], ['two', '2 players']], mode)}
+      <div id="lvw">${seg('lv', [[0, 'Easy'], [1, 'Normal'], [2, 'Hard']], lv)}</div>
       <div class="stats">${stat('you', 'You', 0)}${stat('cpu', 'Phone', 0)}${stat('wn', 'Games won', st.wins)}</div>
-      <div class="cvw" id="w" style="max-width:380px"><canvas id="cv" class="cv" width="${W}" height="${H}" aria-label="Pong table"></canvas></div>`);
-    const cv = $('#cv', root), ctx = fitCanvas(cv, W, H), wrap = $('#w', root);
+      <div class="cvw" id="w" style="max-width:380px"><canvas id="cv" class="cv" width="${W}" height="${H}" aria-label="Pong table"></canvas></div>
+      <div class="msg" id="msg"></div>`);
+    const cv = $('#cv', root), ctx = fitCanvas(cv, W, H), wrap = $('#w', root), say = (t) => { $('#msg', root).textContent = t; };
+    const intro = () => mode === 'two' ? '<b>Pong, 2 players</b><div>Player 1 drags the bottom paddle, Player 2 the top one. First to ' + WIN + ' wins.</div><button class="btn">Start</button>' : '<b>Pong</b><div>First to ' + WIN + ' wins. Drag to move your paddle.</div><button class="btn">Start</button>';
+    function labels() {
+      $('#you', root).nextSibling.textContent = mode === 'two' ? 'P1 (bottom)' : 'You'; $('#cpu', root).nextSibling.textContent = mode === 'two' ? 'P2 (top)' : 'Phone';
+      $('#lvw', root).style.display = mode === 'ai' ? '' : 'none'; cv.setAttribute('aria-label', mode === 'two' ? 'Pong table: player 1 plays the bottom half, player 2 the top half' : 'Pong table');
+    }
     function serve(dir) { ball = { x: W / 2, y: H / 2, vx: (Math.random() - .5) * 160, vy: dir * 230, sp: 250 }; wait = 0.8; aimErr = (Math.random() * 2 - 1) * LV[lv].err; }
-    function start() { me = W / 2; ai = W / 2; sc = [0, 0]; state = 'run'; serve(Math.random() < .5 ? 1 : -1); overlay(wrap, ''); hud(); loop.resume(); }
+    function start() { me = W / 2; ai = W / 2; sc = [0, 0]; state = 'run'; serve(Math.random() < .5 ? 1 : -1); overlay(wrap, ''); hud(); say(''); loop.resume(); }
     function hud() { $('#you', root).textContent = sc[0]; $('#cpu', root).textContent = sc[1]; }
     function finish() {
-      state = 'over'; st.played++; const win = sc[0] > sc[1]; if (win) st.wins++; hsSet('pong', st); $('#wn', root).textContent = st.wins; buzz(win ? 90 : 150);
-      overlay(wrap, '<b>' + (win ? '\u{1F389} You win ' : 'You lose ') + sc[0] + ' - ' + sc[1] + '</b><button class="btn">Play again</button>', start);
+      state = 'over'; const win = sc[0] > sc[1]; buzz(win ? 90 : 150);
+      let txt;
+      if (mode === 'ai') { st.played++; if (win) st.wins++; hsSet('pong', st); $('#wn', root).textContent = st.wins; txt = (win ? 'You win ' : 'You lose ') + sc[0] + ' - ' + sc[1]; }
+      else txt = (win ? 'Player 1' : 'Player 2') + ' wins ' + Math.max(sc[0], sc[1]) + ' - ' + Math.min(sc[0], sc[1]);
+      say(txt); overlay(wrap, '<b>' + (mode === 'ai' && win ? '\u{1F389} ' : '') + txt + '</b><button class="btn">Play again</button>', start);
     }
-    function point(who) { sc[who]++; hud(); buzz(40); if (sc[who] >= WIN) finish(); else serve(who === 0 ? 1 : -1); }
+    function point(who) {
+      sc[who]++; hud(); buzz(40); if (sc[who] >= WIN) finish();
+      else { say(mode === 'two' ? 'Point to ' + (who === 0 ? 'Player 1' : 'Player 2') + ', ' + sc[0] + ' - ' + sc[1] : 'Score ' + sc[0] + ' - ' + sc[1]); serve(who === 0 ? 1 : -1); }
+    }
     function step(dt) {
       if (state !== 'run') return;
       if (wait > 0) { wait -= dt; return; }
       for (let s = 0; s < 3; s++) {
         ball.x += ball.vx * dt / 3; ball.y += ball.vy * dt / 3;
         if (ball.x < R) { ball.x = R; ball.vx = Math.abs(ball.vx); } else if (ball.x > W - R) { ball.x = W - R; ball.vx = -Math.abs(ball.vx); }
-        // my paddle at bottom (y = H-30), AI paddle at top (y = 18)
+        // my paddle at bottom (y = H-30), AI / player 2 paddle at top (y = 18)
         const mh = L.circleRect(ball.x, ball.y, R, me - PW / 2, H - 30, PW, PH), ah = L.circleRect(ball.x, ball.y, R, ai - PW / 2, 18, PW, PH);
         if (mh && ball.vy > 0) { const o = clamp((ball.x - me) / (PW / 2), -1, 1); ball.sp = Math.min(560, ball.sp + 14); ball.vx = o * ball.sp * .8; ball.vy = -Math.sqrt(Math.max(1, ball.sp * ball.sp - ball.vx * ball.vx)); ball.y = H - 30 - R; buzz(8); aimErr = (Math.random() * 2 - 1) * LV[lv].err; }
         if (ah && ball.vy < 0) { const o = clamp((ball.x - ai) / (PW / 2), -1, 1); ball.sp = Math.min(560, ball.sp + 14); ball.vx = o * ball.sp * .8; ball.vy = Math.sqrt(Math.max(1, ball.sp * ball.sp - ball.vx * ball.vx)); ball.y = 18 + PH + R; }
       }
-      const target = ball.vy < 0 ? ball.x + aimErr : W / 2;
-      ai = clamp(L.pongAi(ai, target, LV[lv].sp, dt), PW / 2, W - PW / 2);
+      if (mode === 'ai') {
+        const target = ball.vy < 0 ? ball.x + aimErr : W / 2;
+        ai = clamp(L.pongAi(ai, target, LV[lv].sp, dt), PW / 2, W - PW / 2);
+      }
       if (ball.y < -R) point(0); else if (ball.y > H + R) point(1);
     }
     function draw() {
@@ -1337,13 +1353,36 @@ reg('pong', 'Pong', '\u{1F3D3}', 'Table tennis against the phone: drag your padd
       ctx.fillStyle = cssv(root, '--accent'); ctx.beginPath(); rrect(ctx, me - PW / 2, H - 30, PW, PH, 6); ctx.fill();
       if (ball) { ctx.fillStyle = cssv(root, '--text'); ctx.globalAlpha = wait > 0 ? .5 + Math.sin(wait * 20) * .3 : 1; ctx.beginPath(); ctx.arc(ball.x, ball.y, R, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
     }
-    const loop = gameLoop(T, step, draw, (p) => { if (state === 'run') overlay(wrap, p ? '<b>Paused</b><button class="btn">Resume</button>' : '', p ? () => loop.resume() : null); });
-    function move(e) { me = clamp(ptr(cv, e).x, PW / 2, W - PW / 2); }
-    cv.addEventListener('pointerdown', (e) => { cv.setPointerCapture(e.pointerId); move(e); if (state === 'run' && loop.paused) loop.resume(); });
-    cv.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'touch') move(e); });
-    T.on(window, 'keydown', (e) => { if (e.key === 'ArrowLeft') me = clamp(me - 26, PW / 2, W - PW / 2); else if (e.key === 'ArrowRight') me = clamp(me + 26, PW / 2, W - PW / 2); });
-    onSeg(root, 'lv', (v) => { lv = +v; hsSet('pong.lv', lv); if (state === 'run') { state = 'idle'; overlay(wrap, '<b>Pong</b><div>First to ' + WIN + ' wins. Drag to move.</div><button class="btn">Start</button>', start); } });
-    overlay(wrap, '<b>Pong</b><div>First to ' + WIN + ' wins. Drag to move your paddle.</div><button class="btn">Start</button>', start);
+    const loop = gameLoop(T, step, draw, (p) => { if (p) owners.clear(); if (state === 'run') overlay(wrap, p ? '<b>Paused</b><button class="btn">Resume</button>' : '', p ? () => loop.resume() : null); });
+    const setPad = (who, x) => { x = clamp(x, PW / 2, W - PW / 2); if (who === 'op') ai = x; else me = x; };
+    /* In 2-player mode each finger owns the paddle on the half where it first touched, for as long as it stays down; a second finger on an owned half is ignored. */
+    cv.addEventListener('pointerdown', (e) => {
+      cv.setPointerCapture(e.pointerId); const p = ptr(cv, e);
+      if (mode === 'two') {
+        let who = p.y < H / 2 ? 'op' : 'me';
+        owners.forEach((v) => { if (v === who) who = null; });
+        if (who) { owners.set(e.pointerId, who); setPad(who, p.x); }
+      } else setPad('me', p.x);
+      if (state === 'run' && loop.paused) loop.resume();
+    });
+    cv.addEventListener('pointermove', (e) => {
+      if (mode === 'two') { const who = owners.get(e.pointerId); if (who) setPad(who, ptr(cv, e).x); return; }
+      if (e.buttons || e.pointerType === 'touch') setPad('me', ptr(cv, e).x);
+    });
+    const lift = (e) => { owners.delete(e.pointerId); };
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach((ev) => cv.addEventListener(ev, lift));
+    T.on(window, 'pointerup', lift); T.on(window, 'pointercancel', lift);
+    T.on(window, 'keydown', (e) => {
+      if (e.key === 'ArrowLeft') me = clamp(me - 26, PW / 2, W - PW / 2); else if (e.key === 'ArrowRight') me = clamp(me + 26, PW / 2, W - PW / 2);
+      else if (mode === 'two' && (e.key === 'a' || e.key === 'A')) ai = clamp(ai - 26, PW / 2, W - PW / 2);
+      else if (mode === 'two' && (e.key === 'd' || e.key === 'D')) ai = clamp(ai + 26, PW / 2, W - PW / 2);
+    });
+    onSeg(root, 'md', (v) => {
+      mode = v === 'two' ? 'two' : 'ai'; hsSet('pong.md', mode); owners.clear(); state = 'idle'; sc = [0, 0]; me = W / 2; ai = W / 2; ball = null; wait = 0; hud(); say(''); labels();
+      overlay(wrap, intro(), start);
+    }, () => sure(state === 'run' && sc[0] + sc[1] > 0, 'Change the mode? The game in progress will be lost.'));
+    onSeg(root, 'lv', (v) => { lv = +v; hsSet('pong.lv', lv); if (state === 'run') { state = 'idle'; overlay(wrap, intro(), start); } });
+    labels(); overlay(wrap, intro(), start);
     sc = [0, 0]; me = W / 2; ai = W / 2; ball = null;
     return () => T.stop();
   });
@@ -1526,63 +1565,100 @@ reg('gemmatch', 'Gem Match', '\u{1F4A0}', 'A match-3 puzzle: swap neighbouring f
 /* =====================================================================
    11. Dots and Boxes
    ===================================================================== */
-reg('dotsboxes', 'Dots and Boxes', '\u{1F4E6}', 'Take turns drawing lines between dots. Close the fourth side of a box to claim it and go again. Play the phone at two levels on a 3x3, 4x4 or 5x5 grid.',
-  ['dots', 'boxes', 'pencil', 'paper', 'squares', 'strategy'], function (el) {
+reg('dotsboxes', 'Dots and Boxes', '\u{1F4E6}', 'Take turns drawing lines between dots. Close the fourth side of a box to claim it and go again. Two to four seats, each a person or the phone, each with its own colour and symbol, on a 3x3, 4x4 or 5x5 grid. The phone plays at two levels.',
+  ['dots', 'boxes', 'pencil', 'paper', 'squares', 'strategy', 'multiplayer', '2 player', 'two players', 'four players'], function (el) {
     const T = tracker();
+    /* seat colours and symbols: a claimed box shows both, so the owner never depends on colour alone */
+    const COL = ['var(--accent)', 'var(--danger)', '#43a047', '#f9a825'], SYM = ['★', '♥', '♣', '◆'], SYMN = ['star', 'heart', 'club', 'diamond'];
     let gen = 0, size = hsGet('dotsboxes.n', 4), lv = hsGet('dotsboxes.lv', 1), s, turn, over, last = -1, wins = hsGet('dotsboxes.w', 0);
+    let nSeats = clamp(+hsGet('dotsboxes.np', 2) || 2, 2, 4), ai = hsGet('dotsboxes.ai', [0, 1, 1, 1]);
+    if (!Array.isArray(ai) || ai.length !== 4) ai = [0, 1, 1, 1];
+    ai = ai.map(v => v ? 1 : 0);
     const root = mount(el, `
+      ${seg('np', [[2, '2 players'], [3, '3 players'], [4, '4 players']], nSeats)}
+      <div id="seats" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0"></div>
       ${seg('sz', [[3, '3 x 3'], [4, '4 x 4'], [5, '5 x 5']], size)}
       ${seg('lv', [[0, 'Easy phone'], [1, 'Smart phone']], lv)}
-      <div class="stats">${stat('you', 'You', 0)}${stat('cpu', 'Phone', 0)}${stat('wn', 'Games won', wins)}</div>
+      <div class="stats" id="stats"></div>
       <svg id="svg" viewBox="0 0 100 100" style="display:block;width:100%;max-width:380px;margin:6px auto;touch-action:manipulation" role="img" aria-label="Dots and boxes board"></svg>
       <div class="msg" id="msg"></div>
       <div class="rowb"><button class="btn alt" id="new">New game</button></div>`);
+    const humans = () => { let n = 0; for (let i = 0; i < nSeats; i++) if (!ai[i]) n++; return n; };
+    const phones = () => nSeats - humans();
+    function nm(i) { return ai[i] ? (phones() === 1 ? 'Phone' : 'Phone ' + (i + 1)) : (humans() === 1 ? 'You' : 'Player ' + (i + 1)); }
+    function renderSeats() {
+      $('#seats', root).innerHTML = Array.from({ length: nSeats }, (_, i) =>
+        '<button class="btn alt" data-s="' + i + '" aria-label="Seat ' + (i + 1) + ', ' + SYMN[i] + ', ' + (ai[i] ? 'Phone' : 'Human') + '. Tap to switch" style="min-height:44px;border-left:8px solid ' + COL[i] + '">' + SYM[i] + ' Seat ' + (i + 1) + ': ' + (ai[i] ? 'Phone' : 'Human') + '</button>').join('');
+      $('#stats', root).innerHTML = Array.from({ length: nSeats }, (_, i) => stat('sc' + i, SYM[i] + ' ' + nm(i), 0)).join('') + stat('wn', 'Games won', wins);
+    }
     const GAP = 60, M = 24;
+    const score = (i) => s.box.filter(v => v === i + 1).length;
     function paint() {
       const R = s.R, C = s.C, w = M * 2 + C * GAP, h = M * 2 + R * GAP, svg = $('#svg', root);
       svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h); let o = '';
       for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) {
         const ow = s.box[r * C + c];
-        if (ow) o += '<rect x="' + (M + c * GAP + 4) + '" y="' + (M + r * GAP + 4) + '" width="' + (GAP - 8) + '" height="' + (GAP - 8) + '" rx="8" fill="var(' + (ow === 1 ? '--accent' : '--danger') + ')" opacity=".35" class="pop"/><text x="' + (M + c * GAP + GAP / 2) + '" y="' + (M + r * GAP + GAP / 2 + 8) + '" text-anchor="middle" font-size="22" font-weight="800" fill="var(--text)">' + (ow === 1 ? 'You' : 'Me').slice(0, 1) + '</text>';
+        if (ow) o += '<rect data-o="' + ow + '" x="' + (M + c * GAP + 4) + '" y="' + (M + r * GAP + 4) + '" width="' + (GAP - 8) + '" height="' + (GAP - 8) + '" rx="8" fill="' + COL[ow - 1] + '" opacity=".35" class="pop"/><text x="' + (M + c * GAP + GAP / 2) + '" y="' + (M + r * GAP + GAP / 2 + 8) + '" text-anchor="middle" font-size="22" font-weight="800" fill="var(--text)">' + SYM[ow - 1] + '</text>';
       }
       const hN = (R + 1) * C;
       s.e.forEach((v, e) => {
         let x1, y1, x2, y2;
         if (e < hN) { const r = (e / C) | 0, c = e % C; x1 = M + c * GAP; y1 = M + r * GAP; x2 = x1 + GAP; y2 = y1; } else { const k = e - hN, r = (k / (C + 1)) | 0, c = k % (C + 1); x1 = M + c * GAP; y1 = M + r * GAP; x2 = x1; y2 = y1 + GAP; }
-        if (v) o += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="var(' + (v === 1 ? '--accent' : '--danger') + ')" stroke-width="' + (e === last ? 8 : 6) + '" stroke-linecap="round"/>';
+        if (v) o += '<line data-o="' + v + '" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="' + COL[v - 1] + '" stroke-width="' + (e === last ? 8 : 6) + '" stroke-linecap="round"/>';
         else o += '<line data-e="' + e + '" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="var(--line)" stroke-width="3" stroke-dasharray="2 6" stroke-linecap="round"/><line data-e="' + e + '" x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="transparent" stroke-width="34" stroke-linecap="butt" style="cursor:pointer"/>';
       });
       for (let r = 0; r <= R; r++) for (let c = 0; c <= C; c++) o += '<circle cx="' + (M + c * GAP) + '" cy="' + (M + r * GAP) + '" r="6" fill="var(--text)"/>';
       svg.innerHTML = o;
-      const a = s.box.filter(v => v === 1).length, b = s.box.filter(v => v === 2).length;
-      $('#you', root).textContent = a; $('#cpu', root).textContent = b;
+      for (let i = 0; i < nSeats; i++) $('#sc' + i, root).textContent = score(i);
     }
     function finish() {
-      over = true; const a = s.box.filter(v => v === 1).length, b = s.box.filter(v => v === 2).length;
-      if (a > b) { wins++; hsSet('dotsboxes.w', wins); $('#wn', root).textContent = wins; }
-      if (a > b) celebrate(root, T);
-      $('#msg', root).textContent = a > b ? '\u{1F389} You win ' + a + ' to ' + b : a < b ? 'The phone wins ' + b + ' to ' + a : 'A draw, ' + a + ' each'; buzz(80);
+      over = true; const sc = Array.from({ length: nSeats }, (_, i) => score(i)), top = Math.max(...sc), win = [];
+      sc.forEach((v, i) => { if (v === top) win.push(i); });
+      let m;
+      if (win.length === 1) {
+        const w = win[0], who = ai[w] ? (phones() === 1 ? 'The phone wins' : nm(w) + ' wins') : (humans() === 1 ? 'You win' : nm(w) + ' wins');
+        m = who + (nSeats === 2 ? ' ' + top + ' to ' + Math.min(...sc) : ' with ' + top + ' (' + sc.join(' - ') + ')');
+        if (!ai[w]) celebrate(root, T);
+        if (humans() === 1 && !ai[w]) { wins++; hsSet('dotsboxes.w', wins); $('#wn', root).textContent = wins; }
+      } else m = (win.length === nSeats ? 'A draw, ' : 'A tie between ' + win.map(nm).join(' and ') + ', ') + top + ' each';
+      $('#msg', root).textContent = m; buzz(80);
+    }
+    function announce(again) {
+      const m = $('#msg', root);
+      if (ai[turn]) m.textContent = again ? nm(turn) + ' goes again...' : nm(turn) + ' is thinking...';
+      else if (humans() === 1) m.textContent = again ? 'Box! Go again' : 'Your turn';
+      else m.textContent = again ? 'Box! ' + nm(turn) + ' goes again' : nm(turn) + ': your turn ' + SYM[turn];
     }
     function aiTurn() {
       if (over) return;
       const g = gen;
       T.to(() => {
-        if (g !== gen) return;
-        const e = L.dbAi(s, lv); if (e < 0) return; const n = L.dbPlay(s, e, 2); last = e; paint();
+        if (g !== gen || over) return;
+        const e = L.dbAi(s, lv); if (e < 0) return; const n = L.dbPlay(s, e, turn + 1); last = e; paint();
         if (!L.dbMoves(s).length) return finish();
-        if (n > 0) { $('#msg', root).textContent = 'Phone goes again...'; aiTurn(); } else { turn = 1; $('#msg', root).textContent = 'Your turn'; }
+        if (n === 0) turn = (turn + 1) % nSeats;
+        announce(n > 0); if (ai[turn]) aiTurn();
       }, 520);
     }
     $('#svg', root).addEventListener('click', (ev) => {
-      const t = ev.target.closest('[data-e]'); if (!t || over || turn !== 1) return;
-      const n = L.dbPlay(s, +t.dataset.e, 1); if (n < 0) return; last = +t.dataset.e; buzz(n ? 40 : 10); paint();
+      const t = ev.target.closest('[data-e]'); if (!t || over || ai[turn]) return;
+      const n = L.dbPlay(s, +t.dataset.e, turn + 1); if (n < 0) return; last = +t.dataset.e; buzz(n ? 40 : 10); paint();
       if (!L.dbMoves(s).length) return finish();
-      if (n > 0) { $('#msg', root).textContent = 'Box! Go again'; } else { turn = 2; $('#msg', root).textContent = 'Phone is thinking...'; aiTurn(); }
+      if (n === 0) turn = (turn + 1) % nSeats;
+      announce(n > 0); if (ai[turn]) aiTurn();
     });
-    function newGame() { gen++; s = L.dbNew(size, size); turn = 1; over = false; last = -1; paint(); $('#msg', root).textContent = 'Tap between two dots to draw a line'; }
-    const askDb = () => sure(!over && s.e.some(Boolean), 'Start a new game? The lines you have drawn will be lost.');
+    function newGame() {
+      gen++; s = L.dbNew(size, size); turn = 0; over = false; last = -1; renderSeats(); paint();
+      if (ai[0]) { announce(false); aiTurn(); } else $('#msg', root).textContent = humans() === 1 ? 'Tap between two dots to draw a line' : nm(0) + ' starts: tap between two dots ' + SYM[0];
+    }
+    const askDb = () => sure(!over && s.e.some(Boolean), 'Start a new game? The lines drawn so far will be lost.');
     onSeg(root, 'sz', (v) => { size = +v; hsSet('dotsboxes.n', size); newGame(); }, askDb);
+    onSeg(root, 'np', (v) => { nSeats = +v; hsSet('dotsboxes.np', nSeats); newGame(); }, askDb);
     onSeg(root, 'lv', (v) => { lv = +v; hsSet('dotsboxes.lv', lv); });
+    $('#seats', root).addEventListener('click', (e) => {
+      const b = e.target.closest('button'); if (!b || !askDb()) return;
+      const i = +b.dataset.s; ai[i] = ai[i] ? 0 : 1; hsSet('dotsboxes.ai', ai); newGame();
+    });
     $('#new', root).onclick = () => { if (askDb()) newGame(); };
     newGame();
     return () => T.stop();
@@ -1591,10 +1667,11 @@ reg('dotsboxes', 'Dots and Boxes', '\u{1F4E6}', 'Take turns drawing lines betwee
 /* =====================================================================
    12. Reversi
    ===================================================================== */
-reg('reversi', 'Reversi', '\u{1F317}', 'Outflank the phone\'s discs to flip them to your colour. A look-ahead AI at three levels, legal-move hints, pass handling and a saved win record.',
-  ['othello', 'discs', 'flip', 'strategy', 'board', 'ai'], function (el) {
+reg('reversi', 'Reversi', '\u{1F317}', 'Outflank discs to flip them to your colour. Play the phone (look-ahead AI at three levels, as black or white) or two people on one phone. Legal-move hints, pass handling and a saved win record against the phone.',
+  ['othello', 'discs', 'flip', 'strategy', 'board', 'ai', '2 player', 'two players', 'multiplayer'], function (el) {
     const T = tracker();
-    let gen = 0, lv = hsGet('reversi.lv', 2), b, turn, over, last = -1, flips = [], st = hsGet('reversi', { wins: 0, played: 0, bestDiff: 0 }), thinking = false;
+    let gen = 0, lv = hsGet('reversi.lv', 2), mode = hsGet('reversi.md', 'ai') === 'two' ? 'two' : 'ai', side = hsGet('reversi.sd', 1) === 2 ? 2 : 1;
+    let b, turn, over, last = -1, flips = [], st = hsGet('reversi', { wins: 0, played: 0, bestDiff: 0 }), thinking = false;
     const root = mount(el, `
       <style>.rv-c{aspect-ratio:1;border:0;border-radius:6px;background:#1f7a4d;display:grid;place-items:center;padding:0;position:relative}
         .rv-d{width:82%;height:82%;border-radius:50%;box-shadow:0 2px 4px rgba(0,0,0,.4);border:2px solid rgba(0,0,0,.35)}
@@ -1602,13 +1679,21 @@ reg('reversi', 'Reversi', '\u{1F317}', 'Outflank the phone\'s discs to flip them
         .rv-d.fl{animation:rvflip .45s both}.rv-h{width:22%;height:22%;border-radius:50%;background:rgba(255,255,255,.55)}
         .rv-c.last{box-shadow:inset 0 0 0 3px #f59e0b}
         @keyframes rvflip{0%{transform:rotateY(180deg) scale(.7)}60%{transform:rotateY(90deg) scale(1.1)}100%{transform:rotateY(0) scale(1)}}</style>
-      ${seg('lv', [[1, 'Easy'], [2, 'Normal'], [3, 'Hard']], lv)}
-      <div class="stats">${stat('bk', '⚫ You', 2)}${stat('wh', '⚪ Phone', 2)}${stat('wn', 'Games won', st.wins)}</div>
+      ${seg('md', [['ai', 'vs Phone'], ['two', '2 players']], mode)}
+      <div id="sdw">${seg('sd', [[1, 'Play black'], [2, 'Play white']], side)}</div>
+      <div id="lvw">${seg('lv', [[1, 'Easy'], [2, 'Normal'], [3, 'Hard']], lv)}</div>
+      <div class="stats">${stat('bk', '', 2)}${stat('wh', '', 2)}${stat('wn', 'Games won', st.wins)}</div>
       <div id="bd" style="display:grid;grid-template-columns:repeat(8,1fr);gap:2px;max-width:380px;margin:6px auto;padding:4px;border-radius:12px;background:#0f4d30"></div>
       <div class="msg" id="msg"></div>
       <div class="rowb"><button class="btn alt" id="new">New game</button></div>`);
+    const isAi = (p) => mode === 'ai' && p !== side;
+    const nmOf = (p) => mode === 'two' ? (p === 1 ? 'Black' : 'White') : (p === side ? 'You' : 'Phone');
+    function labels() {
+      $('#bk', root).nextSibling.textContent = '⚫ ' + nmOf(1); $('#wh', root).nextSibling.textContent = '⚪ ' + nmOf(2);
+      $('#sdw', root).style.display = mode === 'ai' ? '' : 'none'; $('#lvw', root).style.display = mode === 'ai' ? '' : 'none';
+    }
     function paint() {
-      const mv = !over && turn === 1 ? L.rvMoves(b, 1) : []; let h = '';
+      const mv = !over && !isAi(turn) ? L.rvMoves(b, turn) : []; let h = '';
       for (let i = 0; i < 64; i++) {
         h += '<button class="rv-c ' + (i === last ? 'last' : '') + '" data-i="' + i + '" aria-label="' + (b[i] === 1 ? 'black disc' : b[i] === 2 ? 'white disc' : mv.indexOf(i) >= 0 ? 'legal move' : 'empty') + ' ' + (((i / 8) | 0) + 1) + ',' + (i % 8 + 1) + '">' +
           (b[i] ? '<span class="rv-d ' + (b[i] === 1 ? 'b' : 'w') + (flips.indexOf(i) >= 0 ? ' fl' : '') + '"></span>' : mv.indexOf(i) >= 0 ? '<span class="rv-h"></span>' : '') + '</button>';
@@ -1616,39 +1701,58 @@ reg('reversi', 'Reversi', '\u{1F317}', 'Outflank the phone\'s discs to flip them
       $('#bd', root).innerHTML = h; flips = [];
       const c = L.rvCount(b); $('#bk', root).textContent = c.b; $('#wh', root).textContent = c.w;
     }
+    function turnMsg() {
+      if (mode === 'two') return nmOf(turn) + '\'s turn (' + (turn === 1 ? 'black' : 'white') + ')';
+      return 'Your move (' + (side === 1 ? 'black' : 'white') + ')';
+    }
     function endGame() {
-      over = true; const c = L.rvCount(b); st.played++;
-      if (c.b > c.w) { st.wins++; st.bestDiff = Math.max(st.bestDiff, c.b - c.w); }
-      hsSet('reversi', st); $('#wn', root).textContent = st.wins; paint(); buzz(80);
-      if (c.b > c.w) celebrate(root, T);
-      $('#msg', root).textContent = c.b > c.w ? '\u{1F389} You win ' + c.b + ' to ' + c.w : c.b < c.w ? 'The phone wins ' + c.w + ' to ' + c.b : 'A draw, ' + c.b + ' each';
+      over = true; const c = L.rvCount(b); paint(); buzz(80);
+      let m;
+      if (mode === 'ai') {
+        const me = side === 1 ? c.b : c.w, them = side === 1 ? c.w : c.b; st.played++;
+        if (me > them) { st.wins++; st.bestDiff = Math.max(st.bestDiff, me - them); celebrate(root, T); }
+        hsSet('reversi', st); $('#wn', root).textContent = st.wins;
+        m = me > them ? '\u{1F389} You win ' + me + ' to ' + them : me < them ? 'The phone wins ' + them + ' to ' + me : 'A draw, ' + me + ' each';
+      } else {
+        m = c.b === c.w ? 'A draw, ' + c.b + ' each' : (c.b > c.w ? 'Black wins ' + c.b + ' to ' + c.w : 'White wins ' + c.w + ' to ' + c.b);
+        if (c.b !== c.w) celebrate(root, T);
+      }
+      $('#msg', root).textContent = m;
     }
     function afterMove(next) {
       if (L.rvOver(b)) return endGame();
       if (!L.rvMoves(b, next).length) {
-        $('#msg', root).textContent = next === 1 ? 'You have no move, the phone plays again' : 'The phone has no move, your turn'; turn = 3 - next; paint();
-        if (turn === 2) aiMove(); return;
+        $('#msg', root).textContent = mode === 'two' ? nmOf(next) + ' has no move, ' + nmOf(3 - next) + ' plays again' : (next === side ? 'You have no move, the phone plays again' : 'The phone has no move, your turn');
+        turn = 3 - next; paint();
+        if (isAi(turn)) aiMove(); return;
       }
       turn = next; paint();
-      if (turn === 2) aiMove(); else $('#msg', root).textContent = 'Your move (black)';
+      if (isAi(turn)) aiMove(); else $('#msg', root).textContent = turnMsg();
     }
     function aiMove() {
       thinking = true; $('#msg', root).textContent = 'Phone is thinking...';
-      const g = gen;
+      const g = gen, p = 3 - side;
       T.to(() => {
         if (g !== gen) return;
-        const m = L.rvAi(b, 2, lv); thinking = false; if (m < 0) return afterMove(1);
-        const r = L.rvApply(b, m, 2); b = r.board; flips = r.flips; last = m; afterMove(1);
+        const m = L.rvAi(b, p, lv); thinking = false; if (m < 0) return afterMove(side);
+        const r = L.rvApply(b, m, p); b = r.board; flips = r.flips; last = m; afterMove(side);
       }, 450);
     }
     $('#bd', root).addEventListener('click', (e) => {
-      const c = e.target.closest('button'); if (!c || over || turn !== 1 || thinking) return; const i = +c.dataset.i;
-      if (!L.rvFlips(b, i, 1).length) { restart($('#bd', root), 'shake'); $('#msg', root).textContent = 'Not a legal move: pick a dot'; return; }
-      const r = L.rvApply(b, i, 1); b = r.board; flips = r.flips.concat([i]); last = i; buzz(12); afterMove(2);
+      const c = e.target.closest('button'); if (!c || over || isAi(turn) || thinking) return; const i = +c.dataset.i;
+      if (!L.rvFlips(b, i, turn).length) { restart($('#bd', root), 'shake'); $('#msg', root).textContent = 'Not a legal move: pick a dot'; return; }
+      const p = turn, r = L.rvApply(b, i, p); b = r.board; flips = r.flips.concat([i]); last = i; buzz(12); afterMove(3 - p);
     });
-    function newGame() { gen++; b = L.rvStart(); turn = 1; over = false; last = -1; flips = []; thinking = false; paint(); $('#msg', root).textContent = 'You are black. Tap a dot to play.'; }
+    function newGame() {
+      gen++; b = L.rvStart(); turn = 1; over = false; last = -1; flips = []; thinking = false; labels(); paint();
+      if (isAi(1)) aiMove();
+      else $('#msg', root).textContent = mode === 'two' ? 'Black starts. Pass the phone after each move.' : 'You are black. Tap a dot to play.';
+    }
+    const askRv = () => sure(!over && L.rvCount(b).b + L.rvCount(b).w > 5, 'Start a new game? The current one will be lost.');
+    onSeg(root, 'md', (v) => { mode = v === 'two' ? 'two' : 'ai'; hsSet('reversi.md', mode); newGame(); }, askRv);
+    onSeg(root, 'sd', (v) => { side = +v === 2 ? 2 : 1; hsSet('reversi.sd', side); newGame(); }, askRv);
     onSeg(root, 'lv', (v) => { lv = +v; hsSet('reversi.lv', lv); });
-    $('#new', root).onclick = () => { if (sure(!over && L.rvCount(b).b + L.rvCount(b).w > 5, 'Start a new game? The current one will be lost.')) newGame(); };
+    $('#new', root).onclick = () => { if (askRv()) newGame(); };
     newGame();
     return () => T.stop();
   });

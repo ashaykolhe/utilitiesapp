@@ -55,10 +55,10 @@ const L = require('../../www/js/tools/games2.js');
   /* ---------------- Dots and Boxes ---------------- */
   await run('dotsboxes', async (t) => {
     const M = 24, GAP = 60;
-    const edgesDrawn = (R, C) => { const owner = {}; t.all('#svg line:not([data-e])').forEach(l => { const x1 = +l.getAttribute('x1'), y1 = +l.getAttribute('y1'), x2 = +l.getAttribute('x2'), y2 = +l.getAttribute('y2'); if (l.getAttribute('stroke') === 'transparent' || /var\(--line\)/.test(l.getAttribute('stroke'))) return; const horiz = y1 === y2, r = Math.round((y1 - M) / GAP), c = Math.round((x1 - M) / GAP); const e = horiz ? r * C + c : (R + 1) * C + r * (C + 1) + c; owner[e] = /accent/.test(l.getAttribute('stroke')) ? 1 : 2; }); return owner; };
+    const edgesDrawn = (R, C) => { const owner = {}; t.all('#svg line[data-o]').forEach(l => { const x1 = +l.getAttribute('x1'), y1 = +l.getAttribute('y1'), horiz = y1 === +l.getAttribute('y2'), r = Math.round((y1 - M) / GAP), c = Math.round((x1 - M) / GAP); owner[horiz ? r * C + c : (R + 1) * C + r * (C + 1) + c] = +l.dataset.o; }); return owner; };
     const open = () => t.all('#svg [data-e]').map(l => +l.dataset.e).filter((v, i, a) => a.indexOf(v) === i);
-    const boxes = (R, C) => { const out = {}; t.all('#svg rect').forEach(r => { const c = Math.round((+r.getAttribute('x') - 4 - M) / GAP), rr = Math.round((+r.getAttribute('y') - 4 - M) / GAP); out[rr * C + c] = /accent/.test(r.getAttribute('fill')) ? 1 : 2; }); return out; };
-    const sc = () => [num(t.q('#you').textContent), num(t.q('#cpu').textContent)];
+    const boxes = (R, C) => { const out = {}; t.all('#svg rect').forEach(r => { const c = Math.round((+r.getAttribute('x') - 4 - M) / GAP), rr = Math.round((+r.getAttribute('y') - 4 - M) / GAP); out[rr * C + c] = +r.dataset.o; }); return out; };
+    const sc = () => [num(t.q('#sc0').textContent), num(t.q('#sc1').textContent)];
     const completed = (R, C, drawn) => { let n = 0; for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if ([r * C + c, (r + 1) * C + c, (R + 1) * C + r * (C + 1) + c, (R + 1) * C + r * (C + 1) + c + 1].every(e => drawn[e])) n++; return n; };
     for (const [size, lv] of [[3, 0], [3, 1], [4, 1]]) {
       t.click('#sz [data-v="' + size + '"]'); t.click('#lv [data-v="' + lv + '"]'); t.click('#new'); T.eq(open().length, 2 * size * (size + 1), 'dots: ' + size + 'x' + size + ' has ' + (2 * size * (size + 1)) + ' lines');

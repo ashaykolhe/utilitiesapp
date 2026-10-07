@@ -94,13 +94,13 @@
 - category: fun
 - plan: free
 - needs: storage
-- what: Table tennis against the phone. Drag your paddle along the bottom, beat the AI paddle at the top to seven points. Three AI levels and a saved count of games won. Drawing falls back to plain rectangles on an old WebView.
+- what: Table tennis for first to seven. Play the phone (drag your paddle along the bottom, three AI levels, saved count of games won) or switch to 2 players on one phone: Player 1 drags the bottom paddle and Player 2 the top paddle, each with their own finger (multi-touch). A finger controls only the paddle on the half where it first touched, so one touch can never move both. The score and result are also in a live-region line. Drawing falls back to plain rectangles on an old WebView.
 - test:
-  1. Tap Start: after a short pause the ball is served. Drag left and right: your paddle follows.
-  2. Miss the ball: the phone scores; let it pass the AI: you score. First to 7 ends the game with a result message.
-  3. Choose Hard: the AI paddle is faster and more accurate than on Easy.
-  4. Edge case: switch level mid-game: the game stops and the start overlay returns. Win a game: Games won goes up by 1 and is remembered.
-
+  1. vs Phone: tap Start; after a short pause the ball is served. Drag left and right: your paddle follows. First to 7 ends the game with a result message.
+  2. Choose Hard: the AI paddle is faster and more accurate than on Easy. Switch level mid-game: the game stops and the start overlay returns. Win a game: Games won goes up by 1 and is remembered.
+  3. Choose 2 players: the level choice disappears. Put one finger on the bottom half and another on the top half: each moves only its own paddle, and nothing moves the top paddle on its own. A third finger on an occupied half does nothing. Lift a finger: its paddle stops following.
+  4. Play to 7: the message says which player won ("Player 1 wins 7 - 4"); Games won does not change in 2 player mode.
+  5. Edge case: switch mode mid-game: it asks before throwing the game away. Hide the app: the game pauses; touching the table resumes it.
 ## Dodge
 - id: dodge
 - category: fun
@@ -131,26 +131,25 @@
 - category: fun
 - plan: free
 - needs: storage
-- what: Take turns drawing lines between dots; closing the fourth side of a box claims it and gives another go. Play the phone on a 3x3, 4x4 or 5x5 grid at an easy or smart level. Wins are saved. New game and grid changes ask first once lines are drawn. A win shows confetti.
+- what: Take turns drawing lines between dots; closing the fourth side of a box claims it and gives another go. Choose 2, 3 or 4 seats; each seat is a Human or the Phone (tap the seat button to switch) and has its own colour and symbol (star, heart, club, diamond) that appears in every box it claims, so it is never colour alone. Grids 3x3, 4x4 or 5x5; the phone plays at an easy or smart level. The default is one human against the phone, and its wins are saved. Changing seats, seat count or grid asks first once lines are drawn. A win shows confetti.
 - test:
-  1. Tap between two dots: a line appears in your colour and the phone replies after a moment.
-  2. Complete a box: it fills with your colour and a Y, and you go again. The phone's boxes use its colour and an M.
-  3. Finish the board: the message shows who won and the score; a win adds 1 to Games won.
-  4. Edge case: tap a line that is already drawn, or tap while the phone is thinking: nothing happens. Press New game while the phone is thinking: the phone's pending move is cancelled.
-  5. Change grid size: a new game of that size starts.
-
+  1. Default: two seats, Seat 1 Human and Seat 2 Phone. Tap between two dots: a line appears in your colour and the phone replies after a moment.
+  2. Complete a box: it fills with your colour and your symbol, and you go again. The phone's boxes show its own symbol.
+  3. Choose 4 players and set every seat to Human: lines and boxes are coloured per seat, the turn passes Player 1 to 4 in order, and the message shows whose turn it is. Close a box: that player goes again.
+  4. Mix humans and phones (for example Human, Human, Phone, Phone): the phones move by themselves after the humans. Finish the board: the message names the winner or the tied seats; with exactly one human, winning adds 1 to Games won.
+  5. Edge case: tap a line that is already drawn, or tap while a phone seat is thinking: nothing happens. Press New game or change a seat mid-game: it asks first.
 ## Reversi
 - id: reversi
 - category: fun
 - plan: free
 - needs: storage
-- what: Outflank the phone's discs to flip them to your colour (you are black). Legal moves are shown as dots, with a look-ahead AI at three levels, automatic passing when someone cannot move and a saved win record. New game asks first during a game. A win shows confetti.
+- what: Outflank discs to flip them to your colour. Play the phone as black or white (look-ahead AI at three levels, saved win record) or choose 2 players to play Black against White on one phone with no AI; the message says whose turn it is. Legal moves are shown as dots, a side with no move passes automatically and the game ends with the final count. Changing mode, side or starting a new game asks first during a game. A win shows confetti.
 - test:
-  1. At the start, four dots show your legal moves. Tap one: your disc is placed, the flipped discs animate, and the phone replies.
-  2. Edge case: tap a square that is not a dot: the board shakes and "Not a legal move" appears.
-  3. When one side has no move, the message says so and the other side plays again. When neither can move the game ends with the final count.
-  4. Win a game: Games won increases and is remembered. New game restarts, even during the phone's turn.
-
+  1. vs Phone as black: four dots show your legal moves. Tap one: your disc is placed, the flipped discs animate, and the phone replies.
+  2. Choose Play white: the phone (black) moves first, then the dots show white's moves. Win a game: Games won increases and is remembered.
+  3. Choose 2 players: the side and level choices disappear. Moves alternate Black, White ("White's turn") with no phone moves; Games won is unchanged.
+  4. Edge case: tap a square that is not a dot: the board shakes and "Not a legal move" appears.
+  5. When one side has no move, the message says so and the other side plays again. When neither can move the game ends with the winner and the count.
 ## Stroop Test
 - id: stroop
 - category: fun
