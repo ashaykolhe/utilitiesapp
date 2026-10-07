@@ -3,7 +3,7 @@
 - category: health
 - plan: free
 - needs: storage
-- what: Body mass index in metric or imperial, with the category, a colour scale with a marker and the healthy weight range for your height. Inputs are remembered. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button.
+- what: Body mass index in metric or imperial, with the category, a colour scale with a marker and the healthy weight range for your height. Inputs are remembered. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button. The category is chosen from the rounded number that is shown, so a BMI that displays as 25.0 is never still called "Healthy weight".
 - test:
   1. 175 cm and 70 kg: BMI 22.9, "Healthy weight", marker in the green part, range about 56.7 to 76.3 kg.
   2. Switch to Imperial, enter 5 ft 9 in and 200 lb: category Overweight.
@@ -11,6 +11,7 @@
   4. Reopen the tool: last values and unit are restored.
   5. The colour bar bands match the categories: BMI 18.4 is in the narrow blue band, 18.6 in the green band, 26 in the amber band; the arrow and the 15/18.5/25/30/35/40 labels sit at the same positions.
   6. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed (only the result and tool name, never your height, weight or dates). Due Date does not keep a history.
+  7. At 200 cm, 99.9 kg shows 25.0 and Overweight; 63.9 kg shows 16.0 and Underweight.
 
 ## Step Counter
 - id: steps
@@ -60,7 +61,7 @@
 - category: health
 - plan: free
 - needs: none (vibration optional)
-- what: Guided breathing with an animated circle for box breathing (4-4-4-4), 4-7-8, 5-5 or a custom pattern, with a session timer and optional vibration cues.
+- what: Guided breathing with an animated circle for box breathing (4-4-4-4), 4-7-8, 5-5 or a custom pattern, with a session timer and optional vibration cues. The pattern, custom times, session length and vibration choice are remembered.
 - test:
   1. Box 4-4-4-4, 1 minute, press Start: the circle grows while "Breathe in", stays during Hold, shrinks on "Breathe out"; the countdown counts each phase.
   2. Choose 4-7-8 and run: hold lasts 7 seconds, out 8.
@@ -68,13 +69,14 @@
   4. Press Stop mid-session: the circle resets. Let a session finish: "Well done" and a vibration.
   5. Leave the tool while running: the timer and vibration stop.
   6. Start a session and lock the screen: the screen stays on while it runs (and where the app can, an end-of-session notification is scheduled). If neither is available a note says to keep the screen on.
+  7. Pick Custom 3-0-3-0, 7 minutes, leave and reopen: the same settings are there.
 
 ## Sleep Calculator
 - id: sleepcalc
 - category: health
 - plan: free
 - needs: none
-- what: Suggests bedtimes for a wake-up time, or wake-up times for a bedtime, using 90 minute cycles and 15 minutes to fall asleep. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button.
+- what: Suggests bedtimes for a wake-up time, or wake-up times for a bedtime, using 90 minute cycles and 15 minutes to fall asleep. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button. The mode and the time are remembered.
 - test:
   1. Wake at 07:00: bedtimes include 9:45 PM (6 cycles) and 11:15 PM (5 cycles); the first two are marked recommended.
   2. Switch to "I go to bed at" 23:00: the first suggestion is 8:15 AM (6 cycles = 9 hours, plus 15 minutes to fall asleep).
@@ -88,7 +90,7 @@
 - category: health
 - plan: pro
 - needs: storage
-- what: Log weight, blood pressure, blood sugar or your own named measures with a date and note, see a line chart, and export the log as text (Share sheet on Android, download elsewhere). The log can also be exported as a CSV file for a spreadsheet.
+- what: Log weight, blood pressure, blood sugar or your own named measures with a date and note, see a line chart, and export the log as text (Share sheet on Android, download elsewhere). The log can also be exported as a CSV file for a spreadsheet. Entry ids only ever grow, so entries added within the same second keep their order in the list and the export. The chart has a text description for screen readers.
 - test:
   1. Add weight 70, then 69.5 on another date: the chart draws two points and both appear in the list.
   2. BP tab: enter 120 and 80: the chart draws two lines (systolic and diastolic).
@@ -130,7 +132,7 @@
 - category: health
 - plan: free
 - needs: none
-- what: Ideal body weight from the Devine, Robinson, Miller and Hamwi formulas plus the healthy BMI range for your height, in metric or imperial. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button.
+- what: Ideal body weight from the Devine, Robinson, Miller and Hamwi formulas plus the healthy BMI range for your height, in metric or imperial. A clock button in the header keeps the results you settle on (the last 200 on the device) with a copy button. Sex, metric / imperial and the height are remembered.
 - test:
   1. Male, 175 cm: four formula values around 66 to 72 kg and a healthy range of about 56.7 to 76.3 kg.
   2. Switch to Imperial, 5 ft 9 in: values are shown in pounds.
@@ -261,7 +263,7 @@
 - category: health
 - plan: free
 - needs: storage
-- what: Record how you feel each day with a face and an optional note, and see the last 14 days as coloured bars plus a recent list. Stored on the device. The log can be exported as a CSV file.
+- what: Record how you feel each day with a face and an optional note, and see the last 14 days as coloured bars plus a recent list. Stored on the device. The log can be exported as a CSV file. A damaged stored entry (an empty or wrong value) no longer stops the list from showing.
 - test:
   1. Tap Save today with no face chosen: "Pick a face first".
   2. Pick a face, add a note and Save: today's bar appears and the entry shows in the list.

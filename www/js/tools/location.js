@@ -41,30 +41,64 @@
     if (v < 1) v = 0;
     return v;
   }
+  /* A two-button unit switch (km/h | mph, m | ft). Returns nothing; calls onPick(value). */
+  function unitSwitch(el, opts, cur, onPick) {
+    const box = $('#units', el);
+    box.innerHTML = opts.map(o => `<button type="button" class="btn ${o[0] === cur ? '' : 'alt'}" data-u="${o[0]}" aria-pressed="${o[0] === cur}">${o[1]}</button>`).join('');
+    box.onclick = e => {
+      const b = e.target.closest('button'); if (!b) return;
+      $$('button', box).forEach(x => { const on = x === b; x.className = 'btn' + (on ? '' : ' alt'); x.setAttribute('aria-pressed', String(on)); });
+      onPick(b.dataset.u);
+    };
+  }
 
   Tools.register({ id: 'speedometer', name: 'Speedometer', icon: '🚗', cat: 'navigate', desc: 'Live speed from GPS with top speed and trip distance.', needs: ['location'], render(el) {
-    el.innerHTML = `<div class="card center"><div class="big" id="sp" aria-live="polite">0</div><div class="muted">km/h</div><div class="muted" id="msg">Waiting for GPS...</div></div>
-      <div class="card row center"><div><div class="mid" id="mx">0</div><small class="muted">Max km/h</small></div><div><div class="mid" id="di" aria-live="polite">0.00</div><small class="muted">Distance km</small></div></div>
-      <button class="btn alt" id="rs">Reset trip</button>`;
-    let st = { last: null, hist: [], d: 0 }, max = 0;
+    el.innerHTML = `<div class="card center"><div class="big" id="sp" aria-live="polite">0</div><div class="muted" id="su">km/h</div><div class="muted" id="msg">Waiting for GPS...</div></div>
+      <div class="card row center"><div><div class="mid" id="mx">0</div><small class="muted" id="ml">Max km/h</small></div><div><div class="mid" id="di" aria-live="polite">0.00</div><small class="muted" id="dl">Distance km</small></div></div>
+      <div class="row" id="units" role="group" aria-label="Speed unit"></div>
+      <button class="btn alt" id="rs">Reset trip</button>
+      <p class="muted center" style="font-size:12px;margin:2px 8px">Needs a clear sky view. Speed and distance come from the GPS only, so they may lag for a few seconds and are approximate.</p>`;
+    let st = { last: null, hist: [], d: 0 }, max = 0, now = 0, unit = Store.get('speedo.unit', 'kmh') === 'mph' ? 'mph' : 'kmh';
+    const paint = () => {
+      const k = unit === 'mph' ? 1.609344 : 1, name = unit === 'mph' ? 'mph' : 'km/h';
+      $('#sp', el).textContent = isFinite(now) ? Math.round(now / k) : '--'; $('#mx', el).textContent = Math.round(max / k);
+      $('#di', el).textContent = (st.d / 1000 / k).toFixed(2);
+      $('#su', el).textContent = name; $('#ml', el).textContent = 'Max ' + name; $('#dl', el).textContent = 'Distance ' + (unit === 'mph' ? 'miles' : 'km');
+    };
+    unitSwitch(el, [['kmh', 'km/h'], ['mph', 'mph']], unit, u => { unit = u; Store.set('speedo.unit', u); paint(); });
     const stop = gps(el, p => {
       const c = p.coords; if (!c || !isFinite(c.latitude) || !isFinite(c.longitude)) return;
       const v = trackFix(st, c, p.timestamp || Date.now());
-      max = Math.max(max, isFinite(v) ? v : 0);
-      $('#sp', el).textContent = isFinite(v) ? Math.round(v) : '--'; $('#mx', el).textContent = Math.round(max);
-      $('#di', el).textContent = (st.d / 1000).toFixed(2);
+      max = Math.max(max, isFinite(v) ? v : 0); now = v; paint();
       $('#msg', el).textContent = c.accuracy >= 30 ? 'Weak GPS signal (±' + Math.round(c.accuracy) + ' m); distance paused' : '';
     });
-    $('#rs', el).onclick = () => { max = 0; st = { last: null, hist: [], d: 0 }; $('#mx', el).textContent = '0'; $('#di', el).textContent = '0.00'; };
+    $('#rs', el).onclick = () => { max = 0; st = { last: null, hist: [], d: 0 }; paint(); };
+    paint();
     return stop;
   } });
   Tools.register({ id: 'altitude', name: 'Altitude', icon: '⛰️', cat: 'navigate', desc: 'Approximate height above sea level from GPS, with your coordinates. GPS altitude can be off by tens of metres.', needs: ['location'], render(el) {
-    el.innerHTML = `<div class="card center"><div class="big" id="al" aria-live="polite">--</div><div class="muted">GPS altitude (approximate), metres</div><div class="muted" id="ac2"></div><div class="muted" id="msg">Waiting for GPS...</div></div>
-      <div class="card list"><div class="item"><span class="grow">Latitude</span><b id="la">--</b></div><div class="item"><span class="grow">Longitude</span><b id="lo">--</b></div><div class="item"><span class="grow">Position accuracy</span><b id="ac">--</b></div></div>`;
+    el.innerHTML = `<div class="card center"><div class="big" id="al" aria-live="polite">--</div><div class="muted" id="au">GPS altitude (approximate), metres</div><div class="muted" id="ac2"></div><div class="muted" id="msg">Waiting for GPS...</div></div>
+      <div class="card list"><div class="item"><span class="grow">Latitude</span><b id="la">--</b></div><div class="item"><span class="grow">Longitude</span><b id="lo">--</b></div><div class="item"><span class="grow">Position accuracy</span><b id="ac">--</b></div></div>
+      <div class="row" id="units" role="group" aria-label="Altitude unit"></div>
+      <button class="btn alt" id="cp">Copy coordinates</button>
+      <p class="muted center" style="font-size:12px;margin:2px 8px">GPS height is much less accurate than GPS position. For a better height, compare with the Barometer tool.</p>`;
+    let unit = Store.get('altitude.unit', 'm') === 'ft' ? 'ft' : 'm', last = null;
+    const paint = () => {
+      const f = unit === 'ft' ? 3.28084 : 1, u = unit === 'ft' ? 'feet' : 'metres', c = last && last.coords;
+      $('#au', el).textContent = 'GPS altitude (approximate), ' + u;
+      if (!c) return;
+      const has = c.altitude != null && isFinite(c.altitude);
+      $('#al', el).textContent = has ? Math.round(c.altitude * f) : 'n/a';
+      $('#ac2', el).textContent = has && c.altitudeAccuracy != null ? '±' + Math.round(c.altitudeAccuracy * f) + ' ' + unit : '';
+    };
+    unitSwitch(el, [['m', 'metres'], ['ft', 'feet']], unit, u => { unit = u; Store.set('altitude.unit', u); paint(); });
+    $('#cp', el).onclick = async () => {
+      if (!last) { toast('Waiting for a GPS fix'); return; }
+      toast(await copyToClipboard(last.coords.latitude.toFixed(5) + ', ' + last.coords.longitude.toFixed(5)) ? 'Coordinates copied' : 'Could not copy');
+    };
     return gps(el, p => {
       const c = p.coords; if (!c || !isFinite(c.latitude) || !isFinite(c.longitude)) return;
-      $('#al', el).textContent = c.altitude != null && isFinite(c.altitude) ? Math.round(c.altitude) : 'n/a';
-      $('#ac2', el).textContent = c.altitude != null && c.altitudeAccuracy != null ? '±' + Math.round(c.altitudeAccuracy) + ' m' : '';
+      last = p; paint();
       $('#la', el).textContent = c.latitude.toFixed(5); $('#lo', el).textContent = c.longitude.toFixed(5);
       $('#ac', el).textContent = isFinite(c.accuracy) ? '±' + Math.round(c.accuracy) + ' m' : '--'; $('#msg', el).textContent = c.altitude == null || !isFinite(c.altitude) ? 'This device did not report an altitude.' : '';
     });

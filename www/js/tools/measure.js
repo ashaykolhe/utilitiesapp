@@ -189,6 +189,13 @@
   }
   const setClino = (svg, deg) => { const n = $('.needle', svg); if (n) n.style.transform = `rotate(${-clamp(deg, -90, 90)}deg)`; };
 
+  /* Eye height and unit are shared by Height Finder and Distance Finder and remembered (eye height is kept in metres). */
+  const eyePrefs = () => { const s = Store.get('measure.eye', {}) || {}; return { unit: s.unit === 'ft' ? 'ft' : 'm', m: clamp(+s.m || 1.6, 0.3, 10) }; };
+  function showEye(el, unit, m) {
+    const i = $('#eye', el); i.max = unit === 'ft' ? 33 : 10; i.value = +(unit === 'ft' ? m * 3.28084 : m).toFixed(2);
+    $$('.u', el).forEach(u => { u.textContent = unit; });
+  }
+  function saveEye(el, unit) { const v = num(el, '#eye'); if (v > 0) Store.set('measure.eye', { unit, m: +(unit === 'ft' ? v / 3.28084 : v).toFixed(3) }); }
   /* Motion sensor wrapper. cb(accelIncludingGravity, event). Returns a stop function. */
   function motion(el, cb, need) {
     let dead = false, got = false;
@@ -400,13 +407,13 @@
       <div class="row"><button class="btn" id="mt">Mark top</button><button class="btn alt" id="mb">Mark base</button></div>
       <div class="row" style="${MUTED};text-align:center"><div>Top: <b id="vt" style="color:var(--text)">--</b></div><div>Base: <b id="vb" style="color:var(--text)">--</b></div></div>
       <div class="card list">
-        ${seg('un', [['m', 'metres'], ['ft', 'feet']], 'm')}
+        ${seg('un', [['m', 'metres'], ['ft', 'feet']], eyePrefs().unit)}
         <div class="row">${field('eye', 'Eye height (<span class="u">m</span>)', 'value="1.6" min="0" max="10" step="0.05"')}${field('dst', 'Distance (<span class="u">m</span>), optional', 'min="0" max="100000" step="0.5"')}</div>
         <div class="center" style="padding:8px 0"><div style="${LBL}">Height</div><div class="big" id="res" style="margin:2px 0" aria-live="polite">--</div><div id="sub" style="${MUTED}"></div></div>
       </div>
       <div style="${NOTE}">Stand on level ground. Mark the top, then the base of the object. With a base mark the distance is worked out from your eye height. Without it, enter the distance. Tilt errors of a degree or two matter.</div>
       <button class="btn alt" id="rs">Clear marks</button></div>`;
-    const sm = lp(0.25); let unit = 'm';
+    const sm = lp(0.25), EP = eyePrefs(); let unit = EP.unit; showEye(el, unit, EP.m);
     const stop = motion(el, a => { ang = sm(elevationDeg(a.x, a.y, a.z)); setClino($('#cl', el), ang); $('#deg', el).textContent = ang.toFixed(1) + '°'; });
     function calc() {
       $('#vt', el).textContent = top == null ? '--' : top.toFixed(1) + '°'; $('#vb', el).textContent = base == null ? '--' : base.toFixed(1) + '°';
@@ -417,8 +424,8 @@
     $('#mt', el).onclick = () => { top = ang; calc(); };
     $('#mb', el).onclick = () => { base = ang; calc(); };
     $('#rs', el).onclick = () => { top = base = null; calc(); };
-    segBind(el, 'un', v => { convertFields(el, ['#eye', '#dst'], unit, v); unit = v; $$('.u', el).forEach(u => u.textContent = v); calc(); });
-    el.addEventListener('input', calc); calc();
+    segBind(el, 'un', v => { convertFields(el, ['#eye', '#dst'], unit, v); unit = v; $$('.u', el).forEach(u => u.textContent = v); $('#eye', el).max = v === 'ft' ? 33 : 10; saveEye(el, unit); calc(); });
+    el.addEventListener('input', () => { saveEye(el, unit); calc(); }); calc();
     return stop;
   } });
 
@@ -427,12 +434,12 @@
     let ang = 0, held = null;
     el.innerHTML = `<div style="${wrap}">
       <div class="card center" style="padding:14px">${clinoSVG('cl')}<div class="big" id="deg" style="margin:4px 0 0">0.0°</div><div style="${MUTED}">Aim the top edge at the object's base</div><div id="msg" style="${MUTED};min-height:18px"></div></div>
-      <div class="card list">${seg('un', [['m', 'metres'], ['ft', 'feet']], 'm')}
+      <div class="card list">${seg('un', [['m', 'metres'], ['ft', 'feet']], eyePrefs().unit)}
         ${field('eye', 'Eye height (<span class="u">m</span>)', 'value="1.6" min="0" max="10" step="0.05"')}
         <div class="center" style="padding:8px 0"><div style="${LBL}">Distance</div><div class="big" id="res" style="margin:2px 0">--</div><div id="sub" style="${MUTED}">distance = eye height ÷ tan(angle down)</div></div>
         <div class="row"><button class="btn" id="hold">Hold angle</button><button class="btn alt" id="rel">Live</button></div></div>
       <div style="${NOTE}">Point at the spot where the object meets the ground, so the phone tilts downward. Works best between 5 and 50 times your eye height.</div></div>`;
-    const sm = lp(0.25); let unit = 'm';
+    const sm = lp(0.25), EP = eyePrefs(); let unit = EP.unit; showEye(el, unit, EP.m);
     function calc() {
       const a = held != null ? held : ang, d = distanceFromAngle(num(el, '#eye'), a);
       $('#res', el).textContent = d ? d.toFixed(1) + ' ' + unit : '--';
@@ -440,27 +447,29 @@
     }
     const stop = motion(el, a => { ang = sm(elevationDeg(a.x, a.y, a.z)); setClino($('#cl', el), ang); $('#deg', el).textContent = ang.toFixed(1) + '°'; calc(); });
     $('#hold', el).onclick = () => { held = ang; calc(); }; $('#rel', el).onclick = () => { held = null; calc(); };
-    segBind(el, 'un', v => { convertFields(el, ['#eye'], unit, v); unit = v; $$('.u', el).forEach(u => u.textContent = v); calc(); });
-    el.addEventListener('input', calc); calc();
+    segBind(el, 'un', v => { convertFields(el, ['#eye'], unit, v); unit = v; $$('.u', el).forEach(u => u.textContent = v); $('#eye', el).max = v === 'ft' ? 33 : 10; saveEye(el, unit); calc(); });
+    el.addEventListener('input', () => { saveEye(el, unit); calc(); }); calc();
     return stop;
   } });
 
   /* ================================================================== 6. Speed calculator */
   Tools.register({ id: 'speedcalc', name: 'Speed Calc', icon: '🩺', cat: 'measure', desc: 'Work out speed, distance or time from the other two, with km, miles, metres, feet and knots.', keys: ['velocity', 'pace', 'distance', 'time', 'mph'], needs: [], render(el) {
-    let mode = 'speed';
+    const SS = Store.get('speedcalc.s', {}) || {};
+    let mode = ['speed', 'dist', 'time'].includes(SS.mode) ? SS.mode : 'speed';
     const du = Object.keys(DIST).map(k => `<option value="${k}">${k === 'nmi' ? 'nautical mi' : k}</option>`).join('');
     const su = Object.keys(SPEED).map(k => `<option value="${k}">${SPEED_NAMES[k]}</option>`).join('');
     el.innerHTML = `<div style="${wrap}">
-      ${seg('md', [['speed', 'Speed'], ['dist', 'Distance'], ['time', 'Time']], 'speed')}
+      ${seg('md', [['speed', 'Speed'], ['dist', 'Distance'], ['time', 'Time']], mode)}
       <div class="card list">
         <div id="gd" class="row"><label class="f">Distance<input id="d" type="number" inputmode="decimal" min="0" max="1000000000" value="100"></label><label class="f">Unit<select id="du">${du}</select></label></div>
         <div id="gs" class="row" style="display:none"><label class="f">Speed<input id="s" type="number" inputmode="decimal" min="0" max="10000000" value="60"></label><label class="f">Unit<select id="su">${su}</select></label></div>
         <div id="gt"><div style="${MUTED};margin-bottom:4px">Time</div><div class="row">${field('th', 'hours', 'min="0" max="100000" value="1"')}${field('tm', 'minutes', 'min="0" max="6000000" value="0"')}${field('ts', 'seconds', 'min="0" max="360000000" value="0"')}</div></div>
       </div>
       <div class="card center"><div id="rl" style="${LBL}">Speed</div><div class="big" id="res" style="margin:4px 0;font-size:44px" aria-live="polite">--</div><div id="sub" style="${MUTED};line-height:1.7"></div></div></div>`;
-    $('#du', el).value = 'km'; $('#su', el).value = 'kmh'; $('#d', el).value = '100';
+    $('#du', el).value = DIST[SS.du] ? SS.du : 'km'; $('#su', el).value = SPEED[SS.su] ? SS.su : 'kmh'; $('#d', el).value = '100';
     const vis = () => { $('#gd', el).style.display = mode === 'dist' ? 'none' : ''; $('#gs', el).style.display = mode === 'speed' ? 'none' : ''; $('#gt', el).style.display = mode === 'time' ? 'none' : ''; };
     function calc() {
+      Store.set('speedcalc.s', { mode, du: $('#du', el).value, su: $('#su', el).value });
       const D = num(el, '#d') * DIST[$('#du', el).value], V = num(el, '#s') * SPEED[$('#su', el).value];
       const T = (num(el, '#th') || 0) * 3600 + (num(el, '#tm') || 0) * 60 + (num(el, '#ts') || 0);
       const out = $('#res', el), sub = $('#sub', el);
@@ -565,6 +574,7 @@
       pad.style.transform = 'scale(.97)'; setTimeout(() => { pad.style.transform = ''; }, 80);
       if (navigator.vibrate) navigator.vibrate(8);
     };
+    pad.onclick = e => { if (e.detail === 0) pad.onpointerdown(e); }; // keyboard / screen reader activation
     $('#rs', el).onclick = () => { taps.length = 0; $('#n', el).textContent = '0'; showRpm(null); };
     async function startMic() {
       const my = ++gen; // a newer start/stop invalidates this one
@@ -609,6 +619,7 @@
     el.innerHTML = `<div style="${wrap}"><div class="card center"><div style="${LBL}">Resolution</div><div class="big" id="res" style="margin:4px 0;font-size:40px">--</div><div id="sub" style="${MUTED}"></div></div>
       <div class="card list" id="rows"></div>
       <div class="row"><button class="btn" id="grid">Grid overlay</button><button class="btn alt" id="dead">Dead pixel test</button></div>
+      <button class="btn alt" id="cp">Copy these details</button>
       <div style="${NOTE}">Inches are an estimate that assumes Android's standard of 160 dp per inch. Real panel sizes can differ a little.</div></div>`;
     function info() {
       const s = window.screen, dpr = window.devicePixelRatio || 1, w = s.width, h = s.height;
@@ -616,7 +627,8 @@
       $('#res', el).textContent = `${pw} × ${ph}`; $('#sub', el).textContent = `${w} × ${h} dp  ·  ratio ${dpr.toFixed(2)}×`;
       const rows = [['Physical pixels', `${pw} × ${ph} px`], ['Screen in dp (CSS px)', `${w} × ${h}`], ['Pixel ratio', dpr.toFixed(3)], ['Density (approx.)', Math.round(dpr * 160) + ' dpi'],
         ['Viewport', `${innerWidth} × ${innerHeight} dp`], ['Size estimate', `${(w / 160).toFixed(2)} × ${(h / 160).toFixed(2)} in`], ['Diagonal estimate', dI.toFixed(1) + ' in'],
-        ['Aspect ratio', (Math.max(w, h) / Math.min(w, h)).toFixed(2) + ' : 1'], ['Color depth', (s.colorDepth || '--') + ' bit'], ['Orientation', (s.orientation && s.orientation.type) || (innerWidth > innerHeight ? 'landscape' : 'portrait')]];
+        ['Aspect ratio', Math.min(w, h) > 0 ? (Math.max(w, h) / Math.min(w, h)).toFixed(2) + ' : 1' : '--'], ['Color depth', (s.colorDepth || '--') + ' bit'], ['Orientation', (s.orientation && s.orientation.type) || (innerWidth > innerHeight ? 'landscape' : 'portrait')]];
+      info.text = 'Screen info\n' + rows.map(r => r[0] + ': ' + r[1]).join('\n');
       $('#rows', el).innerHTML = rows.map(r => `<div class="item"><span class="grow" style="color:var(--muted)">${esc(r[0])}</span><b>${esc(r[1])}</b></div>`).join('');
     }
     function close() { if (overlay) { overlay.remove(); overlay = null; } }
@@ -642,6 +654,7 @@
       }
     }
     $('#grid', el).onclick = () => open('grid'); $('#dead', el).onclick = () => open('dead');
+    $('#cp', el).onclick = async () => { toast(await copyToClipboard(info.text || '') ? 'Copied' : 'Could not copy'); };
     const rs = () => info(); addEventListener('resize', rs); info();
     return () => { removeEventListener('resize', rs); close(); };
   } });
@@ -653,7 +666,8 @@
       ${seg('md', [['flat', 'Lay on surface'], ['sight', 'Sight along edge']], 'flat')}
       <div class="card center" style="padding:14px 8px">${gaugeSVG('ga', 200)}<div style="margin-top:-130px;height:130px"><div class="big" id="deg" style="margin:0;font-size:46px">0.0°</div><div style="${MUTED}" id="hint">Phone lying on the slope</div></div><div id="msg" style="${MUTED};min-height:18px"></div></div>
       <div class="row"><div class="card center" style="padding:10px"><div style="${LBL}">Percent</div><div class="mid" id="pc" style="font-size:24px">0%</div></div><div class="card center" style="padding:10px"><div style="${LBL}">Ratio</div><div class="mid" id="ra" style="font-size:24px">--</div></div><div class="card center" style="padding:10px"><div style="${LBL}">Per 12</div><div class="mid" id="p12" style="font-size:24px">0</div></div></div>
-      <div class="row"><button class="btn" id="hold">Hold</button><button class="btn alt" id="zero">Zero here</button></div></div>`;
+      <div class="row"><button class="btn" id="hold">Hold</button><button class="btn alt" id="zero">Zero here</button></div>
+      <div style="${NOTE}">Lay the phone flat on the roof or ramp (or sight along its top edge), then press Hold to freeze the number. If a level table does not read 0, lay the phone on it and press Zero here.</div></div>`;
     const sm = lp(.25);
     const stop = motion(el, a => { raw = sm(mode === 'flat' ? foldDeg(flatTiltDeg(a.x, a.y, a.z)) : elevationDeg(a.x, a.y, a.z)); ang = raw - zero; paint(); });
     function paint() {
@@ -713,7 +727,9 @@
     const row = i => `<div class="card list" id="r${i}"><div style="font-weight:700">Product ${'ABC'[i]}</div><div class="row">${field('p' + i, 'Price', 'min="0" max="1000000000" step="0.01"')}${field('q' + i, 'Amount', 'min="0" max="1000000000"')}<label class="f">Unit<select id="u${i}">${units.map(u => `<option value="${u[0]}">${u[1]}</option>`).join('')}</select></label></div>
       <div id="o${i}" class="center" style="min-height:26px;font-weight:700">--</div></div>`;
     el.innerHTML = `<div style="${wrap}">${row(0)}${row(1)}${row(2)}<div id="best" class="card center" style="font-weight:600">Fill in at least two products</div></div>`;
+    const savedU = Store.get('unitprice.u', []); [0, 1, 2].forEach(i => { if (Array.isArray(savedU) && BASE[savedU[i]]) $('#u' + i, el).value = savedU[i]; });
     function calc() {
+      Store.set('unitprice.u', [0, 1, 2].map(i => $('#u' + i, el).value));
       const r = [0, 1, 2].map(i => unitPrice(num(el, '#p' + i), num(el, '#q' + i), $('#u' + i, el).value));
       const ok = r.map((x, i) => x ? { i, x } : null).filter(Boolean);
       [0, 1, 2].forEach(i => { $('#r' + i, el).style.outline = ''; const x = r[i]; $('#o' + i, el).textContent = x ? (x.dim === 'pc' ? x.label.toFixed(3) + ' per piece' : x.label.toFixed(3) + ' per ' + (x.dim === 'm' ? 'metre' : '100 ' + x.dim)) : '--'; });
@@ -747,6 +763,7 @@
         set(ms + ' ms. Tap to go again', 'var(--accent)', 'var(--accent-t)');
       }
     };
+    pad.onclick = e => { if (e.detail === 0) pad.onpointerdown(e); }; // keyboard / screen reader activation
     return () => clearTimeout(to);
   } });
 

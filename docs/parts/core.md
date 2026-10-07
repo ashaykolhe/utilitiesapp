@@ -68,30 +68,32 @@
 - category: navigate
 - plan: free
 - needs: motion
-- what: A compass dial that points to north with the heading in degrees and a direction label. The heading is tilt-compensated (uses the full orientation, so it stays right when the phone is not perfectly flat) and the dial turns the short way across north.
+- what: A compass dial that points to north with the heading in degrees and a direction label. The heading is tilt-compensated (uses the full orientation, so it stays right when the phone is not perfectly flat) and the dial turns the short way across north. A short hint under the dial says to keep away from magnets and metal and to wave the phone in a figure 8 if the heading drifts.
 - test:
   1. Hold the phone flat and turn around. The dial rotates and the heading changes. North matches another compass app within about 15 degrees.
   2. On a phone without a compass sensor a message says so after a few seconds.
   3. Tilt the phone about 30 degrees while turning: the heading stays steady. Turn slowly through north (359 to 0): the dial does not spin the long way round. Leave the tool right after opening: no errors.
+  4. Under the dial a hint about figure-8 calibration is shown. Open the tool on a phone with permission denied: "Sensor permission denied" and nothing keeps listening.
 
 ## Leveler
 - id: leveler
 - category: navigate
 - plan: free
 - needs: motion
-- what: A bubble level that shows how far the phone is tilted in two directions, with a zero button.
+- what: A bubble level that shows how far the phone is tilted in two directions, with a zero button. The bubble turns green and the line says "Level" when both angles are within half a degree. A hint explains how to check the phone by flipping it 180 degrees.
 - test:
   1. Lay the phone on a flat table. The bubble is near the centre and the angles are close to 0.
   2. Lift one edge. The bubble moves toward the lower side and the angle grows.
   3. Tap "Set current position as zero" on a slightly tilted surface. The readout becomes 0.
   4. On a device without an orientation sensor (or with permission denied) a message says so after a few seconds.
+  5. Lay the phone flat and adjust until both numbers are under 0.5: the bubble turns green and says Level.
 
 ## Speedometer
 - id: speedometer
 - category: navigate
 - plan: free
 - needs: location
-- what: Live speed in km/h from GPS with top speed and trip distance. Distance only counts movement larger than the GPS noise, so walking adds up and standing still does not drift; speed is worked out from recent fixes when the phone gives no speed value.
+- what: Live speed in km/h from GPS with top speed and trip distance. Distance only counts movement larger than the GPS noise, so walking adds up and standing still does not drift; speed is worked out from recent fixes when the phone gives no speed value. A km/h | mph switch (remembered) changes the speed, max and distance labels and values.
 - test:
   1. Open it outdoors and allow location. "Waiting for GPS" disappears and speed shows 0 when standing still.
   2. Walk or ride. The speed and distance rise. Max speed keeps the highest value.
@@ -99,17 +101,19 @@
   4. Deny the permission. A message says location permission was denied.
   5. Walk slowly for 100 m: distance reads about 0.10 km and speed about 4 to 6 km/h. Stand still for two minutes: the distance stays put. With a weak signal (accuracy 30 m or worse) "Weak GPS signal" shows and distance pauses.
   6. With an odd GPS reading (no position) the numbers show "--" or stay put, never NaN.
+  7. Tap mph: speed, max speed and distance convert (10 m/s = 22 mph, 1 km = 0.62 mi) and the choice is still mph the next time the tool opens.
 
 ## Altitude
 - id: altitude
 - category: navigate
 - plan: free
 - needs: location
-- what: Approximate height above sea level from GPS (labelled as approximate, with the altitude accuracy when the phone gives it), plus latitude, longitude and position accuracy.
+- what: Approximate height above sea level from GPS (labelled as approximate, with the altitude accuracy when the phone gives it), plus latitude, longitude and position accuracy. A metres | feet switch (remembered) and a Copy coordinates button (latitude, longitude with 5 decimals) were added.
 - test:
   1. Open it outdoors and allow location. Altitude, latitude, longitude and accuracy fill in.
   2. On a phone without altitude data the value shows "n/a".
   3. Deny location: "Location permission denied" shows. Turn GPS off: "Location unavailable" shows. A timeout shows its own message.
+  4. Tap feet: the altitude and its accuracy convert (1000 m = 3281 ft). Tap Copy coordinates and paste somewhere: "lat, lon" appears.
 
 ## Device Info
 - id: deviceinfo

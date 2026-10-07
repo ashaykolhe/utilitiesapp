@@ -27,7 +27,8 @@
       <circle r="95" fill="none" stroke="currentColor" opacity=".3" stroke-width="2"/>
       ${[0, 90, 180, 270].map((a, i) => `<text y="-72" text-anchor="middle" font-size="20" font-weight="700" fill="${i ? 'currentColor' : '#dc2626'}" transform="rotate(${a})">${'NESW'[i]}</text>`).join('')}
       <path d="M0-60L8 0H-8Z" fill="#dc2626"/><path d="M0 60L8 0H-8Z" fill="currentColor" opacity=".5"/></svg>
-      <div class="mid" id="deg" aria-live="polite">--</div><div class="muted" id="msg">Hold the phone flat</div></div>`;
+      <div class="mid" id="deg" aria-live="polite">--</div><div class="muted" id="msg">Hold the phone flat</div></div>
+      <p class="muted center" style="font-size:12px;margin:2px 8px">Keep away from magnets, speaker cases and metal. If the heading drifts or looks wrong, wave the phone in a figure 8 a few times. The arrow points to magnetic north.</p>`;
     let dead = false, cur = null, to = 0;
     const on = (e) => {
       let a = null;
@@ -57,14 +58,16 @@
       <div style="position:absolute;left:50%;top:0;bottom:0;border-left:1px dashed var(--muted)"></div><div style="position:absolute;top:50%;left:0;right:0;border-top:1px dashed var(--muted)"></div>
       <div id="bub" style="position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px;border-radius:50%;background:var(--accent)"></div></div>
       <div class="mid" id="deg" aria-live="polite">--</div><div class="muted" id="msg">Lay the phone flat; the bubble shows tilt</div></div>
-      <button class="btn alt" id="cal">Set current position as zero</button>`;
+      <button class="btn alt" id="cal">Set current position as zero</button>
+      <p class="muted center" style="font-size:12px;margin:2px 8px">Lay the phone flat on the surface. The bubble turns green within half a degree of level. To check the phone itself, flip it 180 degrees: a true level reads the same both ways.</p>`;
     let b = 0, g = 0, ob = 0, og = 0, dead = false, to = 0;
     const on = (e) => {
       if (e.beta == null || e.gamma == null) return;
       b = e.beta; g = e.gamma;
       const x = Math.max(-45, Math.min(45, g - og)), y = Math.max(-45, Math.min(45, b - ob));
-      $('#bub', el).style.transform = `translate(${x * 2.2}px,${y * 2.2}px)`;
+      $('#bub', el).style.transform = `translate(${Math.round(x * 22) / 10}px,${Math.round(y * 22) / 10}px)`;
       $('#deg', el).textContent = `${(b - ob).toFixed(1)}° / ${(g - og).toFixed(1)}°`;
+      const lv = Math.abs(b - ob) < 0.5 && Math.abs(g - og) < 0.5; $('#bub', el).style.background = lv ? 'var(--ok)' : 'var(--accent)'; $('#msg', el).textContent = lv ? 'Level' : 'Front-back tilt / left-right tilt, in degrees';
     };
     $('#cal', el).onclick = () => { ob = b; og = g; };
     orientationPermission().then(ok => {

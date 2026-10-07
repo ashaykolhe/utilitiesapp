@@ -335,7 +335,7 @@
       else { m = ((num(el, '#ft') || 0) * 12 + (num(el, '#inch') || 0)) * 0.0254; kg = num(el, '#lb') * 0.45359237; Store.set('bmi.ft', num(el, '#ft') || 5); Store.set('bmi.in', num(el, '#inch') || 0); Store.set('bmi.lb', num(el, '#lb') || 154); }
       const b = bmiOf(kg, m), mk = $('#mk', el);
       if (!b || m < 0.5 || m > 2.7) { $('#b', el).textContent = '--'; $('#cat', el).textContent = 'Enter height and weight'; $('#rng', el).textContent = ''; mk.style.opacity = 0; return; }
-      const c = bmiCat(b), r = healthyRange(m);
+      const c = bmiCat(+b.toFixed(1)), r = healthyRange(m); // classify the number that is shown, so 15.97 shown as 16.0 is not still called severely underweight
       $('#b', el).textContent = b.toFixed(1); $('#cat', el).textContent = c.label; $('#cat', el).style.color = c.col;
       mk.style.opacity = 1; mk.style.left = (clamp((b - 15) / 25, 0, 1) * 100) + '%';
       if (ev && ev.type) hk.soon(() => hk.add('BMI ' + (unit === 'm' ? num(el, '#cm') + ' cm, ' + num(el, '#kg') + ' kg' : num(el, '#ft') + ' ft ' + (num(el, '#inch') || 0) + ' in, ' + num(el, '#lb') + ' lb'), b.toFixed(1) + ' (' + c.label + ')'));
@@ -358,7 +358,7 @@
       <div class="row"><button class="btn" id="go">Start counting</button><button class="btn alt" id="rs">Reset today</button></div>
       <button class="btn alt" id="ex">Export history (CSV)</button>
       <div class="row">${stat('km', 'Distance', '0 km')}${stat('kc', 'Calories', '0')}</div>
-      <div class="card"><div style="${LBL};margin-bottom:8px">Last 14 days</div><canvas id="cv" style="${CANVAS};height:130px"></canvas></div>
+      <div class="card"><div style="${LBL};margin-bottom:8px">Last 14 days</div><canvas id="cv" role="img" aria-label="Bar chart of your steps for the last 14 days" style="${CANVAS};height:130px"></canvas></div>
       <div class="card list"><div style="${LBL}">Settings</div><div class="row">${field('gl', 'Daily goal', 'min="100" max="100000" step="500"')}${field('ht', 'Height (cm)', 'min="100" max="250"')}${field('kg', 'Weight (kg)', 'min="20" max="300"')}</div></div>
       <div style="${NOTE}">Steps are only counted while this tool is open and counting, because the phone does not let apps count in the background. Results are estimates.</div></div>`;
     $('#gl', el).value = goal; $('#ht', el).value = height; $('#kg', el).value = kg;
@@ -416,7 +416,7 @@
       <div class="row">${[150, 250, 330, 500].map(v => `<button class="btn alt add" data-v="${v}" style="padding:12px 0;font-size:15px">+${v}</button>`).join('')}</div>
       <div class="row"><input id="cu" type="number" inputmode="numeric" placeholder="Custom ml" min="1" max="5000" aria-label="Custom amount in ml"><button class="btn" id="ca">Add</button><button class="btn alt" id="un">Undo</button></div>
       <button class="btn alt" id="ex">Export history (CSV)</button>
-      <div class="card"><div style="${LBL};margin-bottom:8px">Last 14 days (ml)</div><canvas id="cv" style="${CANVAS};height:130px"></canvas></div>
+      <div class="card"><div style="${LBL};margin-bottom:8px">Last 14 days (ml)</div><canvas id="cv" role="img" aria-label="Bar chart of your water intake for the last 14 days" style="${CANVAS};height:130px"></canvas></div>
       <div class="card">${field('gl', 'Daily goal (ml)', 'min="500" max="10000" step="100"')}</div>
       <div style="${NOTE}">Needs vary with weather, size and activity. A common guide is about 2 litres a day. ${MED}</div></div>`;
     $('#gl', el).value = goal;
@@ -474,18 +474,22 @@
   /* ================================================================== 5. Breathing */
   Tools.register({ id: 'breathe', name: 'Breathing', icon: '🌬️', cat: 'health', desc: 'Guided breathing with an animated circle: box breathing, 4-7-8 or your own pattern, with a session timer and optional vibration cues.', keys: ['relax', 'calm', 'box breathing', '4-7-8', 'stress', 'anxiety'], needs: [], render(el) {
     const PRE = { box: [4, 4, 4, 4], '478': [4, 7, 8, 0], calm: [5, 0, 5, 0], custom: null };
-    let key = 'box', pat = PRE.box.slice(), mins = 3, running = false, iv = 0, t0 = 0, lastI = -1, wl = null;
-    el.innerHTML = `<div style="${wrap}">${seg('pr', [['box', 'Box 4-4-4-4'], ['478', '4-7-8'], ['calm', '5-5'], ['custom', 'Custom']], 'box')}
-      <div id="cu" class="card row" style="display:none">${field('c0', 'In', 'min="0" max="30" value="4"')}${field('c1', 'Hold', 'min="0" max="30" value="4"')}${field('c2', 'Out', 'min="0" max="30" value="4"')}${field('c3', 'Hold', 'min="0" max="30" value="0"')}</div>
+    const BS = Store.get('breathe.s', {}) || {};
+    let key = Object.prototype.hasOwnProperty.call(PRE, BS.key) ? BS.key : 'box', pat = (PRE[key] || [4, 4, 4, 0]).slice(), mins = clamp(Math.round(+BS.mn) || 3, 1, 60), running = false, iv = 0, t0 = 0, lastI = -1, wl = null;
+    el.innerHTML = `<div style="${wrap}">${seg('pr', [['box', 'Box 4-4-4-4'], ['478', '4-7-8'], ['calm', '5-5'], ['custom', 'Custom']], key)}
+      <div id="cu" class="card row" style="display:${key === 'custom' ? '' : 'none'}">${field('c0', 'In', 'min="0" max="30" value="4"')}${field('c1', 'Hold', 'min="0" max="30" value="4"')}${field('c2', 'Out', 'min="0" max="30" value="4"')}${field('c3', 'Hold', 'min="0" max="30" value="0"')}</div>
       <div class="card center" style="padding:20px 8px"><div style="position:relative;width:240px;height:240px;margin:0 auto;display:grid;place-items:center">
         <div style="position:absolute;inset:0;border-radius:50%;border:2px dashed var(--line)"></div>
         <div id="ci" style="width:240px;height:240px;border-radius:50%;background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--accent) 60%,#fff),var(--accent));opacity:.9;transform:scale(.45);transition:transform 1s ease-in-out"></div>
         <div style="position:absolute;inset:0;display:grid;place-content:center;text-align:center"><div id="ph" style="font-size:24px;font-weight:700;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.4)">Ready</div><div id="ct" style="font-size:38px;font-weight:700;color:#fff;text-shadow:0 1px 8px rgba(0,0,0,.4)"></div></div></div>
-        <div id="tm" style="${MUTED};margin-top:10px">Session 3:00</div></div>
+        <div id="tm" style="${MUTED};margin-top:10px">Session ${mmss(mins * 60)}</div></div>
       <div class="row">${field('mn', 'Session (minutes)', 'min="1" max="60" value="3"')}<label class="f">Vibration cues<select id="vb"><option value="1">On</option><option value="0">Off</option></select></label></div>
       <button class="btn" id="go" style="min-height:52px">Start</button>
       <div id="aw" style="${NOTE};min-height:16px"></div>
       <div style="${NOTE}">Breathe through your nose if you can. Stop if you feel dizzy. ${MED}</div></div>`;
+    if (Array.isArray(BS.c)) BS.c.slice(0, 4).forEach((v, i) => { $('#c' + i, el).value = clamp(Math.round(+v) || 0, 0, 30); });
+    $('#mn', el).value = mins; if (BS.vb === '0') $('#vb', el).value = '0';
+    const saveB = () => Store.set('breathe.s', { key, mn: mins, vb: $('#vb', el).value, c: [0, 1, 2, 3].map(i => clamp(Math.round(num(el, '#c' + i)) || 0, 0, 30)) });
     const names = ['Breathe in', 'Hold', 'Breathe out', 'Hold'];
     const build = () => names.map((nm, i) => ({ name: nm, sec: pat[i] })).filter(p => p.sec > 0);
     const circle = (scale, sec) => { const c = $('#ci', el); c.style.transitionDuration = sec + 's'; c.style.transform = `scale(${scale})`; };
@@ -513,21 +517,24 @@
       running = true; lastI = -1; cycleN = -1; t0 = Date.now(); $('#go', el).textContent = 'Stop'; iv = setInterval(tick, 100); tick();
       wl = keepAwake(); awakeNote(el, wl, notifyAt(9101, 'Breathing session complete', 'Well done.', t0 + mins * 60000 + 1000));
     };
-    segBind(el, 'pr', v => { key = v; $('#cu', el).style.display = v === 'custom' ? '' : 'none'; if (running) stop(false); });
+    segBind(el, 'pr', v => { key = v; $('#cu', el).style.display = v === 'custom' ? '' : 'none'; if (running) stop(false); saveB(); });
+    el.addEventListener('change', () => { mins = clamp(Math.round(num(el, '#mn')) || 3, 1, 60); saveB(); });
     $('#mn', el).oninput = () => { if (!running) $('#tm', el).textContent = 'Session ' + mmss((clamp(Math.round(num(el, '#mn')) || 3, 1, 60)) * 60); };
     return () => { clearInterval(iv); if (wl) wl.off(); cancelNote(9101); if (navigator.vibrate) navigator.vibrate(0); };
   } });
 
   /* ================================================================== 6. Sleep calculator */
   Tools.register({ id: 'sleepcalc', name: 'Sleep Calculator', icon: '🗃️', cat: 'health', desc: 'Suggests bedtimes or wake-up times that fit 90 minute sleep cycles, with 15 minutes allowed to fall asleep.', keys: ['bedtime', 'wake up', 'cycles', 'alarm', 'rest'], needs: ['storage'], render(el) {
-    let mode = 'wake'; const fmtT = m => { const d = new Date(2000, 0, 1, Math.floor(m / 60), m % 60); return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
-    el.innerHTML = `<div style="${wrap}">${seg('md', [['wake', 'I need to wake at'], ['bed', 'I go to bed at']], 'wake')}
-      <div class="card list"><label class="f"><span id="lb">Wake-up time</span><input id="tm" type="time" maxlength="5" value="07:00" style="font-size:28px;text-align:center;font-weight:700"></label><button class="btn alt" id="nw" style="display:none">Use the current time</button></div>
+    const SS = Store.get('sleep.s', {}) || {};
+    let mode = SS.mode === 'bed' ? 'bed' : 'wake'; const fmtT = m => { const d = new Date(2000, 0, 1, Math.floor(m / 60), m % 60); return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); };
+    el.innerHTML = `<div style="${wrap}">${seg('md', [['wake', 'I need to wake at'], ['bed', 'I go to bed at']], mode)}
+      <div class="card list"><label class="f"><span id="lb">${mode === 'bed' ? 'Bedtime' : 'Wake-up time'}</span><input id="tm" type="time" maxlength="5" value="${/^\d\d:\d\d$/.test(SS.time) ? SS.time : '07:00'}" style="font-size:28px;text-align:center;font-weight:700"></label><button class="btn alt" id="nw" style="display:${mode === 'bed' ? '' : 'none'}">Use the current time</button></div>
       <div id="out" class="list"></div>
       <div style="${NOTE}">An average cycle is about 90 minutes and most adults need 5 to 6 cycles (7.5 to 9 hours). ${MED}</div></div>`;
     const hk = kit('sleepcalc');
     function calc(ev) {
       const v = $('#tm', el).value; if (!v) { $('#out', el).innerHTML = ''; return; }
+      Store.set('sleep.s', { mode, time: v });
       const [h, m] = v.split(':').map(Number), list = sleepTimes(h * 60 + m, mode);
       if (ev && ev.type !== 'click') hk.soon(() => hk.add((mode === 'wake' ? 'Wake at ' : 'Bed at ') + v, (mode === 'wake' ? 'Go to bed at ' : 'Wake up at ') + list.slice(0, 2).map(s => fmtT(s.at) + ' (' + s.cycles + ' cycles)').join(' or ')));
       $('#out', el).innerHTML = (mode === 'wake' ? 'Go to bed at' : 'Wake up at').replace(/^/, `<div style="${LBL};padding:0 4px">`) + '</div>' + list.map((s, i) =>
@@ -541,13 +548,13 @@
 
   /* ================================================================== 7. Health log */
   Tools.register({ id: 'healthlog', pro: true, proKey: 'trackers', name: 'Health Log', icon: '🛌', cat: 'health', desc: 'Log weight, blood pressure, blood sugar or your own measures with dates, see a line chart and export the log as text.', keys: ['weight', 'blood pressure', 'sugar', 'glucose', 'diary', 'journal'], needs: ['storage'], render(el) {
-    let entries = Store.get('hlog.entries', []), type = 'weight';
+    let entries = Store.arr('hlog.entries'), type = 'weight', lastId = 0; // ids only grow, so entries added in the same second keep their order
     const TYPES = { weight: ['Weight', 'kg', 'var(--accent)'], bp: ['Blood pressure', 'mmHg', 'var(--accent)'], sugar: ['Sugar', 'mg/dL', 'var(--accent)'], custom: ['Custom', '', 'var(--accent)'] };
     el.innerHTML = `<div style="${wrap}">${seg('ty', [['weight', 'Weight'], ['bp', 'BP'], ['sugar', 'Sugar'], ['custom', 'Custom']], 'weight')}
       <div class="card list"><div id="cus" class="row" style="display:none"><label class="f">Name<input id="nm" type="text" maxlength="20" placeholder="e.g. Temperature"></label><label class="f">Unit<input id="un" type="text" maxlength="8" placeholder="e.g. °C"></label></div>
         <div class="row" id="vals"></div><div class="row"><label class="f">Date<input id="dt" type="date" min="1900-01-01" max="${dkey()}"></label><label class="f">Note<input id="nt" type="text" maxlength="60" placeholder="optional"></label></div>
         <button class="btn" id="add">Add entry</button></div>
-      <div class="card"><canvas id="cv" style="${CANVAS}"></canvas><div id="lg" style="${MUTED};margin-top:8px"></div></div>
+      <div class="card"><canvas id="cv" role="img" aria-label="Line chart of the selected log entries" style="${CANVAS}"></canvas><div id="lg" style="${MUTED};margin-top:8px"></div></div>
       <div id="ls" class="list"></div>
       <div class="row"><button class="btn alt" id="ex">Export as text</button><button class="btn alt" id="cp">Copy text</button></div>
       <button class="btn alt" id="csv">Export CSV (spreadsheet)</button>
@@ -578,7 +585,7 @@
       if (!(v > 0) || v < R[0] || v > R[1] || (type === 'bp' && !(v2 >= 20 && v2 <= 200))) { toast('That value looks out of range'); return; }
       if (type === 'custom' && !$('#nm', el).value.trim()) { toast('Give the measure a name'); return; }
       if (entries.length >= 1000) { toast('Log is full (1000 entries)'); return; }
-      entries.push({ id: Date.now() + Math.floor(Math.random() * 1000), type, v: +v.toFixed(2), v2: type === 'bp' ? +v2.toFixed(1) : undefined, date, note: $('#nt', el).value.trim().slice(0, 60), name: type === 'custom' ? $('#nm', el).value.trim().slice(0, 20) : undefined, unit: type === 'custom' ? $('#un', el).value.trim().slice(0, 8) : undefined });
+      entries.push({ id: (lastId = Math.max(Date.now() * 1000, lastId + 1)), type, v: +v.toFixed(2), v2: type === 'bp' ? +v2.toFixed(1) : undefined, date, note: $('#nt', el).value.trim().slice(0, 60), name: type === 'custom' ? $('#nm', el).value.trim().slice(0, 20) : undefined, unit: type === 'custom' ? $('#un', el).value.trim().slice(0, 8) : undefined });
       Store.set('hlog.entries', entries); $('#v', el).value = ''; if ($('#v2', el)) $('#v2', el).value = ''; $('#nt', el).value = ''; paint(); toast('Added');
     };
     $('#ls', el).onclick = e => { const b = e.target.closest('.del'); if (!b || !confirm('Delete this entry?')) return; entries = entries.filter(x => String(x.id) !== b.dataset.id); Store.set('hlog.entries', entries); paint(); };
@@ -600,7 +607,7 @@
     el.innerHTML = `<div style="${wrap}"><div class="card center" style="padding:16px 8px"><div style="position:relative;width:200px;margin:0 auto">${ringSVG('rg', 200, 'var(--danger)')}
         <div style="position:absolute;inset:0;display:grid;place-content:center"><div id="hr" style="font-size:20px;color:var(--danger)">❤️</div><div class="big" id="bpm" style="margin:0;font-size:52px" aria-live="polite">--</div><div style="${MUTED}">BPM</div></div></div>
         <div id="msg" style="font-size:14px;margin-top:10px;min-height:20px">Press start, then cover the rear camera and flash with your fingertip.</div></div>
-      <div class="card"><canvas id="cv" style="${CANVAS};height:110px"></canvas></div>
+      <div class="card"><canvas id="cv" role="img" aria-label="Pulse signal graph" style="${CANVAS};height:110px"></canvas></div>
       <button class="btn" id="go" style="min-height:52px">Start measuring</button>
       <video id="v" playsinline muted style="display:none"></video>
       <div class="card" style="border-color:var(--danger)"><b>Approximate, not medical.</b><div style="${MUTED}">This is an estimate from camera brightness changes. It can be wrong and must not be used to diagnose, treat or monitor any condition. If you feel unwell, contact a doctor.</div></div>
@@ -683,14 +690,16 @@
 
   /* ================================================================== 10. Ideal weight */
   Tools.register({ id: 'idealweight', name: 'Ideal Weight', icon: '🎯', cat: 'health', desc: 'Ideal body weight from four classic formulas plus the healthy BMI range for your height.', keys: ['target weight', 'devine', 'hamwi', 'healthy weight'], needs: [], render(el) {
-    let sex = 'm', imp = false;
-    el.innerHTML = `<div style="${wrap}"><div class="card list">${seg('sx', [['m', 'Male'], ['f', 'Female']], 'm')}${seg('un', [['m', 'Metric'], ['i', 'Imperial']], 'm')}
+    const IS = Store.get('ideal.s', {}) || {};
+    let sex = IS.sex === 'f' ? 'f' : 'm', imp = IS.imp === true;
+    el.innerHTML = `<div style="${wrap}"><div class="card list">${seg('sx', [['m', 'Male'], ['f', 'Female']], sex)}${seg('un', [['m', 'Metric'], ['i', 'Imperial']], imp ? 'i' : 'm')}
       <div id="hh" class="row"></div></div><div class="card list" id="out"></div>
       <div style="${NOTE}">Formulas ignore build and age. They are rough guides. ${MED}</div></div>`;
-    const build = () => { $('#hh', el).innerHTML = imp ? field('ft', 'Feet', 'value="5" min="1" max="8"') + field('inch', 'Inches', 'value="9" min="0" max="11"') : field('cm', 'Height (cm)', 'value="175" min="100" max="250"'); };
+    const build = () => { $('#hh', el).innerHTML = imp ? field('ft', 'Feet', 'value="' + (+IS.ft || 5) + '" min="1" max="8"') + field('inch', 'Inches', 'value="' + (IS.inch >= 0 && IS.inch <= 11 ? +IS.inch : 9) + '" min="0" max="11"') : field('cm', 'Height (cm)', 'value="' + (+IS.cm || 175) + '" min="100" max="250"'); };
     const hk = kit('idealweight');
     function calc(ev) {
       const cm = imp ? ((num(el, '#ft') || 0) * 12 + (num(el, '#inch') || 0)) * 2.54 : num(el, '#cm');
+      IS.sex = sex; IS.imp = imp; if (imp) { IS.ft = num(el, '#ft') || 5; IS.inch = num(el, '#inch') || 0; } else if (num(el, '#cm') > 0) IS.cm = num(el, '#cm'); Store.set('ideal.s', IS);
       if (!(cm >= 100 && cm <= 250)) { $('#out', el).innerHTML = `<div class="center muted">Enter a height</div>`; return; }
       const w = idealWeights(sex, cm), r = healthyRange(cm / 100), f = k => imp ? (k / 0.45359237).toFixed(0) + ' lb' : k.toFixed(1) + ' kg';
       $('#out', el).innerHTML = Object.keys(w).map(k => `<div class="item"><span class="grow">${k}</span><b>${f(w[k])}</b></div>`).join('') + `<div class="item" style="border-color:var(--ok)"><span class="grow">Healthy BMI range</span><b>${f(r[0])} to ${f(r[1])}</b></div>`;
@@ -961,7 +970,7 @@
     const sel = i => { pick = i; $$('.fc', el).forEach((b, j) => { b.style.transform = j === i ? 'scale(1.12)' : ''; b.style.borderColor = j === i ? FACES[i][2] : ''; b.style.opacity = i === -1 || j === i ? 1 : .55; }); };
     function paint() {
       $('#gr', el).innerHTML = lastDays(14).map(d => { const m = days[dkey(d)]; return `<div style="flex:1;text-align:center"><div title="${m ? fc(m)[1] : 'no entry'}" style="height:${m ? 14 + (FACES[m.m] ? m.m : 2) * 14 : 6}px;border-radius:6px;background:${m ? fc(m)[2] : 'var(--surface2)'};transition:height .4s"></div><small class="muted" style="font-size:10px">${DAYL[d.getDay()]}</small></div>`; }).join('');
-      $('#ls', el).innerHTML = Object.keys(days).sort().reverse().slice(0, 10).map(k => `<div class="item"><span style="font-size:24px">${fc(days[k])[0]}</span><div class="grow"><b>${fc(days[k])[1]}</b> <span class="muted">${esc(k)}</span>${days[k].n ? `<div style="${MUTED}">${esc(days[k].n)}</div>` : ''}</div></div>`).join('');
+      $('#ls', el).innerHTML = Object.keys(days).sort().reverse().slice(0, 10).map(k => `<div class="item"><span style="font-size:24px">${fc(days[k])[0]}</span><div class="grow"><b>${fc(days[k])[1]}</b> <span class="muted">${esc(k)}</span>${(days[k] || {}).n ? `<div style="${MUTED}">${esc(days[k].n)}</div>` : ''}</div></div>`).join('');
     }
     $('#fc', el).onclick = e => { const b = e.target.closest('.fc'); if (b) sel(+b.dataset.i); };
     $('#sv', el).onclick = () => { if (pick < 0) { toast('Pick a face first'); return; } days[dkey()] = { m: pick, n: $('#nt', el).value.trim().slice(0, 80) }; const k = Object.keys(days).sort(); while (k.length > 400) delete days[k.shift()]; Store.set('mood.days', days); paint(); toast('Saved'); };

@@ -41,7 +41,7 @@
 - category: measure
 - plan: free
 - needs: motion
-- what: Measures the height of a tree or building from the tilt angle to its top and its base. Uses your eye height to get the distance (or a distance you type) and shows the working.
+- what: Measures the height of a tree or building from the tilt angle to its top and its base. Uses your eye height to get the distance (or a distance you type) and shows the working. Your eye height and the metres / feet choice are remembered (shared with Distance Finder).
 - test:
   1. Stand about 10 m from a wall. Sight along the top edge of the phone at the top of the wall and tap "Mark top"; then sight at the foot of the wall and tap "Mark base". With eye height 1.6 m the height appears.
   2. Clear the marks, mark only the top, type a distance of 10: the height shows as eye + d x tan(top).
@@ -49,13 +49,14 @@
   4. Mark a base angle that points upward (positive): no result appears (needs a downward base angle or a distance).
   5. Switch to feet: the eye height converts (1.6 m becomes 5.25 ft). Aim almost straight up (over 85 degrees): the result shows "--" instead of a huge number.
   6. Type 50 in Eye height: a message shows and the value is limited to 10. Type -5 in Distance: the minus sign is refused.
+  7. Switch to feet, enter 6 ft, leave and reopen (also open Distance Finder): both show feet and 6.
 
 ## Distance Finder
 - id: distancefinder
 - category: measure
 - plan: free
 - needs: motion
-- what: Finds the horizontal distance to an object by sighting its base and entering your eye height, using distance = eye height divided by tan of the angle downwards.
+- what: Finds the horizontal distance to an object by sighting its base and entering your eye height, using distance = eye height divided by tan of the angle downwards. Your eye height and the metres / feet choice are remembered (shared with Height Finder).
 - test:
   1. Set eye height 1.6 m, point the top edge at a mark on the floor and read the distance; compare with a tape measure (expect within about 10 percent).
   2. Tap "Hold angle", move the phone: the result stays; tap Live to resume.
@@ -69,13 +70,14 @@
 - category: measure
 - plan: free
 - needs: none
-- what: Calculates speed from distance and time, distance from speed and time, or time from distance and speed, with km, m, miles, feet and nautical miles, and km/h, m/s, mph and knots.
+- what: Calculates speed from distance and time, distance from speed and time, or time from distance and speed, with km, m, miles, feet and nautical miles, and km/h, m/s, mph and knots. The mode (speed, distance, time) and both unit choices are remembered.
 - test:
   1. Speed tab: 100 km in 1 hour gives 100 km/h and 62.14 mph.
   2. Distance tab: 60 km/h for 30 minutes gives 30 km.
   3. Time tab: 100 km at 50 km/h gives 2 h 0 min 0 s.
   4. Empty or zero fields show "--" and a hint, never an error.
   5. Enter -5 in Distance (a minus sign is refused) and 99999999999 (a message shows and the value is limited). Result stays a number or "--", never NaN.
+  6. Choose Time mode with miles and mph, leave and reopen: the same mode and units are selected.
 
 ## G Meter
 - id: gmeter
@@ -107,7 +109,7 @@
 - category: measure
 - plan: free
 - needs: microphone (mic mode only)
-- what: Tap once per revolution to read RPM averaged over the last taps, or use the microphone to estimate the repeating pulse rate of a sound such as a fan or engine.
+- what: Tap once per revolution to read RPM averaged over the last taps, or use the microphone to estimate the repeating pulse rate of a sound such as a fan or engine. The tap pad also works from a keyboard or screen reader.
 - test:
   1. Tap the big button once every half second: RPM settles near 120. Wait 3 seconds and tap again: the series restarts.
   2. Tap Reset: taps return to 0 and RPM to "--".
@@ -120,19 +122,20 @@
 - category: measure
 - plan: free
 - needs: none
-- what: Shows the screen resolution in pixels and dp, pixel ratio, density, viewport, estimated size in inches and aspect ratio, with a full-screen grid overlay and a dead pixel colour test.
+- what: Shows the screen resolution in pixels and dp, pixel ratio, density, viewport, estimated size in inches and aspect ratio, with a full-screen grid overlay and a dead pixel colour test. A "Copy these details" button copies the whole table as text.
 - test:
   1. Open the tool: resolution matches the phone's spec sheet (for example 1080 x 2400).
   2. Tap "Grid overlay": a 10 dp grid with bold lines every 100 dp fills the screen; tap to close.
   3. Tap "Dead pixel test": the screen turns red, green, blue, white, black on each tap and closes after black.
   4. Rotate the phone: the viewport row updates.
+  5. Tap "Copy these details" and paste: the rows (Physical pixels, Pixel ratio, ...) appear.
 
 ## Slope Finder
 - id: slope
 - category: measure
 - plan: free
 - needs: motion
-- what: Measures roof pitch or ramp slope in degrees, percent, ratio (1:n) and rise per 12, by laying the phone on the surface or sighting along its edge.
+- what: Measures roof pitch or ramp slope in degrees, percent, ratio (1:n) and rise per 12, by laying the phone on the surface or sighting along its edge. A note explains how to freeze the reading (Hold) and how to zero it on a level table.
 - test:
   1. Lay the phone flat on a table: reads about 0 degrees. Prop one end on a 10 cm book on a 1 m board: about 5.7 degrees, 10 percent.
   2. Tap "Zero here" on a surface to calibrate it to 0.
@@ -170,7 +173,7 @@
 - category: measure
 - plan: free
 - needs: none
-- what: Compares up to three products by price per 100 g, 100 ml or per piece and highlights the best value, handling kg, lb, oz, litres and fl oz.
+- what: Compares up to three products by price per 100 g, 100 ml or per piece and highlights the best value, handling kg, lb, oz, litres and fl oz. The unit chosen for each product is remembered. The aspect ratio and similar values never show NaN.
 - test:
   1. Product A: 2.00 for 500 g; Product B: 3.00 for 1 kg. A shows 0.400 per 100 g, B 0.300; B is outlined green as best value.
   2. Change B's unit to ml: the message says mixed units cannot be compared.
@@ -182,7 +185,7 @@
 - category: measure
 - plan: free
 - needs: storage (best time)
-- what: A reaction timer: tap as soon as the big button turns green and see your time in milliseconds, with last, average and best.
+- what: A reaction timer: tap as soon as the big button turns green and see your time in milliseconds, with last, average and best. The big pad also works from a keyboard or screen reader (activating the button without a touch).
 - test:
   1. Tap to start: the button turns red and says wait. Tap before green: "Too soon!".
   2. Start again and tap when it turns green: your time in ms shows and Last, Average, Best fill in.
