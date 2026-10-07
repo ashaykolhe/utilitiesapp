@@ -280,7 +280,7 @@ _Free. Needs: notifications_
 _Free_
 
 - [ ] Open the tool: a tip is shown with "Today's pick" and the date.
-- [ ] Tap Next and Previous: the text changes and the label shows "Tip n of 36".
+- [ ] Tap Next and Previous: the text changes and the label shows "Tip n of 1185" (the exact total is shown in the first Show option).
 - [ ] Close and reopen on the same day: the same tip is today's pick.
 - [ ] Tap "Surprise me" several times: different tips appear. Copy and Share work.
 

@@ -18,6 +18,7 @@
     "audit:inputs": "node tests/validation-audit.js",
     "test:drive": "node tests/drive-flow.js",
     "test:quotes": "node tests/quotes-real.test.js && node tests/quotes-goofy.test.js",
+    "test:tips": "node tests/tips.test.js",
     "test:functional": "node tests/run-functional.js"
   },
   "dependencies": {

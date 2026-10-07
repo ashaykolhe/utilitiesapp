@@ -191,10 +191,11 @@
 - category: daily
 - plan: free
 - needs: none
-- what: A short practical tip or proverb for each day from a built-in list, with next, previous, random, copy and share. Works fully offline.
+- what: A short practical tip, kind thought or proverb for each day from a built-in list of over 1,000 (health, money, phone and safety, home and food, study and work, travel, kindness, proverbs and sayings), with next, previous, random, copy and share, and a Show filter to read only one kind. Works fully offline.
 - test:
   1. Open the tool: a tip is shown with "Today's pick" and the date.
-  2. Tap Next and Previous: the text changes and the label shows "Tip n of 36".
+  2. Tap Next and Previous: the text changes and the label shows "Tip n of 1185" (the exact total is shown in the first Show option).
+  2b. Open the Show list and pick Proverb: only proverbs appear and Next stays within them; pick All tips to go back. The choice is remembered next time.
   3. Close and reopen on the same day: the same tip is today's pick.
   4. Tap "Surprise me" several times: different tips appear. Copy and Share work.
 

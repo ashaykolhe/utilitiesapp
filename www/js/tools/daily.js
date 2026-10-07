@@ -1288,7 +1288,7 @@ Tools.register({ id: 'expenses', pro: true, proKey: 'trackers', name: 'Expense T
 
 /* ---------- Tip of the Day ---------- */
 Tools.register({ id: 'tipday', name: 'Tip of the Day', icon: '🌟', cat: 'daily', desc: 'A short thought or practical tip for each day, built in and available offline.', keys: ['quote', 'motivation', 'proverb', 'wisdom', 'inspiration', 'advice'], needs: [], render(el) {
-  const TIPS = [
+  const BASE_TIPS = [
     ['Start with the smallest next step. Momentum does the rest.', 'Tip'], ['Drink a glass of water before your first coffee.', 'Tip'], ['A journey of a thousand miles begins with a single step.', 'Proverb'],
     ['Write tomorrow\'s top three tasks before you stop working today.', 'Tip'], ['If a task takes under two minutes, do it now.', 'Tip'], ['Slow is smooth, smooth is fast.', 'Saying'],
     ['Look away from the screen every 20 minutes and focus on something far away for 20 seconds.', 'Tip'], ['The best time to plant a tree was twenty years ago. The second best time is now.', 'Proverb'],
@@ -1302,19 +1302,28 @@ Tools.register({ id: 'tipday', name: 'Tip of the Day', icon: '🌟', cat: 'daily
     ['Eat a little slower. You will notice when you are full.', 'Tip'], ['Put your keys and wallet in the same place every time.', 'Tip'], ['Every expert was once a beginner.', 'Saying'],
     ['Leave ten minutes early. Calm travel beats fast travel.', 'Tip'], ['Read ten pages before bed instead of scrolling.', 'Tip'], ['Do not wait for motivation. Start, and it will follow.', 'Tip'], ['A good laugh is the cheapest medicine.', 'Saying']
   ];
-  let i = (dayOfYear(new Date()) * 7) % TIPS.length, shown = i;
+  /* The built-in list plus every data file in www/js/data/tips-*.js, without duplicates. */
+  const TIPS = (() => { const seen = new Set(), out = []; for (const t of BASE_TIPS.concat(...(window.TIPS_PARTS || []))) { if (!Array.isArray(t) || typeof t[0] !== 'string') continue; const k = t[0].trim().toLowerCase(); if (!k || seen.has(k)) continue; seen.add(k); out.push([t[0].trim(), String(t[1] || 'Tip')]); } return out; })();
+  const LABELS = [...new Set(TIPS.map(t => t[1]))].sort((x, y) => (x === 'Tip' ? -1 : y === 'Tip' ? 1 : x.localeCompare(y)));
+  let pool = TIPS;
+  const base = () => (dayOfYear(new Date()) * 7) % pool.length;
+  let i = base(), shown = i;
   el.innerHTML = `<div class="card center" style="${GRAD};padding:34px 20px"><div style="font-size:44px">🌟</div><div id="tx" style="font-size:21px;font-weight:600;line-height:1.4;margin:14px 0 10px;min-height:5.6em;display:flex;align-items:center;justify-content:center"></div><div id="ty" class="muted" style="font-size:13px;letter-spacing:.08em;text-transform:uppercase"></div></div>
     <div class="row"><button class="btn alt" id="pv">‹ Previous</button><button class="btn alt" id="rn">Surprise me</button><button class="btn alt" id="nx">Next ›</button></div>
     <div class="row"><button class="btn alt" id="cp">Copy</button><button class="btn" id="sh">Share</button></div>
+    <label class="f">Show <select id="fl" aria-label="Kind of tips to show"></select></label>
     <div class="muted center" id="dn" style="font-size:13px"></div>`;
+  const fl = $('#fl', el); fl.innerHTML = '<option value="">All tips (' + TIPS.length + ')</option>' + LABELS.map(l => '<option value="' + esc(l) + '">' + esc(l) + ' (' + TIPS.filter(t => t[1] === l).length + ')</option>').join('');
+  { const sv = Store.get('daily.tipkind', ''); if (LABELS.includes(sv)) { fl.value = sv; pool = TIPS.filter(t => t[1] === sv); i = shown = base(); } }
+  fl.onchange = () => { pool = fl.value ? TIPS.filter(t => t[1] === fl.value) : TIPS; Store.set('daily.tipkind', fl.value); i = shown = base(); draw(); };
   function draw() {
-    $('#tx', el).textContent = TIPS[i][0]; $('#ty', el).textContent = TIPS[i][1];
-    $('#dn', el).textContent = i === shown ? 'Today\'s pick · ' + new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }) : 'Tip ' + (i + 1) + ' of ' + TIPS.length;
+    $('#tx', el).textContent = pool[i][0]; $('#ty', el).textContent = pool[i][1];
+    $('#dn', el).textContent = i === shown ? 'Today\'s pick · ' + new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' }) : 'Tip ' + (i + 1) + ' of ' + pool.length;
   }
-  $('#pv', el).onclick = () => { i = (i + TIPS.length - 1) % TIPS.length; draw(); };
-  $('#nx', el).onclick = () => { i = (i + 1) % TIPS.length; draw(); };
-  $('#rn', el).onclick = () => { i = Math.floor(Math.random() * TIPS.length); draw(); };
-  $('#cp', el).onclick = () => copyText(TIPS[i][0]); $('#sh', el).onclick = () => shareText('Tip of the day', TIPS[i][0]);
+  $('#pv', el).onclick = () => { i = (i + pool.length - 1) % pool.length; draw(); };
+  $('#nx', el).onclick = () => { i = (i + 1) % pool.length; draw(); };
+  $('#rn', el).onclick = () => { i = Math.floor(Math.random() * pool.length); draw(); };
+  $('#cp', el).onclick = () => copyText(pool[i][0]); $('#sh', el).onclick = () => shareText('Tip of the day', pool[i][0]);
   draw();
 } });
 

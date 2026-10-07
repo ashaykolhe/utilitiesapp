@@ -240,7 +240,11 @@ const { bootFx, clock, fakeNotifications, fakeShare } = require('./fx');
     T.ok(first.length > 10, 'tipday: a tip is shown');
     T.has(t.q('#dn').textContent, "Today's pick", 'tipday: marked as today\'s pick');
     t.click('#nx'); T.ok(t.q('#tx').textContent !== first, 'tipday: next tip differs');
-    T.has(t.q('#dn').textContent, ' of 36', 'tipday: counter');
+    T.ok(/Tip \d+ of \d{3,5}$/.test(t.q('#dn').textContent), 'tipday: counter shows the position in the full list of hundreds of tips');
+    { const fl = t.q('#fl'); T.ok(fl && fl.options.length >= 8, 'tipday: a filter lists the kinds of tips'); const kinds = [...fl.options].map(o => o.value);
+      const allN = +/\((\d+)\)/.exec(fl.options[0].textContent)[1]; let sum = 0; for (const o of [...fl.options].slice(1)) sum += +/\((\d+)\)/.exec(o.textContent)[1]; T.eq(sum, allN, 'tipday: the kind counts add up to the total');
+      const pv = kinds.find(k => k === 'Proverb'); T.ok(!!pv, 'tipday: has Proverb kind'); t.select('#fl', 'Proverb'); await page.wait(10); T.eq(t.q('#ty').textContent, 'Proverb', 'tipday: filtered to proverbs'); T.has(t.q('#dn').textContent, 'Today', 'tipday: filtered list also has a pick of the day'); t.click('#nx'); T.eq(t.q('#ty').textContent, 'Proverb', 'tipday: next stays within the kind');
+      t.select('#fl', ''); await page.wait(10); t.click('#nx'); }
     t.click('#pv'); T.eq(t.q('#tx').textContent, first, 'tipday: previous returns');
     const sameDay = (await (async () => { t.close(); const t2 = await page.open('tipday'); const r = t2.q('#tx').textContent; t2.close(); return r; })());
     T.eq(sameDay, first, 'tipday: same tip all day');
