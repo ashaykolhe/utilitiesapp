@@ -13,7 +13,8 @@ const PRO = {
   create: ['pixelart', 'signature'],
   study: ['flashcards', 'matrix'],
   locker: ['totp'],
-  sensors: ['sensorlist']
+  sensors: ['sensorlist'],
+  pdf: ['pdfimages', 'pdfmerge', 'pdfpages', 'pdftext']
 };
 const keyOf = {}; for (const [k, ids] of Object.entries(PRO)) for (const id of ids) keyOf[id] = k;
 
