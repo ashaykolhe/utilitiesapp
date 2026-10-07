@@ -395,7 +395,7 @@ const CSS = `
 .sx-seg button.on{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
 .sx-pw{position:relative}
 .sx-pw input{padding-right:52px}
-.sx-eye{position:absolute;right:2px;top:0;bottom:0;width:48px;border:0;background:none;font-size:18px}
+.sx-eye{position:absolute;right:2px;top:0;bottom:0;width:48px;min-height:44px;border:0;background:none;font-size:18px}
 .sx-ic{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:22px;font-weight:700;background:color-mix(in srgb,var(--accent) 16%,var(--surface2));flex:none;overflow:hidden}
 .sx-ic img{width:100%;height:100%;object-fit:cover}
 .sx-act{display:flex;gap:8px;flex-wrap:wrap}
@@ -447,16 +447,20 @@ const fmtSize = n => n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(1) +
 const METER = ['var(--danger)', '#f97316', '#eab308', '#84cc16', 'var(--ok)'];
 function paintMeter(meter, a) {
   const bar = $('i', meter);
+  meter.setAttribute('role', 'progressbar'); meter.setAttribute('aria-label', 'Password strength'); meter.setAttribute('aria-valuemin', '0'); meter.setAttribute('aria-valuemax', '4');
+  meter.setAttribute('aria-valuenow', String(a.len ? a.level : 0)); meter.setAttribute('aria-valuetext', a.len ? a.label : 'No password yet');
   bar.style.width = a.len ? Math.min(100, 12 + a.level * 22) + '%' : '0';
   bar.style.background = METER[a.level];
 }
 function pwField(id, label, ph, auto) {
-  return `<label class="f">${esc(label)}<div class="sx-pw"><input type="password" id="${id}" placeholder="${esc(ph || '')}" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="256"><button type="button" class="sx-eye" data-eye="${id}" aria-label="Show or hide password">👁</button></div></label>`;
+  return `<label class="f">${esc(label)}<div class="sx-pw"><input type="password" id="${id}" placeholder="${esc(ph || '')}" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="256"><button type="button" class="sx-eye" data-eye="${id}" aria-label="Show password" aria-pressed="false">👁</button></div></label>`;
 }
 function wireEyes(root) {
   $$('[data-eye]', root).forEach(b => b.addEventListener('click', () => {
     const i = $('#' + b.dataset.eye, root);
-    if (i) i.type = i.type === 'password' ? 'text' : 'password';
+    if (!i) return;
+    i.type = i.type === 'password' ? 'text' : 'password';
+    const shown = i.type === 'text'; b.setAttribute('aria-pressed', String(shown)); b.setAttribute('aria-label', shown ? 'Hide password' : 'Show password');
   }));
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -618,6 +622,7 @@ function lockout(name) {
   const k = 'sec.lock.' + name, get = () => Store.get(k, { n: 0, until: 0 });
   return {
     left() { return Math.min(900000, Math.max(0, (Number(get().until) || 0) - clock())); },
+    tries() { return 5 - (get().n % 5); },
     fail() { const s = get(); s.n++; if (s.n % 5 === 0) s.until = Math.round(clock() + Math.min(900000, 30000 * Math.pow(2, s.n / 5 - 1))); Store.set(k, s); return s.n; },
     ok() { Store.set(k, { n: 0, until: 0 }); }
   };
@@ -686,7 +691,7 @@ function sealedShell(el, cfg) {
       (orphans ? `<div class="sx-warn"><span>⚠️</span><span><b>Old locked data was found but its password record is missing.</b> ${orphans} encrypted item${orphans === 1 ? ' is' : 's are'} still on this phone. They cannot be opened with a new password, and the original password alone is not enough without the missing record. If you have an exported backup, restore that instead.</span></div>` : '') +
       `<div class="card sx-card">
         ${pwField('s1', 'Choose a strong password', 'At least 8 characters', 'off')}
-        <div class="sx-meter" id="s-meter"><i></i></div><div class="muted" id="s-hint" style="font-size:13px">Use a long phrase you can remember.</div>
+        <div class="sx-meter" id="s-meter"><i></i></div><div class="muted" id="s-hint" style="font-size:13px" aria-live="polite">Easiest strong password: 7 random words (the PIN & Passphrase tool makes one). Long beats clever.</div>
         ${pwField('s2', 'Confirm password', '', 'off')}
         <div class="sx-warn"><span>⚠️</span><span><b>There is no way to recover a forgotten password.</b> Nobody, including the app maker, can open your data without it. Write it down and keep it somewhere safe. Uninstalling the app or clearing its data also deletes everything stored here.</span></div>
         <label class="sx-t"><input type="checkbox" id="s-ok"><span>I understand I cannot recover my data if I forget this password.</span></label>
@@ -700,7 +705,7 @@ function sealedShell(el, cfg) {
     $('#s1', box).addEventListener('input', e => {
       const a = assess(e.target.value);
       forced = false; $('#s-any', box).hidden = true;
-      paintMeter(m, a); hint.textContent = a.len ? a.label + ' (about ' + Math.round(a.entropy) + ' bits)' + (a.issues[0] ? '. ' + a.issues[0] : '') : 'Use a long phrase you can remember.';
+      paintMeter(m, a); hint.textContent = a.len ? a.label + ' (about ' + Math.round(a.entropy) + ' bits)' + (a.issues[0] ? '. ' + a.issues[0] : '') : 'Easiest strong password: 7 random words (the PIN & Passphrase tool makes one). Long beats clever.';
     });
     $('#s-any', box).addEventListener('click', () => { forced = true; $('#s-go', box).click(); });
     $('#s-go', box).addEventListener('click', async () => {
@@ -769,7 +774,7 @@ function sealedShell(el, cfg) {
           return;
         }
         lk.fail(); inp.focus();
-        err.textContent = 'Wrong password.';
+        err.textContent = 'Wrong password.' + (lk.left() > 0 ? '' : lk.tries() <= 2 ? ' ' + lk.tries() + (lk.tries() === 1 ? ' try' : ' tries') + ' left before a short wait.' : '');
         cd();
       }
     }
@@ -921,7 +926,8 @@ function sealedShell(el, cfg) {
       if (f.size > 20 * 1048576) { msg('That file is too big to be a backup (over 20 MB).'); return; }
       let b;
       try { b = JSON.parse(await f.text()); } catch (e) { msg('That is not a PocketKit backup file.'); return; }
-      if (!b || b.app !== 'PocketKit' || b.type !== cfg.name) { msg('That backup belongs to a different tool.'); return; }
+      if (!b || typeof b !== 'object' || b.app !== 'PocketKit') { msg('That is not a PocketKit backup file.'); return; }
+      if (b.type !== cfg.name) { msg('That backup belongs to a different tool.'); return; }
       const pw = await askPassword(el, 'Backup password', 'Enter the master password the backup was made with. Entries that are not already here will be added.');
       if (pw === null) return;
       msg('Decrypting…');
@@ -1027,7 +1033,7 @@ function lockerBuild(body, S) {
   let urls = [], viewUrls = new Set(), dead = false;
   const lim = () => proLimit('locker');
   body.innerHTML = `<div class="card sx-card"><div class="sx-head"><div class="grow"><b id="lk-sum">Your files</b><small id="lk-sub"></small></div></div>
-      <div class="progress"><i id="lk-bar" style="width:0"></i></div></div>
+      <div class="progress" aria-hidden="true"><i id="lk-bar" style="width:0"></i></div></div>
     <div class="sx-drop"><div style="font-size:36px">🗂️</div><b>Add files to the locker</b>
       <span class="muted" style="font-size:13.5px">Photos, videos and documents up to 200 MB each. Each file is encrypted with AES-256 before it is stored.</span>
       <button class="btn" id="lk-add" style="min-height:48px;padding:0 24px">＋ Choose files</button>
@@ -1124,8 +1130,8 @@ function lockerBuild(body, S) {
     S.hold(90000); msg('Decrypting…');
     try {
       const { meta, bytes } = await plain(id);
-      await saveFile(new Blob([bytes], { type: meta.type || 'application/octet-stream' }), meta.name);
-      msg('Exported. The exported copy is NOT encrypted; delete it when you are done.');
+      const ok = await saveFile(new Blob([bytes], { type: meta.type || 'application/octet-stream' }), meta.name);
+      msg(ok ? 'Exported. The exported copy is NOT encrypted; delete it when you are done.' : 'Export cancelled. Nothing was saved.');
     } catch (e) { msg('Could not export this file.'); }
     finally { S.release(); }
   }
@@ -1242,7 +1248,7 @@ function vaultBuild(body, S) {
     const d = dialog(S.root, `<h2>${cur ? 'Edit entry' : 'New entry'}</h2>
       <label class="f">Title<input type="text" id="e-t" maxlength="80" required autocomplete="off" value="${esc(e.title)}"></label>
       <label class="f">Username or email<input type="text" id="e-u" maxlength="160" autocomplete="off" autocapitalize="off" value="${esc(e.user)}"></label>
-      <label class="f">Password<div class="sx-pw"><input type="password" id="e-p" maxlength="256" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(e.pass)}"><button type="button" class="sx-eye" data-eye="e-p" aria-label="Show or hide password">👁</button></div></label>
+      <label class="f">Password<div class="sx-pw"><input type="password" id="e-p" maxlength="256" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(e.pass)}"><button type="button" class="sx-eye" data-eye="e-p" aria-label="Show password" aria-pressed="false">👁</button></div></label>
       <div class="sx-meter" id="e-m"><i></i></div>
       <div class="row"><label class="f">Length<input type="number" id="e-len" min="8" max="64" step="1" value="20"></label><button class="btn alt" id="e-gen" style="margin-top:18px;min-height:44px">🎲 Generate</button></div>
       <label class="f">Website<input type="text" id="e-w" maxlength="200" autocomplete="off" autocapitalize="off" value="${esc(e.url)}"></label>
@@ -1390,8 +1396,8 @@ function totpBuild(body, S) {
     list.innerHTML = items().length ? items().map(a => `<div class="card sx-card" data-id="${esc(a.id)}">
       <div style="display:flex;align-items:center;gap:12px"><div class="sx-ic">${esc((a.issuer || a.account || '?')[0].toUpperCase())}</div>
         <div style="flex:1"><b class="sx-ell">${esc(a.issuer || a.account)}</b><small class="muted sx-ell">${a.issuer ? esc(a.account) : ''}</small></div><button data-a="del" class="btn alt" style="min-height:44px" aria-label="Remove ${esc(a.issuer || a.account)}">✕</button></div>
-      <button data-a="copy" style="all:unset;cursor:pointer;display:block;text-align:center;padding:6px 0"><div class="sx-code" data-code>------</div></button>
-      <div class="progress"><i data-bar style="width:100%"></i></div><small class="muted center" data-sec></small></div>`).join('')
+      <button data-a="copy" aria-label="Copy the code for ${esc(a.issuer || a.account)}" style="background:none;border:0;color:inherit;cursor:pointer;display:block;width:100%;min-height:56px;text-align:center;padding:6px 0"><div class="sx-code" data-code>------</div></button>
+      <div class="progress" aria-hidden="true"><i data-bar style="width:100%"></i></div><small class="muted center" data-sec></small></div>`).join('')
       : '<div class="sx-empty">No accounts yet.<br>Add one using the secret key (or otpauth link) that a website shows when you turn on two-step verification.</div>';
     cache.clear(); update();
   }
@@ -1492,7 +1498,7 @@ Tools.register({
     box.innerHTML = hero('🛡️', 'Password strength', 'Type a password to test it. It is analysed on this phone only and is never saved or sent anywhere.') +
       `<div class="card sx-card">${pwField('pc', 'Password to test', 'Type or paste here', 'off')}
         <div class="sx-meter" id="pc-m"><i></i></div>
-        <div style="display:flex;justify-content:space-between;align-items:baseline"><b id="pc-l" style="font-size:20px">Empty</b><span class="muted" id="pc-e"></span></div></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><b id="pc-l" aria-live="polite" style="font-size:20px">Empty</b><span class="muted" id="pc-e"></span></div></div>
       <div class="card sx-card" id="pc-t" hidden><h3>Estimated time to crack</h3><div id="pc-times"></div></div>
       <div class="card sx-card" id="pc-i" hidden><h3>Problems found</h3><div id="pc-il"></div></div>
       <div class="card sx-card"><h3>How to improve it</h3><div id="pc-s" class="muted" style="font-size:14px"></div></div>
@@ -1526,13 +1532,13 @@ Tools.register({
     st.pinLen = clampInt(st.pinLen, 4, 12, 6); st.words = clampInt(st.words, 3, 10, 7); st.pwLen = clampInt(st.pwLen, 8, 64, 16);
     if (typeof st.sep !== 'string' || st.sep.length > 1) st.sep = '-';
     if (!st.opt || typeof st.opt !== 'object') st.opt = { lower: true, upper: true, digit: true, symbol: true };
-    box.innerHTML = `<div class="sx-seg" role="tablist"><button data-m="pin">PIN</button><button data-m="phrase">Passphrase</button><button data-m="pw">Password</button></div>
+    box.innerHTML = `<div class="sx-seg" role="group" aria-label="What to generate"><button data-m="pin" aria-pressed="false">PIN</button><button data-m="phrase" aria-pressed="false">Passphrase</button><button data-m="pw" aria-pressed="false">Password</button></div>
       <div class="card sx-card" id="g-opt"></div>
       <button class="btn" id="g-go" style="min-height:50px;font-size:17px">🎲 Generate</button>
       <div class="list" id="g-out"></div>
       <div class="status info" id="g-bits" style="text-align:center"></div>
       <div class="sx-note"><span>🔐</span><span>Made with your phone's cryptographic random generator. Nothing is stored or sent. After you copy, the message tells you whether this phone clears the clipboard by itself after 30 s.</span></div>`;
-    const range = (id, label, v, min, max) => `<label class="f">${label}: <b id="${id}-v" style="color:var(--text)">${v}</b><input type="range" id="${id}" min="${min}" max="${max}" value="${v}" style="width:100%;accent-color:var(--accent);min-height:36px"></label>`;
+    const range = (id, label, v, min, max) => `<label class="f">${label}: <b id="${id}-v" style="color:var(--text)">${v}</b><input type="range" id="${id}" min="${min}" max="${max}" value="${v}" style="width:100%;accent-color:var(--accent);min-height:44px"></label>`;
     const chk = (id, label, on) => `<label class="sx-t"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}><span>${label}</span></label>`;
     function opts() {
       const o = $('#g-opt', box);
@@ -1554,15 +1560,15 @@ Tools.register({
       if (st.mode === 'pin') { vals = Array.from({ length: 5 }, () => genPin(st.pinLen, st.easy)); bits = pinBits(st.pinLen, st.easy); }
       else if (st.mode === 'phrase') { vals = Array.from({ length: 4 }, () => genPassphrase(st.words, st.sep, st.cap, st.num)); bits = st.words * Math.log2(WORDS.length) + (st.num ? Math.log2(100) : 0); }
       else { vals = Array.from({ length: 4 }, () => genPassword(st.pwLen, st.opt)); bits = st.pwLen * Math.log2(Object.keys(SETS).filter(k => st.opt[k]).map(k => SETS[k]).join('').length || 26); }
-      $('#g-out', box).innerHTML = vals.map(v => `<div class="item" style="gap:8px"><span class="grow sx-mono" style="font-size:${st.mode === 'pin' ? 22 : 15}px;font-weight:${st.mode === 'pin' ? 700 : 500};letter-spacing:${st.mode === 'pin' ? '.1em' : '0'}">${esc(v)}</span><button class="btn alt" data-v="${esc(v)}" style="min-height:44px">Copy</button></div>`).join('');
+      $('#g-out', box).innerHTML = vals.map((v, n) => `<div class="item" style="gap:8px"><span class="grow sx-mono" style="font-size:${st.mode === 'pin' ? 22 : 15}px;font-weight:${st.mode === 'pin' ? 700 : 500};letter-spacing:${st.mode === 'pin' ? '.1em' : '0'}">${esc(v)}</span><button class="btn alt" data-v="${esc(v)}" aria-label="Copy option ${n + 1}" style="min-height:44px">Copy</button></div>`).join('');
       $('#g-bits', box).textContent = 'About ' + Math.round(bits) + ' bits of randomness' + (st.mode === 'phrase' ? ' (word list of ' + WORDS.length + '; each word adds about ' + Math.log2(WORDS.length).toFixed(1) + ' bits)' + (bits < 60 ? '. Use 7 or more words for a strong passphrase.' : '') : '');
       Store.set('pingen.s', { pinLen: st.pinLen, easy: st.easy, words: st.words, sep: st.sep, cap: st.cap, num: st.num, pwLen: st.pwLen, opt: st.opt });
     }
-    $$('.sx-seg button', box).forEach(b => b.addEventListener('click', () => { const m = b.dataset.m; $$('.sx-seg button', box).forEach(x => x.classList.toggle('on', x.dataset.m === m)); st.mode = m; opts(); gen(); }));
+    $$('.sx-seg button', box).forEach(b => b.addEventListener('click', () => { const m = b.dataset.m; $$('.sx-seg button', box).forEach(x => { x.classList.toggle('on', x.dataset.m === m); x.setAttribute('aria-pressed', String(x.dataset.m === m)); }); st.mode = m; opts(); gen(); }));
     $('#g-go', box).addEventListener('click', gen);
     $('#g-opt', box).addEventListener('change', gen);
     $('#g-out', box).addEventListener('click', ev => { const b = ev.target.closest('button[data-v]'); if (b) copyText(b.dataset.v, 30000); });
-    $$('.sx-seg button', box)[0].classList.add('on'); opts(); gen();
+    $$('.sx-seg button', box)[0].classList.add('on'); $$('.sx-seg button', box)[0].setAttribute('aria-pressed', 'true'); opts(); gen();
     return () => { box.innerHTML = ''; };
   }
 });
@@ -1576,7 +1582,7 @@ Tools.register({
     const box = mount(el);
     const MAX_TEXT_BYTES = 14000;
     let mode = 'enc', busy = false, forced = false;
-    box.innerHTML = `<div class="sx-seg"><button data-m="enc" class="on">Lock a message</button><button data-m="dec">Unlock a message</button></div>
+    box.innerHTML = `<div class="sx-seg" role="group" aria-label="Lock or unlock"><button data-m="enc" class="on" aria-pressed="true">Lock a message</button><button data-m="dec" aria-pressed="false">Unlock a message</button></div>
       <div class="card sx-card">
         <label class="f" id="tl-lab">Message<textarea id="tl-in" rows="6" maxlength="14000" placeholder="Type the secret message" spellcheck="false"></textarea></label>
         ${pwField('tl-pw', 'Password', 'Share it separately, never in the same chat', 'off')}
@@ -1592,7 +1598,7 @@ Tools.register({
     wireEyes(box);
     const pw = $('#tl-pw', box), inp = $('#tl-in', box), out = $('#tl-out', box), err = $('#tl-e', box);
     const setMode = m => {
-      mode = m; $$('.sx-seg button', box).forEach(b => b.classList.toggle('on', b.dataset.m === m));
+      mode = m; $$('.sx-seg button', box).forEach(b => { b.classList.toggle('on', b.dataset.m === m); b.setAttribute('aria-pressed', String(b.dataset.m === m)); });
       $('#tl-lab', box).firstChild.textContent = m === 'enc' ? 'Message' : 'Locked code';
       inp.placeholder = m === 'enc' ? 'Type the secret message' : 'Paste the locked code here';
       inp.maxLength = m === 'enc' ? 14000 : 100000; // a locked code is longer than the message it holds
@@ -1644,7 +1650,7 @@ Tools.register({
         <label class="f">Expected hash (optional)<textarea id="ck-exp" rows="2" maxlength="800" class="sx-mono" autocapitalize="off" spellcheck="false" placeholder="Paste the hash, or the whole line from sha256sum"></textarea></label>
         <button class="btn" id="ck-go" style="min-height:48px" disabled>Calculate</button>
         <div class="status info" id="ck-st" role="status"></div></div>
-      <div class="card sx-card" id="ck-res" hidden><div id="ck-verdict" class="center" style="font-size:20px;font-weight:700"></div>
+      <div class="card sx-card" id="ck-res" hidden><div id="ck-verdict" class="center" role="status" style="font-size:20px;font-weight:700"></div>
         <div class="sx-lbl">Calculated hash</div><div class="sx-mono" id="ck-hash" style="font-size:13px"></div>
         <button class="btn alt" id="ck-cp" style="min-height:44px">Copy hash</button></div>
       <div class="sx-note"><span>ℹ️</span><span>The phone's crypto engine hashes a whole file at once, so very large files (over about 500 MB) may fail on low-memory phones. Prefer SHA-256 or SHA-512; SHA-1 is only for old checklists.</span></div>`;
@@ -1783,15 +1789,20 @@ Tools.register({
           : k === 'dob' ? `<label class="f">${l}<input type="date" id="em-${k}" min="1900-01-01" max="${today}" value="${/^\d{4}-\d\d-\d\d$/.test(c[k] || '') ? esc(c[k]) : ''}"></label>`
           : /p$/.test(k) ? `<label class="f">${l}<input type="tel" id="em-${k}" maxlength="20" pattern="[0-9+() .\-]{0,20}" title="Digits, spaces and + ( ) - only" inputmode="tel" autocomplete="off" value="${esc(c[k] || '')}"></label>`
           : `<label class="f">${l}<input type="text" id="em-${k}" maxlength="60" autocomplete="off" value="${esc(c[k] || '')}"></label>`).join('')}
-          <button class="btn" id="em-save" style="min-height:48px">Save card</button>${card ? '<button class="btn alt" id="em-cancel" style="min-height:44px">Cancel</button>' : ''}</div>`;
+          <button class="btn" id="em-save" style="min-height:48px">Save card</button>${card ? '<button class="btn alt" id="em-cancel" style="min-height:44px">Cancel</button><button class="btn danger" id="em-del" style="min-height:44px">Delete this card</button>' : ''}</div>`;
       $('#em-save', box).addEventListener('click', () => {
         const n = {};
         F.forEach(([k]) => { n[k] = $('#em-' + k, box).value.trim(); });
-        n.c1p = n.c1p.replace(/[^0-9+() .\-]/g, '').slice(0, 20); n.c2p = n.c2p.replace(/[^0-9+() .\-]/g, '').slice(0, 20);
+        n.c1p = n.c1p.replace(/[^0-9+() .\-]/g, '').trim().slice(0, 20); n.c2p = n.c2p.replace(/[^0-9+() .\-]/g, '').trim().slice(0, 20);
         if (n.dob && (n.dob < '1900-01-01' || n.dob > today)) n.dob = '';
         card = n; Store.set('emergency.card', n); editing = false; view(); toast('Saved');
       });
       const cn = $('#em-cancel', box); if (cn) cn.addEventListener('click', () => { editing = false; view(); });
+      const dl = $('#em-del', box);
+      if (dl) dl.addEventListener('click', () => {
+        if (!confirm('Delete the emergency card from this phone? Your medical details and contacts are removed and cannot be recovered.')) return;
+        card = null; Store.set('emergency.card', null); editing = true; edit(); toast('Card deleted');
+      });
     }
     editing ? edit() : view();
   }

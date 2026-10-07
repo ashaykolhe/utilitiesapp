@@ -7,7 +7,7 @@
 - test:
   1. Open File Locker. Enter a password under 8 characters: an error appears. Enter two different passwords: mismatch error. Enter "password123" twice and tick the box: a "too easy to guess" message and a "Use this weak password anyway" button appear. Use a strong password (for example 7 random words) twice without ticking the box: asked to confirm; tick it and tap Create: the locker opens empty.
   2. Tap Choose files and pick two photos and a PDF (free plan allows 3). They appear with names, sizes and image thumbnails. Pick one more file: the Pro sheet opens and the file is not added.
-  3. Tap View on a photo: it opens in a dialog. Tap Export on a file: the share sheet (or a download in a desktop browser) offers the decrypted file. Tap Delete and confirm: it disappears.
+  3. Tap View on a photo: it opens in a dialog. Tap Export on a file: the share sheet (or a download in a desktop browser) offers the decrypted file. If you close the share sheet without sending, the tool says "Export cancelled. Nothing was saved." instead of "Exported". Tap Delete and confirm: it disappears.
   4. Tap Lock, then enter a wrong password 5 times: after the fifth, the Unlock button is disabled with a countdown of about 30 s. Wait, then enter the right password: it unlocks.
   5. Open Security and backup, change the password (wrong current password is rejected; a weak new password asks for "Use anyway"), then lock and unlock with the new one: all files still open and the old password is rejected. Choose a file over 200 MB: it is skipped with a message.
   6. Unlock, send the app to the background for over 60 s and return: the locker is locked. Leave it untouched for 2 minutes: it locks. Leave the tool and re-enter: it is locked. On Android the screen cannot be screenshotted while it is unlocked. On a phone with biometrics: Security and backup shows "Turn on biometric unlock" (hidden if the plugin or biometrics are missing); after enabling, the Unlock screen shows a biometrics button and a fingerprint or face check is required. Add a fingerprint in Android settings: the button stops working, a message explains it, and the password still works.
@@ -24,7 +24,7 @@
   3. Tap Show, then Copy password: the toast says it clears in 30 s only when this phone does it natively; otherwise it says it may not clear by itself. Paste elsewhere to check it, wait 30 s and paste again: on a phone with the native helper the clipboard is empty.
   4. Add entries up to 5: the sixth opens the Pro sheet. Search for part of a title: the list filters.
   5. Security and backup > Export backup: a .pkbackup.json file is shared/downloaded. Delete an entry, choose Import backup, pick the file and enter the master password: the deleted entry returns. Enter a wrong password: a clear error and nothing changes.
-  6. Lock and unlock with a wrong password: "Wrong password." After 5 wrong tries a 30 s lockout appears.
+  6. Lock and unlock with a wrong password: "Wrong password." From the 3rd wrong try it says how many tries are left (2, then 1); after 5 wrong tries a 30 s lockout appears, it survives leaving the tool and moving the phone clock back, and the next round is 60 s. When creating the vault the hint under the strength meter suggests 7 random words.
 
 ## Password Check
 - id: pwcheck
@@ -98,8 +98,8 @@
 - test:
   1. First open shows the edit form. Date of birth is a date picker (not in the future, not before 1900); phone fields take at most 20 characters of digits, spaces and + ( ) - only. Fill in a name, blood group O+, an allergy and a contact phone, then Save.
   2. The card shows the name in large type, a big red blood group and a Call button for the contact; tapping it opens the dialer with the number.
-  3. Tap Edit card, clear the allergy, Save: it disappears from the card. Cancel on the edit screen returns to the card without changes.
-  4. Close and reopen the app: the card is still there.
+  3. Tap Edit card, clear the allergy, Save: it disappears from the card. A phone typed as "+91 98765-43210 abc" is saved without the letters and without trailing spaces. Cancel on the edit screen returns to the card without changes.
+  4. Close and reopen the app: the card is still there. In Edit card, tap Delete this card and confirm: the saved card is erased from the phone and the form is empty again (the Cancel button is gone because there is nothing to go back to).
 
 ## 2FA Codes
 - id: totp
