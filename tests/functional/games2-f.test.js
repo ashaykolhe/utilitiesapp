@@ -19,7 +19,7 @@ const L = require('../../www/js/tools/games2.js');
   const mins = (t) => { const m = /(\d+):(\d+)/.exec(t.q('#tm').textContent); return +m[1] * 60 + +m[2]; };
 
   /* every result line is announced; no tool leaves its drawing unchecked */
-  for (const id of ['dailychal', 'wordguess', 'mastermind', 'pegsol', 'nonogram', 'blockstack', 'breakout', 'pong', 'dodge', 'gemmatch', 'dotsboxes', 'reversi', 'stroop', 'mazerun', 'balanceball', 'game24', 'blackjack', 'hilo', 'digitspan', 'typingfalls']) {
+  for (const id of ['dailychal', 'wordguess', 'mastermind', 'pegsol', 'nonogram', 'blockstack', 'breakout', 'pong', 'dodge', 'gemmatch', 'dotsboxes', 'reversi', 'stroop', 'mazerun', 'balanceball', 'game24', 'hilo', 'digitspan', 'typingfalls']) {
     await run(id, async (t) => { const m = t.all('.msg'); T.ok(m.length === 0 || m.every(x => x.getAttribute('role') === 'status' && x.getAttribute('aria-live') === 'polite'), id + ': result lines are announced to screen readers'); });
   }
 

@@ -199,20 +199,6 @@
   3. Edge case: divide by a card with value 0 (for example 5 - 5 then divide by it): "Cannot divide by zero". Divisions can produce fractions that are shown as n / d.
   4. Tap Hint: a working solution is shown. New deals four new numbers; Reset restores the current four.
 
-## Blackjack
-- id: blackjack
-- category: fun
-- plan: free
-- needs: storage
-- what: Single-player blackjack against the dealer with saved chips: hit, stand or double down. Blackjack pays 3 to 2, the dealer stands on all 17s and aces count as 11 or 1. Chips and best chips are remembered; if you run out you can start again with 1000. Diamonds are drawn in red like hearts (they were black before).
-- test:
-  1. Tap chip buttons to build a bet (chips shows the amount), then Deal: you get two cards and the dealer shows one with one hidden.
-  2. Hit: a card is added and the total updates (soft totals are labelled). Over 21: Bust and you lose the bet. Stand: the dealer reveals and draws to 17.
-  3. Double: only available with two cards and enough chips; the bet doubles, you get one card and the hand ends.
-  4. Edge case: Deal with no bet: "Place a bet first". A natural 21 pays 3 to 2 (a bet of 10 wins 15). All in then lose: "Out of chips" button restores 1000.
-  5. Leave and reopen: the chip total is kept.
-  6. Deal several hands: hearts and diamonds are red, spades and clubs black.
-
 ## Higher or Lower
 - id: hilo
 - category: fun

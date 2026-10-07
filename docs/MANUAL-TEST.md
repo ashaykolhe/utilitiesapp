@@ -2299,16 +2299,6 @@ _Free_
 - [ ] Never repeats a number; after 75 a message says all are called.
 - [ ] Enable Read numbers aloud: the number is spoken. New game clears the board.
 
-### Blackjack
-_Free. Needs: storage_
-
-- [ ] Tap chip buttons to build a bet (chips shows the amount), then Deal: you get two cards and the dealer shows one with one hidden.
-- [ ] Hit: a card is added and the total updates (soft totals are labelled). Over 21: Bust and you lose the bet. Stand: the dealer reveals and draws to 17.
-- [ ] Double: only available with two cards and enough chips; the bet doubles, you get one card and the hand ends.
-- [ ] Edge case: Deal with no bet: "Place a bet first". A natural 21 pays 3 to 2 (a bet of 10 wins 15). All in then lose: "Out of chips" button restores 1000.
-- [ ] Leave and reopen: the chip total is kept.
-- [ ] Deal several hands: hearts and diamonds are red, spades and clubs black.
-
 ### Block Stack
 _Free. Needs: storage_
 

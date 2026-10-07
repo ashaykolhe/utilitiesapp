@@ -1,5 +1,5 @@
 'use strict';
-/* games2.js, part 3: blackjack, higher or lower, digit span. The random card order is predicted with an independent copy of the page's random stream. */
+/* games2.js, part 3: higher or lower, digit span. The random card order is predicted with an independent copy of the page's random stream. */
 const { bootGame } = require('./fun-lib');
 const { suite } = require('../helpers/page');
 global.Tools = global.Tools || { register() {} };
@@ -17,60 +17,6 @@ const L = require('../../www/js/tools/games2.js');
   const num = (s) => +String(s).replace(/[^\d.-]/g, '');
   const RANKS = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'], SUITS = ['♠', '♥', '♦', '♣'];
   const shuffle = (a, rep) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rep.rnd(i + 1); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
-
-  /* ---------------- Blackjack ---------------- */
-  await run('blackjack', async (t) => {
-    const rep = G.replica(808);
-    const mkShoe = () => { const s = []; for (let d = 0; d < 6; d++) for (let r = 1; r <= 13; r++) for (let k = 0; k < 4; k++) s.push(r); return shuffle(s, rep); };
-    let shoe = mkShoe(); const draw = () => { if (shoe.length < 60) shoe = mkShoe(); const r = shoe.pop(), s = rep.rnd(4); return { r, s }; };
-    const total = (cards) => { let tt = 0, a = 0; cards.forEach(c => { tt += c.r === 1 ? 11 : Math.min(c.r, 10); if (c.r === 1) a++; }); while (tt > 21 && a) { tt -= 10; a--; } return tt; };
-    const isBJ = (cards) => cards.length === 2 && total(cards) === 21;
-    const shown = (sel) => t.all(sel + ' .bj-card').map(c => c.textContent), lbl = (c) => RANKS[c.r] + SUITS[c.s];
-    const strat = (hand, k) => { if (k % 11 === 0 && hand.length === 2) return 'dbl'; return total(hand) < 17 ? 'hit' : 'stand'; };
-    let chips = 1000, bad = 0, hands = 0, doubles = 0, naturals = 0, busts = 0, reshuffled = 0, lastShoe = shoe.length, rebuys = 0;
-    const chipsUi = () => num(t.q('#ch').textContent);
-    T.eq(chipsUi(), 1000, 'blackjack: start with 1000 chips'); T.has(t.q('#msg').textContent, 'Place your bet', 'blackjack: asks for a bet');
-    t.click('#deal'); T.has(t.q('#msg').textContent, 'Place a bet first', 'blackjack: Deal without a bet is refused'); T.eq(shown('#ph').length, 0, 'blackjack: no cards dealt');
-    for (let k = 1; k <= 160; k++) {
-      if (chips <= 0) { t.click('#rebuy'); chips = 1000; rebuys++; if (chipsUi() !== 1000) bad++; }
-      t.click('#clr'); const unit = k % 7 === 0 ? 100 : k % 3 === 0 ? 25 : 10; const betChip = Math.min(unit, chips); const btn = t.all('#bets button').find(b => b.dataset.v === String(unit));
-      let bet; if (btn) { btn.click(); bet = unit; } else { t.q('#bets [data-v="all"]').click(); bet = chips; }
-      if (num(t.q('#bt').textContent) !== bet) { bad++; if (process.env.DBG) console.log('bet', k, num(t.q('#bt').textContent), bet); }
-      t.click('#deal');
-      const p = [draw(), draw()], d = [draw(), draw()]; hands++;
-      if (shown('#ph').join() !== p.map(lbl).join() || shown('#dh')[0] !== lbl(d[0]) || shown('#dh')[1] !== '?' && !isBJ(p) && !isBJ(d)) { bad++; if (process.env.DBG) console.log('deal', k, shown('#ph'), p.map(lbl), shown('#dh'), d.map(lbl)); }
-      let dbl = false;
-      if (!isBJ(p) && !isBJ(d)) {
-        for (let guard = 0; guard < 12; guard++) {
-          const a = strat(p, k + guard); const canDbl = p.length === 2 && chips >= bet * 2;
-          if (a === 'dbl' && canDbl) { t.click('#dbl'); p.push(draw()); dbl = true; doubles++; break; }
-          if (a === 'dbl' || a === 'hit') { if (total(p) >= 21) break; t.click('#hit'); p.push(draw()); if (total(p) >= 21) break; } else { t.click('#stand'); break; }
-        }
-      } else naturals++;
-      const bust = total(p) > 21; if (bust) busts++;
-      if (!bust && !isBJ(p) && !isBJ(d)) while (total(d) < 17) d.push(draw());
-      const eff = dbl ? bet * 2 : bet; let net;
-      if (bust) net = -eff; else if (isBJ(p) && !isBJ(d)) net = Math.floor(eff * 1.5); else if (isBJ(d) && !isBJ(p)) net = -eff; else if (total(d) > 21) net = eff; else if (total(p) > total(d)) net = eff; else if (total(p) < total(d)) net = -eff; else net = 0;
-      chips = Math.max(0, chips + net);
-      if (shown('#ph').join() !== p.map(lbl).join() || shown('#dh').join() !== d.map(lbl).join()) { bad++; if (process.env.DBG) console.log('final', k, shown('#ph'), p.map(lbl), shown('#dh'), d.map(lbl)); }
-      if (chipsUi() !== chips) { bad++; if (process.env.DBG) console.log('chips', k, chipsUi(), chips, net); }
-      const msg = t.q('#msg').textContent; if ((net > 0 && !/win|Blackjack/.test(msg)) || (net < 0 && !/lose|Bust/.test(msg)) || (net === 0 && !/Push/.test(msg))) { bad++; if (process.env.DBG) console.log('msg', k, msg, net); }
-      if (shoe.length > lastShoe + 100) reshuffled++; lastShoe = shoe.length;
-      if (chips > 0) t.click('#again'); else { if (!t.has('#rebuy')) bad++; }
-    }
-    T.eq(bad, 0, 'blackjack: 160 hands: every card dealt, every total, payout and chip count matches an independent game (' + hands + ' hands, ' + doubles + ' doubles, ' + naturals + ' naturals, ' + busts + ' busts, ' + rebuys + ' rebuys)'); T.ok(doubles > 5 && busts > 5 && naturals >= 1, 'blackjack: the run covered doubles, busts and naturals'); T.ok(reshuffled >= 1, 'blackjack: the shoe was reshuffled when it ran low');
-    const sv = G.store('fun2.blackjack'); T.eq(sv.chips, chips, 'blackjack: chips saved'); T.ok(sv.best >= 1000, 'blackjack: best chips saved (' + sv.best + ')');
-    /* cards: hearts and diamonds are red, spades and clubs black */
-    let colourOk = true; for (let k = 0; k < 40; k++) { t.click('#clr'); t.q('#bets [data-v="10"]').click(); t.click('#deal'); t.all('.bj-card:not(.back)').forEach(c => { const s = c.querySelector('small').textContent, red = c.classList.contains('r'); if ((s === '♥' || s === '♦') !== red) colourOk = false; }); if (t.has('#stand')) t.click('#stand'); t.click('#again'); }
-    T.ok(colourOk, 'blackjack: hearts and diamonds are red, spades and clubs are black');
-  }, () => G.seed(808));
-  await run('blackjack', async (t) => {
-    T.eq(num(t.q('#ch').textContent), 0, 'blackjack: broke state is remembered'); T.ok(t.has('#rebuy'), 'blackjack: with no chips the only option is to start again'); T.eq(t.all('#bets button').filter(b => b.dataset.v !== 'all').length, 0, 'blackjack: no chips to bet'); t.click('#rebuy'); T.eq(num(t.q('#ch').textContent), 1000, 'blackjack: starting again gives 1000');
-  }, () => G.setStore('fun2.blackjack', { chips: 0, best: 1500 }));
-  await run('blackjack', async (t) => {
-    t.q('#bets [data-v="all"]').click(); T.eq(num(t.q('#bt').textContent), 30, 'blackjack: ALL bets every chip'); t.q('#bets [data-v="10"]').click(); T.eq(num(t.q('#bt').textContent), 30, 'blackjack: the bet can never exceed the chips'); t.click('#clr'); T.eq(num(t.q('#bt').textContent), 0, 'blackjack: Clear bet');
-    T.eq(t.all('#bets button').map(b => b.dataset.v).join(), '10,25,all', 'blackjack: chip buttons that you cannot afford are not offered');
-  }, () => G.setStore('fun2.blackjack', { chips: 30, best: 1000 }));
 
   /* ---------------- Higher or Lower ---------------- */
   await run('hilo', async (t) => {

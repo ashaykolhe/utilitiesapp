@@ -512,30 +512,6 @@ L.gen24 = function (rf) {
   for (;;) { const n = [0, 0, 0, 0].map(() => 1 + rf(9)); if (L.solve24(n)) return n; }
 };
 
-/* ---- Blackjack ---- */
-/* Cards are ranks 1..13 (1 = ace, 11 to 13 are court cards). */
-L.bjVal = (r) => r === 1 ? 11 : Math.min(r, 10);
-L.bjHand = function (cards) {
-  let t = 0, aces = 0;
-  for (const r of cards) { t += L.bjVal(r); if (r === 1) aces++; }
-  while (t > 21 && aces) { t -= 10; aces--; }
-  return { total: t, soft: aces > 0, bust: t > 21, bj: cards.length === 2 && t === 21 };
-};
-L.bjShoe = (decks) => { const s = []; for (let d = 0; d < decks; d++) for (let r = 1; r <= 13; r++) for (let k = 0; k < 4; k++) s.push(r); return shuffle(s); };
-/* Dealer draws to 17 and stands on all 17s. */
-L.bjDealer = function (hand, draw) { while (L.bjHand(hand).total < 17) hand.push(draw()); return hand; };
-/* Net chips won (negative = lost) for a bet. */
-L.bjSettle = function (player, dealer, bet) {
-  const p = L.bjHand(player), d = L.bjHand(dealer);
-  if (p.bust) return -bet;
-  if (p.bj && !d.bj) return Math.floor(bet * 1.5);
-  if (d.bj && !p.bj) return -bet;
-  if (d.bust) return bet;
-  if (p.total > d.total) return bet;
-  if (p.total < d.total) return -bet;
-  return 0;
-};
-
 /* ---- Higher or Lower ---- */
 L.hiloRank = (r) => r === 1 ? 14 : r;
 L.hiloCmp = (a, b) => Math.sign(L.hiloRank(b) - L.hiloRank(a)); /* 1 higher, -1 lower, 0 tie */
@@ -1933,77 +1909,9 @@ reg('game24', '24 Game', '\u{1F55B}', 'Make exactly 24 from four numbers using +
   });
 
 /* =====================================================================
-   17. Blackjack
+   Shared card helpers (Higher or Lower)
    ===================================================================== */
 const SUITS = ['♠', '♥', '♦', '♣'], RANKS = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
-reg('blackjack', 'Blackjack', '♠️', 'Single-player blackjack against the dealer with chips that are saved: hit, stand or double down. Blackjack pays 3 to 2 and the dealer stands on all 17s.',
-  ['21', 'cards', 'casino', 'chips', 'twenty one', 'dealer'], function (el) {
-    const T = tracker();
-    let sv = hsGet('blackjack', { chips: 1000, best: 1000 }), chips = sv.chips, bestC = sv.best, shoe = L.bjShoe(6), bet = 0, player, dealer, phase = 'bet', hidden = true, dbl = false;
-    const root = mount(el, `
-      <style>.bj-card{display:inline-grid;place-items:center;width:52px;height:74px;border-radius:9px;background:#fff;color:#111;font-weight:800;font-size:20px;margin:0 -8px 0 0;border:1px solid #bbb;box-shadow:0 2px 6px rgba(0,0,0,.3);animation:g2pop .3s both;position:relative}
-        .bj-card.r{color:#d11}.bj-card small{position:absolute;bottom:3px;right:5px;font-size:15px}
-        .bj-card.back{background:repeating-linear-gradient(45deg,#4338ca 0 6px,#6366f1 6px 12px);color:transparent}
-        .bj-t{background:#136b3f;border-radius:20px;padding:12px;color:#fff;min-height:96px}.bj-t b{font-size:13px;opacity:.85;display:block;margin-bottom:6px}
-        .bj-ch{width:58px;height:58px;border-radius:50%;border:4px dashed rgba(255,255,255,.7);color:#fff;font-weight:800;font-size:15px;padding:0}</style>
-      <div class="stats">${stat('ch', '\u{1FA99} Chips', chips)}${stat('bt', 'Bet', 0)}${stat('bs', 'Best chips', bestC)}</div>
-      <div class="bj-t"><b>Dealer <span id="dv"></span></b><div id="dh" style="min-height:76px"></div></div>
-      <div class="gap" style="height:8px"></div>
-      <div class="bj-t"><b>You <span id="pv"></span></b><div id="ph" style="min-height:76px"></div></div>
-      <div class="msg" id="msg"></div>
-      <div id="bets" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"></div>
-      <div id="acts" class="rowb"></div>`);
-    function save() { bestC = Math.max(bestC, chips); hsSet('blackjack', { chips, best: bestC }); $('#ch', root).textContent = chips; $('#bs', root).textContent = bestC; $('#bt', root).textContent = bet; }
-    const cardHtml = (c, back) => back ? '<span class="bj-card back">?</span>' : '<span class="bj-card ' + ((c.s === 1 || c.s === 2) ? 'r' : '') + '">' + RANKS[c.r] + '<small>' + SUITS[c.s] + '</small></span>';
-    function draw1() { if (shoe.length < 60) shoe = L.bjShoe(6); return { r: shoe.pop(), s: rnd(4) }; }
-    function paintHands() {
-      $('#dh', root).innerHTML = dealer.map((c, i) => cardHtml(c, hidden && i === 1)).join(''); $('#ph', root).innerHTML = player.map(c => cardHtml(c)).join('');
-      const pv = L.bjHand(player.map(c => c.r)), dvv = L.bjHand((hidden ? dealer.slice(0, 1) : dealer).map(c => c.r));
-      $('#pv', root).textContent = player.length ? '(' + (pv.soft && pv.total <= 21 ? 'soft ' : '') + pv.total + ')' : ''; $('#dv', root).textContent = dealer.length ? '(' + (hidden ? dvv.total + ' + ?' : dvv.total) + ')' : '';
-    }
-    function betUi() {
-      phase = 'bet'; hidden = true; $('#acts', root).innerHTML = '<button class="btn" id="deal">Deal</button><button class="btn alt" id="clr">Clear bet</button>';
-      const opts = [10, 25, 100, 500].filter(v => v <= chips);
-      $('#bets', root).innerHTML = opts.map(v => '<button class="bj-ch" style="background:' + ({ 10: '#2563eb', 25: '#16a34a', 100: '#111827', 500: '#9333ea' })[v] + '" data-v="' + v + '" aria-label="Add ' + v + ' chips">' + v + '</button>').join('') + (chips > 0 ? '<button class="bj-ch" style="background:#dc2626;font-size:12px" data-v="all" aria-label="All in">ALL</button>' : '');
-      if (chips <= 0) { $('#acts', root).innerHTML = '<button class="btn" id="rebuy">Out of chips: start again with 1000</button>'; $('#msg', root).textContent = 'You are out of chips'; } else $('#msg', root).textContent = bet ? 'Bet ' + bet + '. Deal when ready' : 'Place your bet';
-      save();
-    }
-    function actUi() {
-      $('#bets', root).innerHTML = '';
-      $('#acts', root).innerHTML = '<button class="btn" id="hit">Hit</button><button class="btn alt" id="stand">Stand</button><button class="btn alt" id="dbl" ' + (player.length === 2 && chips >= bet * 2 ? '' : 'disabled') + '>Double</button>';
-    }
-    function dealRound() {
-      if (bet <= 0 || bet > chips) { $('#msg', root).textContent = 'Place a bet first'; return; }
-      player = [draw1(), draw1()]; dealer = [draw1(), draw1()]; hidden = true; dbl = false; paintHands(); phase = 'play'; buzz(10);
-      const pb = L.bjHand(player.map(c => c.r)).bj, db = L.bjHand(dealer.map(c => c.r)).bj;
-      if (pb || db) { finish(); return; }
-      $('#msg', root).textContent = 'Hit, stand or double?'; actUi();
-    }
-    function finish() {
-      hidden = false; phase = 'done';
-      const pr = player.map(c => c.r), p = L.bjHand(pr);
-      if (!p.bust && !p.bj && !L.bjHand(dealer.map(c => c.r)).bj) { const dr = dealer.map(c => c.r); L.bjDealer(dr, () => { const c = draw1(); dealer.push(c); return c.r; }); }
-      paintHands();
-      const net = L.bjSettle(pr, dealer.map(c => c.r), bet); chips += net; if (chips < 0) chips = 0;
-      const msg = p.bj && net > 0 ? '\u{1F0CF} Blackjack! +' + net : net > 0 ? '\u{1F389} You win +' + net : net < 0 ? (p.bust ? 'Bust! ' : '') + 'You lose ' + net : 'Push: bet returned';
-      $('#msg', root).textContent = msg; if (net > 0) buzz(60);
-      bet = Math.min(bet / (dbl ? 2 : 1), chips); save();
-      $('#acts', root).innerHTML = '<button class="btn" id="again">Next hand</button>';
-    }
-    root.addEventListener('click', (e) => {
-      const b = e.target.closest('button'); if (!b) return;
-      if (b.dataset.v) { if (phase !== 'bet') return; bet = b.dataset.v === 'all' ? chips : Math.min(chips, bet + (+b.dataset.v)); $('#bt', root).textContent = bet; $('#msg', root).textContent = 'Bet ' + bet + '. Deal when ready'; return; }
-      const id = b.id;
-      if (id === 'clr') { bet = 0; betUi(); } else if (id === 'deal') dealRound();
-      else if (id === 'hit') { player.push(draw1()); paintHands(); buzz(8); const h = L.bjHand(player.map(c => c.r)); if (h.bust || h.total === 21) finish(); else actUi(); }
-      else if (id === 'stand') finish();
-      else if (id === 'dbl') { if (player.length === 2 && chips >= bet * 2) { bet *= 2; dbl = true; player.push(draw1()); paintHands(); finish(); } }
-      else if (id === 'again') { player = []; dealer = []; paintHands(); if (bet > chips) bet = chips; betUi(); }
-      else if (id === 'rebuy') { chips = 1000; bet = 0; player = []; dealer = []; paintHands(); betUi(); }
-    });
-    player = []; dealer = []; betUi();
-    return () => T.stop();
-  });
 
 /* =====================================================================
    18. Higher or Lower

@@ -1,6 +1,6 @@
 # PocketKit: features
 
-PocketKit has 327 tools in 11 categories. Everything works offline and all data stays on the phone.
+PocketKit has 326 tools in 11 categories. Everything works offline and all data stays on the phone.
 **Free** = every everyday utility. **Pro** = a one-time purchase (no subscription) for the heavier features and higher limits.
 
 _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-07. Edit the parts files, not this file._
@@ -318,7 +318,7 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-07. Edit the
 | **Sticky Board** | Free | storage | A board of colourful sticky notes you can drag around, edit, recolour and delete. Saved on the device, up to 100 notes. |
 | **Text to PDF** | Pro | storage | Type or paste up to 200,000 characters and save them as a PDF in Helvetica, with an optional bold title, font size 6 to 36, A4 or Letter pages, margins, and line spacing. Lines are wrapped and pages added automatically. Characters the standard font cannot show (emoji, non-Latin letters) become "?" and the tool tells you how many were replaced. |
 
-## Fun (86)
+## Fun (85)
 
 | Tool | Plan | Needs | What it does |
 |---|---|---|---|
@@ -328,7 +328,6 @@ _Generated from docs/parts/*.md by scripts/build-docs.js on 2026-10-07. Edit the
 | **Backgammon** | Free | storage | Standard backgammon (no doubling cube) on a portrait board, against the phone at Easy or Normal, or pass-and-play with a friend. Dice are rolled for you, legal checkers are highlighted, then legal destinations; the bar, blocked points, bearing off and the rules that force you to use both dice (or the larger one when only one can be played) are all enforced. Wins are counted. |
 | **Balance Ball** | Free | motion, storage | Tilt the phone to roll a ball around an arena, collect stars (they add time) and avoid the moving red mines before the 45 seconds run out. Without a tilt sensor, drag a finger to pull the ball instead. The screen stays awake during play. Saved best score. |
 | **Bingo Caller** | Free | - | Calls bingo numbers 1 to 75 with the B-I-N-G-O letter, shows all called numbers on a board and the last few calls, optionally read aloud. Saved between sessions. |
-| **Blackjack** | Free | storage | Single-player blackjack against the dealer with saved chips: hit, stand or double down. Blackjack pays 3 to 2, the dealer stands on all 17s and aces count as 11 or 1. Chips and best chips are remembered; if you run out you can start again with 1000. Diamonds are drawn in red like hearts (they were black before). |
 | **Block Stack** | Free | storage | A falling-blocks game. Move, rotate and drop the pieces to complete rows; the speed rises with the level. Control by dragging, tapping and swiping on the board or with the on-screen buttons (hold to repeat). Next-piece preview, ghost piece, pause and a saved best score. Drawing falls back to plain squares on an old WebView without rounded rectangles. |
 | **Bottle Spinner** | Free | - | Spin a bottle in the middle of a circle of 2 to 12 numbered seats. It slows to a stop and highlights the seat it points at. |
 | **Breakout** | Free | storage | Bounce the ball off your paddle to smash every brick. Drag your finger to steer, three lives, faster balls and more rows each level, with a saved best score. Drawing falls back to plain rectangles on an old WebView. |
