@@ -17,7 +17,7 @@
   const errMsg = (e) => e && (e.message === 'permission' || /permission|denied/i.test(String(e.message || e))) ? 'Permission was not granted. Allow it in the prompt, or in the phone\'s Settings > Apps > PocketKit > Permissions.' : 'Could not read this (' + String((e && e.message) || e).slice(0, 60) + ').';
 
   /* ------------------------------------------------------------------ Wi-Fi Scanner */
-  Tools.register({ id: 'wifiscan', name: 'Wi-Fi Scanner', icon: '🏠', cat: 'measure', desc: 'Lists the Wi-Fi networks around you with signal strength, security type, band and channel, and shows which channels are crowded. Nothing is saved or sent.', keys: ['wifi', 'wi-fi', 'networks', 'router', 'channel', 'signal', 'ssid'], needs: ['location'], render(el) {
+  Tools.register({ id: 'wifiscan', name: 'Wi-Fi Scanner', icon: '🔶', cat: 'measure', desc: 'Lists the Wi-Fi networks around you with signal strength, security type, band and channel, and shows which channels are crowded. Nothing is saved or sent.', keys: ['wifi', 'wi-fi', 'networks', 'router', 'channel', 'signal', 'ssid'], needs: ['location'], render(el) {
     el.innerHTML = '<div id="msg" class="muted center" style="min-height:18px"></div>' +
       '<button class="btn" id="go" style="width:100%">Scan for networks</button>' +
       '<div class="card" id="chart" hidden><b>Channels in use</b><div id="bars" style="display:flex;align-items:flex-end;gap:3px;height:90px;margin-top:8px;overflow-x:auto" role="img" aria-label="Number of networks on each Wi-Fi channel"></div><div class="muted" id="advice" style="margin-top:8px;font-size:13px"></div></div>' +
