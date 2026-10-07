@@ -29,7 +29,11 @@ vc.on('jsdomError', e => { if (!/Not implemented/.test(e.message)) fail('page er
       /* jsdom blocks localStorage on file:// pages: an in-memory stand-in so saved state (pins, recents, settings) really works */
       const mem = new Map();
       Object.defineProperty(w, 'localStorage', { value: { getItem: k => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => { mem.set(k, String(v)); }, removeItem: k => { mem.delete(k); }, clear: () => mem.clear(), key: i => [...mem.keys()][i] || null, get length() { return mem.size; } } });
-      w.scrollTo = () => {};
+      /* a scroll position the tests can set and read, to check Home keeps its place */
+      let fakeY = 0; w.__scrolls = [];
+      Object.defineProperty(w, 'scrollY', { get: () => fakeY, configurable: true });
+      w.__setY = y => { fakeY = y; };
+      w.scrollTo = (x, y) => { w.__scrolls.push(y); fakeY = y; };
       w.AudioContext = w.webkitAudioContext = undefined;
     }
   });
@@ -65,6 +69,18 @@ vc.on('jsdomError', e => { if (!/Not implemented/.test(e.message)) fail('page er
     if (!w.document.querySelector('#sections .tile')) fail('searching for "emi" found nothing');
     w.eval(`document.querySelector('#search').value = ''; renderHome();`);
   } catch (e) { fail('home flows threw: ' + e.message); }
+
+  /* Home keeps its scroll position after opening a tool or Settings and coming back (the browser's own restoration is off) */
+  try {
+    if ('scrollRestoration' in w.history && w.history.scrollRestoration !== 'manual') fail('history.scrollRestoration must be manual so Back does not reset Home to the top');
+    for (const act of ["openTool('timer')", "document.querySelector('#settingsBtn').click()"]) {
+      w.__setY(1700); w.eval(act); w.eval('goHome()');
+      await new Promise(r => setTimeout(r, 200));
+      if (w.__scrolls[w.__scrolls.length - 1] !== 1700) fail('Home scroll position was not restored after ' + act + ' (last scrollTo ' + w.__scrolls[w.__scrolls.length - 1] + ')');
+    }
+    /* jsdom has no browser scroll restoration, so also check the source line that switches it off (it caused Home to jump to the top on Back) */
+    if (!fs.readFileSync(path.join(ROOT, 'js', 'app.js'), 'utf8').includes("history.scrollRestoration = 'manual'")) fail("app.js must set history.scrollRestoration = 'manual'");
+  } catch (e) { fail('scroll flow threw: ' + e.message); }
 
   /* render and clean up every tool (sensor tools included: they must fail gracefully, not throw) */
   let rendered = 0;

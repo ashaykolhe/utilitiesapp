@@ -4,6 +4,7 @@
 const APP_VERSION = '0.1.0';
 const WHATS_NEW = {}; // 'x.y.z': ['line', ...] shown once after an update
 let activeCleanup = null, view = 'home', homeScroll = 0, searchTimer = null, filter = 'all', curTool = null;
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; // the app keeps and restores Home's scroll position itself
 
 /* Theme */
 const mq = matchMedia('(prefers-color-scheme: dark)');
@@ -159,7 +160,12 @@ function togglePin(id) {
 function show(name) {
   view = name;
   ['home', 'tool', 'settings'].forEach(s => { $('#' + s).hidden = s !== name; });
-  if (name === 'home') window.scrollTo(0, homeScroll);
+  if (name === 'home') {
+    /* Put Home back where it was. The browser may also try to restore a scroll position when Back is used, so repeat after the next paints. */
+    const y = homeScroll; window.scrollTo(0, y);
+    requestAnimationFrame(() => { window.scrollTo(0, y); requestAnimationFrame(() => window.scrollTo(0, y)); });
+    setTimeout(() => { if (view === 'home') window.scrollTo(0, y); }, 120);
+  }
   else { window.scrollTo(0, 0); const h1 = name === 'tool' ? $('#toolTitle') : $('#settingsTitle'); h1.focus({ preventScroll: true }); }
 }
 function refreshPin(id) {
