@@ -1882,52 +1882,132 @@ function dieHTML(v, opts) {
     (opts.style ? ' style="' + opts.style + '"' : '') + '>' + cells.join('') + '</button>';
 }
 
-reg('dicefive', 'Dice Five', '🪘', 'A five-dice scorecard game: roll up to three times, hold the dice you like and fill 13 boxes. Play solo for a high score or against the phone.',
-  ['dice', 'yahtzee', 'five', 'scorecard', 'roll'], function (el) {
+/* LOGIC-START */
+/* ---- Seats for the multi-player dice games (Dice Five, Liar's Dice): any mix of humans sharing the phone and phone players ---- */
+L.SEAT_MAX = 4; L.NAME_MAX = 12;
+/* Plain text only: no angle brackets or control characters, one space between words, at most 12 characters. Output is still escaped by the UI. */
+L.cleanName = (s, fallback) => { const t = String(s == null ? '' : s).replace(/[<>\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, L.NAME_MAX).trim(); return t || fallback; };
+/* Saved/default setup -> { np, kinds (4 of 'h'|'p'), names (4 strings, '' = automatic) }. Always at least one human seat among the first np. */
+L.normSeats = function (sv, def) {
+  sv = sv && typeof sv === 'object' ? sv : {};
+  const np = Number.isInteger(sv.np) && sv.np >= def.min && sv.np <= L.SEAT_MAX ? sv.np : def.np;
+  const kinds = [0, 1, 2, 3].map((i) => { const k = Array.isArray(sv.kinds) ? sv.kinds[i] : (i === 0 ? 'h' : 'p'); return k === 'h' ? 'h' : 'p'; });
+  if (!kinds.slice(0, np).includes('h')) kinds[0] = 'h';
+  const names = [0, 1, 2, 3].map((i) => L.cleanName(Array.isArray(sv.names) ? sv.names[i] : '', ''));
+  return { np, kinds, names };
+};
+/* The seats of a game: humans are "Player 1".., phones "Phone 1".. unless a human typed a name. Names are made unique. */
+L.seatList = function (np, kinds, names) {
+  let h = 0, p = 0; const out = [];
+  for (let i = 0; i < np; i++) {
+    const ai = kinds[i] !== 'h', idx = ai ? p++ : h++;
+    out.push({ ai, pi: idx, name: ai ? 'Phone ' + (idx + 1) : L.cleanName(names && names[i], 'Player ' + (idx + 1)) });
+  }
+  const orig = out.map((s) => s.name.toLowerCase());
+  out.forEach((s, i) => { if (orig.some((o, j) => j !== i && o === orig[i])) s.name = s.name.slice(0, L.NAME_MAX - 2).trim() + ' ' + (i + 1); });
+  return out;
+};
+/* Dice Five standings: competition ranking (1, 1, 3), winners = everyone on the top total. */
+L.dfStandings = function (totals) {
+  const top = Math.max(...totals), order = totals.map((t, i) => ({ i, total: t, rank: 1 + totals.filter((o) => o > t).length })).sort((a, b) => b.total - a.total || a.i - b.i);
+  return { top, order, winners: order.filter((o) => o.total === top).map((o) => o.i) };
+};
+L.ordinal = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10 > 3 ? 0 : n % 10]);
+/* Liar's Dice: next seat with dice, the winner (the only seat left, else -1) and who loses a die after a challenge. */
+L.ldNextAlive = (ns, i) => { for (let k = 1; k <= ns.length; k++) { const j = (i + k) % ns.length; if (ns[j] > 0) return j; } return i; };
+L.ldWinner = (ns) => { const a = ns.map((n, i) => (n > 0 ? i : -1)).filter((i) => i >= 0); return a.length === 1 ? a[0] : -1; };
+L.ldChallenge = function (prev, cur, hands, wild) { const r = L.ldResolve(prev, hands, wild); return { actual: r.actual, bidderRight: r.bidderRight, loser: r.bidderRight ? cur : prev.by }; };
+/* Hidden information: the dice a viewer may see. Everything after the reveal, otherwise only the viewer's own seat (viewer -1 = nobody). Hidden seats are null. */
+L.ldView = (hands, ns, viewer, reveal) => hands.map((h, i) => (reveal || i === viewer ? h.slice() : null));
+/* A pass-the-phone cover is needed before a human's turn whenever more than one human is still in the game. */
+L.ldNeedCover = (ns, kinds, cur) => kinds[cur] === 'h' && ns[cur] > 0 && kinds.filter((k, i) => k === 'h' && ns[i] > 0).length > 1;
+/* LOGIC-END */
+
+/* Setup widgets shared by Dice Five and Liar's Dice: a seat button (Human / Phone) and a name box per seat. */
+function seatRowsHTML(S) {
+  const list = L.seatList(S.np, S.kinds, S.names);
+  return '<div class="muted" style="font-size:13px">Tap a seat to switch it between a human (sharing this phone) and the phone.</div>' + list.map((s, i) =>
+    '<div style="display:flex;gap:8px;align-items:flex-end;margin:6px 0"><button class="btn alt seat" data-s="' + i + '" style="flex:none;min-width:132px;min-height:44px">Seat ' + (i + 1) + ': ' + (s.ai ? '🤖 Phone' : '👤 Human') + '</button>' +
+    (s.ai ? '<span class="muted" style="flex:1;min-height:44px;line-height:44px">' + esc(s.name) + '</span>'
+      : '<label style="flex:1;font-size:12px;color:var(--muted)">Name<input class="nm" data-s="' + i + '" type="text" maxlength="12" autocomplete="off" aria-label="Name for seat ' + (i + 1) + '" value="' + esc(S.names[i]) + '" placeholder="' + esc(s.name) + '" style="width:100%;box-sizing:border-box;min-height:44px;font-size:16px"></label>') + '</div>').join('');
+}
+function bindSeatSetup(box, S, repaint, other) {
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.classList.contains('seat')) { const i = +b.dataset.s; S.kinds[i] = S.kinds[i] === 'h' ? 'p' : 'h'; repaint(); }
+    else if (b.parentNode && b.parentNode.id === 'np') { S.np = +b.dataset.v; repaint(); }
+    else other(b);
+  });
+  box.addEventListener('input', (e) => { const t = e.target; if (t.classList && t.classList.contains('nm')) S.names[+t.dataset.s] = L.cleanName(t.value, ''); });
+}
+
+reg('dicefive', 'Dice Five', '🪘', 'A five-dice scorecard game: roll up to three times, hold the dice you like and fill 13 boxes. Play alone for a high score, or with 2 to 4 seats of humans sharing the phone and phone players.',
+  ['dice', 'yahtzee', 'five', 'scorecard', 'roll', 'pass and play', 'multiplayer'], function (el) {
     const T = tracker(), ID = 'dicefive';
     const sv = gget(ID);
-    let mode = sv.mode === 'phone' ? 'phone' : 'solo', pl = [], turn = 0, dice = [0, 0, 0, 0, 0], held = [false, false, false, false, false], rolls = 3, over = false, busy = false, msg = '', token = 0, lastPick = null;
+    const S = L.normSeats(sv.kinds ? sv : Object.assign({}, sv, { np: sv.mode === 'phone' ? 2 : 1 }), { np: 1, min: 1 });
+    let pl = [], turn = 0, dice = [0, 0, 0, 0, 0], held = [false, false, false, false, false], rolls = 3, over = false, busy = false, msg = '', token = 0, lastPick = null, phase = 'setup', standings = null;
     const root = mount(el, `
-      ${seg('md', [['solo', 'Solo'], ['phone', 'vs Phone']], mode)}
-      <div class="stats">${stat('bs', 'Best solo', '–')}${stat('wl', 'Wins vs phone', '0–0')}</div>
-      <div class="msg" id="msg"></div>
-      <div id="dc" class="dice"></div>
-      <div class="acts"><button class="btn" id="roll">Roll dice</button><button class="btn alt" id="hint">💡 Hint</button><button class="btn alt" id="new">New game</button></div>
-      <div class="card" style="padding:6px"><table class="tbl" id="sc"></table></div>
+      <div id="setup"></div>
+      <div id="play" hidden>
+        <div class="stats">${stat('bs', 'Best solo', '–')}${stat('wl', 'Won–lost–tied', '0–0–0')}${stat('gp', 'Played', 0)}</div>
+        <div class="muted" id="ord" style="font-size:13px;text-align:center"></div>
+        <div class="msg" id="msg" role="status" aria-live="polite"></div>
+        <div id="dc" class="dice"></div>
+        <div class="acts"><button class="btn" id="roll">Roll dice</button><button class="btn alt" id="hint">💡 Hint</button><button class="btn alt" id="new">New game</button></div>
+        <div class="card" style="padding:6px;overflow-x:auto"><table class="tbl" id="sc" style="font-size:13px"></table></div>
+        <div id="stand"></div>
+      </div>
       <div class="muted" style="font-size:12px;text-align:center">Upper boxes: 35 bonus for 63 or more. A second Dice Five scores 100 when the Dice Five box holds 50 and follows the joker rules.</div>`);
-    const stats = () => { const s = gget(ID); return { w: s.w || 0, l: s.l || 0, t: s.t || 0 }; };
+    const stats = () => { const s = gget(ID); return { w: s.w || 0, l: s.l || 0, t: s.t || 0, gp: s.gp || 0 }; };
+    const isAi = (i) => !!(pl[i] && pl[i].ai);
+    const myTurn = () => !over && !busy && pl[turn] && !pl[turn].ai;
+    function paintSetup() {
+      phase = 'setup'; $('#play', root).hidden = true;
+      const hs = S.kinds.slice(0, S.np).filter((k) => k === 'h').length;
+      $('#setup', root).innerHTML = `<div class="card"><b>Players</b>${seg('np', [[1, '1'], [2, '2'], [3, '3'], [4, '4']], S.np)}
+        ${seatRowsHTML(S)}
+        <div class="muted" id="warn" role="status" aria-live="polite" style="font-size:13px;min-height:18px">${hs ? '' : 'Pick at least one human seat.'}</div>
+        <button class="btn" id="start" style="width:100%;min-height:48px"${hs ? '' : ' disabled'}>Start game</button></div>`;
+    }
     function showStats() {
       const b = getBest(ID, 'solo'), s = stats();
-      $('#bs', root).textContent = b || '–'; $('#wl', root).textContent = s.w + '–' + s.l + (s.t ? '–' + s.t : '');
+      $('#bs', root).textContent = b || '–'; $('#wl', root).textContent = s.w + '–' + s.l + '–' + s.t; $('#gp', root).textContent = s.gp;
     }
     function paintDice() {
-      const mine = !over && !busy && pl[turn] && !pl[turn].ai;
+      const mine = myTurn();
       $('#dc', root).innerHTML = dice.map((v, i) => dieHTML(v, { i, hold: held[i], dis: !mine || rolls === 3 || rolls === 0 })).join('');
       const b = $('#roll', root);
       b.disabled = !mine || rolls === 0; b.textContent = rolls === 3 ? 'Roll dice' : rolls > 0 ? 'Roll again (' + rolls + ' left)' : 'Pick a box';
     }
     function paintCard() {
-      const legal = !over && !busy && pl[turn] && !pl[turn].ai && rolls < 3 ? L.dfLegal(pl[turn].sheet, dice) : [];
-      let h = '<tr><th></th>' + pl.map((p, i) => '<th' + (i === turn && !over ? ' style="color:var(--accent)"' : '') + '>' + p.name + '</th>').join('') + '</tr>';
+      const legal = myTurn() && rolls < 3 ? L.dfLegal(pl[turn].sheet, dice) : [];
+      let h = '<tr><th scope="col"></th>' + pl.map((p, i) => '<th scope="col"' + (i === turn && !over ? ' style="color:var(--accent)"' : '') + '>' + (i === turn && !over && pl.length > 1 ? '▶ ' : '') + esc(p.name) + '</th>').join('') + '</tr>';
       const row = (label, cell) => '<tr><td style="text-align:left">' + label + '</td>' + pl.map((p, i) => cell(p, i)).join('') + '</tr>';
       L.DF_CATS.forEach((cat, ci) => {
-        if (ci === 6) h += row('<b>Upper</b> <span class="muted">(' + 63 + ' needed)</span>', (p) => '<td><b>' + L.dfUpper(p.sheet) + '</b></td>') + row('Upper bonus', (p) => '<td>' + (L.dfUpper(p.sheet) >= 63 ? '35' : '0') + '</td>');
+        if (ci === 6) h += row('<b>Upper</b> <span class="muted">(63 needed)</span>', (p) => '<td><b>' + L.dfUpper(p.sheet) + '</b></td>') + row('Upper bonus', (p) => '<td>' + (L.dfUpper(p.sheet) >= 63 ? '35' : '0') + '</td>');
         h += row(L.DF_LABEL[cat], (p, i) => {
           const v = p.sheet[cat];
           if (v !== null) return '<td' + (lastPick && lastPick.p === i && lastPick.cat === cat ? ' style="background:' + bgOK + '"' : '') + '>' + v + '</td>';
           const o = i === turn ? legal.find((x) => x.cat === cat) : null;
-          return '<td>' + (o ? '<button data-c="' + cat + '" style="min-width:44px;min-height:40px;border:2px solid var(--accent);border-radius:8px;background:var(--surface);color:var(--accent);font-weight:700">' + o.score + '</button>' : '') + '</td>';
+          return '<td>' + (o ? '<button data-c="' + cat + '" aria-label="' + esc(L.DF_LABEL[cat].replace(/ \(\d+\)/, '')) + ' for ' + o.score + ' points" style="min-width:44px;min-height:44px;border:2px solid var(--accent);border-radius:8px;background:var(--surface);color:var(--accent);font-weight:700">' + o.score + '</button>' : '') + '</td>';
         });
       });
       h += row('Dice Five bonus', (p) => '<td>' + (p.sheet.yb ? '+' + 100 * p.sheet.yb : '–') + '</td>');
       h += row('<b>Total</b>', (p) => '<td><b>' + L.dfTotal(p.sheet) + '</b></td>');
       $('#sc', root).innerHTML = h;
     }
-    function paint() { $('#msg', root).textContent = msg; paintDice(); paintCard(); showStats(); }
+    function paintOrder() {
+      $('#ord', root).textContent = pl.length > 1 ? 'Turn order: ' + pl.map((p, i) => (i === turn && !over ? '[' + p.name + ']' : p.name)).join(' → ') + (over ? '' : '. Up now: ' + pl[turn].name) : '';
+      $('#stand', root).innerHTML = standings ? '<div class="card"><b>Final standings</b><ol style="margin:6px 0 0;padding-left:0;list-style:none">' + standings.order.map((o) =>
+        '<li style="min-height:32px;display:flex;justify-content:space-between;gap:8px"><span>' + L.ordinal(o.rank) + ' · ' + esc(pl[o.i].name) + (standings.winners.includes(o.i) ? (standings.winners.length > 1 ? ' (tied winner)' : ' (winner)') : '') + '</span><b>' + o.total + ' points</b></li>').join('') + '</ol></div>' : '';
+    }
+    function paint() { $('#msg', root).textContent = msg; paintOrder(); paintDice(); paintCard(); showStats(); }
     function newGame() {
-      token++; busy = false; over = false; turn = 0; rolls = 3; dice = [0, 0, 0, 0, 0]; held = held.map(() => false); lastPick = null;
-      pl = mode === 'phone' ? [{ name: 'You', sheet: L.dfNewSheet() }, { name: 'Phone', sheet: L.dfNewSheet(), ai: true }] : [{ name: 'You', sheet: L.dfNewSheet() }];
-      msg = 'Roll the dice to start'; paint();
+      token++; busy = false; over = false; turn = 0; rolls = 3; dice = [0, 0, 0, 0, 0]; held = held.map(() => false); lastPick = null; standings = null; phase = 'play';
+      pl = L.seatList(S.np, S.kinds, S.names).map((s) => ({ name: s.name, ai: s.ai, sheet: L.dfNewSheet() }));
+      $('#setup', root).innerHTML = ''; $('#play', root).hidden = false;
+      if (pl[0].ai) { paint(); phoneTurn(); } else { msg = pl.length > 1 ? pl[0].name + ': roll the dice to start' : 'Roll the dice to start'; paint(); }
     }
     function rollDice() {
       for (let i = 0; i < 5; i++) if (!held[i]) dice[i] = 1 + rnd(6);
@@ -1935,25 +2015,24 @@ reg('dicefive', 'Dice Five', '🪘', 'A five-dice scorecard game: roll up to thr
     }
     function endGame() {
       over = true; busy = false;
-      const mine = L.dfTotal(pl[0].sheet);
-      if (mode === 'solo') {
-        const nb = recBest(ID, 'solo', mine, false);
-        msg = 'Game over: ' + mine + ' points' + (nb ? ' (new best!)' : '');
-      } else {
-        const theirs = L.dfTotal(pl[1].sheet), s = stats();
-        if (mine > theirs) { s.w++; msg = '🎉 You win ' + mine + ' to ' + theirs; } else if (mine < theirs) { s.l++; msg = 'Phone wins ' + theirs + ' to ' + mine; } else { s.t++; msg = 'A tie at ' + mine; }
-        gput(ID, s);
+      const totals = pl.map((p) => L.dfTotal(p.sheet)), st = L.dfStandings(totals), win = st.winners.map((i) => pl[i].name), h0 = pl.findIndex((p) => !p.ai), s = stats();
+      if (pl.length === 1) { const nb = recBest(ID, 'solo', totals[0], false); msg = 'Game over: ' + totals[0] + ' points' + (nb ? ' (new best!)' : ''); }
+      else { standings = st; msg = '🏁 ' + (win.length > 1 ? 'Tie: ' + win.join(' and ') + ' share the top with ' + st.top : win[0] + ' wins with ' + st.top); }
+      if (h0 >= 0) {
+        s.gp++;
+        if (pl.length > 1) { if (st.winners.includes(h0)) { if (win.length > 1) s.t++; else s.w++; } else s.l++; }
+        gput(ID, { w: s.w, l: s.l, t: s.t, gp: s.gp, gw: (gget(ID).gw || 0) + (pl.length > 1 && st.winners.includes(h0) && win.length === 1 ? 1 : 0) });
       }
       paint();
     }
     function fill(cat) {
-      const r = L.dfApply(pl[turn].sheet, cat, dice);
+      const r = L.dfApply(pl[turn].sheet, cat, dice), who = pl[turn].name;
       pl[turn].sheet = r.sheet; lastPick = { p: turn, cat };
-      msg = (turn === 0 ? 'You' : pl[turn].name) + ' scored ' + r.score + ' in ' + L.DF_LABEL[cat].replace(/ \(\d+\)/, '') + (r.bonus ? ' and a 100 bonus' : '');
+      msg = who + ' scored ' + r.score + ' in ' + L.DF_LABEL[cat].replace(/ \(\d+\)/, '') + (r.bonus ? ' and a 100 bonus' : '');
       held = held.map(() => false); rolls = 3;
       if (pl.every((p) => L.dfDone(p.sheet))) { paint(); endGame(); return; }
       turn = (turn + 1) % pl.length; dice = [0, 0, 0, 0, 0];
-      if (pl[turn].ai) { paint(); phoneTurn(); } else { msg += '. Your turn: roll!'; paint(); }
+      if (pl[turn].ai) { paint(); phoneTurn(); } else { msg += '. ' + (pl.length > 1 ? pl[turn].name + ': your turn, roll!' : 'Your turn: roll!'); paint(); }
     }
     function phoneTurn() {
       const my = ++token; busy = true; const me = pl[turn];
@@ -1965,13 +2044,13 @@ reg('dicefive', 'Dice Five', '🪘', 'A five-dice scorecard game: roll up to thr
           if (rolls > 0) {
             const hold = L.dfAIHold(me.sheet, dice, rolls, 2);
             if (hold.every(Boolean)) { held = hold; paint(); T.to(finish, 700); return; }
-            held = hold; msg = 'Phone keeps ' + (hold.filter(Boolean).length || 'no') + ' dice'; paint();
+            held = hold; msg = me.name + ' keeps ' + (hold.filter(Boolean).length || 'no') + ' dice'; paint();
             T.to(() => { held = held.map(() => false).map((_, i) => hold[i]); step(); }, 800);
           } else finish();
         }, 700);
       };
       const finish = () => { if (my !== token) return; busy = false; held = held.map(() => false); fill(L.dfAIPick(me.sheet, dice)); };
-      held = held.map(() => false); rolls = 3; msg = 'Phone is rolling…'; paint(); T.to(step, 500);
+      held = held.map(() => false); rolls = 3; msg = me.name + ' is rolling…'; paint(); T.to(step, 500);
     }
     $('#dc', root).onclick = (e) => {
       const b = e.target.closest('button'); if (!b || over || busy || rolls === 3 || rolls === 0 || b.disabled) return;
@@ -1990,9 +2069,11 @@ reg('dicefive', 'Dice Five', '🪘', 'A five-dice scorecard game: roll up to thr
       if (rolls > 0) { held = L.dfAIHold(pl[turn].sheet, dice, rolls, 2); msg = 'Hint: the highlighted dice are worth keeping'; } else msg = 'Hint: try ' + L.DF_LABEL[L.dfAIPick(pl[turn].sheet, dice)].replace(/ \(\d+\)/, '');
       paint();
     };
-    onSeg(root, 'md', (v) => { mode = v === 'phone' ? 'phone' : 'solo'; gput(ID, { mode }); newGame(); });
-    $('#new', root).onclick = newGame;
-    newGame();
+    $('#new', root).onclick = () => { token++; busy = false; paintSetup(); };
+    bindSeatSetup($('#setup', root), S, paintSetup, (b) => {
+      if (b.id === 'start') { gput(ID, { np: S.np, kinds: S.kinds, names: S.names }); newGame(); }
+    });
+    paintSetup(); showStats();
     return () => { token++; T.stop(); };
   });
 
@@ -2239,75 +2320,112 @@ L.ldAI = function (hand, total, prev, wild, risk) {
 };
 /* LOGIC-END */
 
-reg('liarsdice', "Liar's Dice", '🥃', 'Bluff against 1 to 3 phone players: bid how many dice of a face are under all the cups, or call the last bid a lie. Lose a die when you are wrong; last player with dice wins.',
-  ['liar', 'dice', 'bluff', 'perudo', 'cup'], function (el) {
+reg('liarsdice', "Liar's Dice", '🥃', 'Bluff in 2 to 4 seats, each a human sharing this phone (pass and play) or a phone player: bid how many dice of a face are under all the cups, or call the last bid a lie. Lose a die when you are wrong; last seat with dice wins.',
+  ['liar', 'dice', 'bluff', 'perudo', 'cup', 'pass and play', 'multiplayer'], function (el) {
     const T = tracker(), ID = 'liarsdice';
     const sv = gget(ID);
-    let opp = [1, 2, 3].includes(sv.opp) ? sv.opp : 1, wild = sv.wild !== false, dpp = [3, 4, 5].includes(sv.dpp) ? sv.dpp : 5;
-    let pl = [], cur = 0, prev = null, phase = 'setup', msg = '', token = 0, qty = 1, face = 2, loser = -1, resolved = null, over = false;
+    const S = L.normSeats(sv.kinds ? sv : Object.assign({}, sv, { np: [1, 2, 3].includes(sv.opp) ? sv.opp + 1 : 2 }), { np: 2, min: 2 });
+    let wild = sv.wild !== false, dpp = [3, 4, 5].includes(sv.dpp) ? sv.dpp : 5;
+    let pl = [], cur = 0, prev = null, phase = 'setup', msg = '', token = 0, qty = 1, face = 2, loser = -1, resolved = null, over = false, pendingNote = '', h1 = -1, humans = 0;
     const root = mount(el, `
       <div id="setup"></div>
+      <div id="cover" hidden></div>
       <div id="play" hidden>
         <div id="tb"></div>
-        <div class="msg" id="msg" style="min-height:44px"></div>
+        <div class="msg" id="msg" role="status" aria-live="polite" style="min-height:44px"></div>
         <div id="bid" style="text-align:center;font-size:18px;font-weight:700;margin:4px 0"></div>
-        <div class="muted" style="font-size:12px;text-align:center">Your dice (under your cup)</div>
+        <div class="muted" id="melab" style="font-size:12px;text-align:center"></div>
         <div id="me" class="dice"></div>
         <div id="ctl"></div>
         <div class="acts"><button class="btn alt" id="menu">New game</button></div>
       </div>
-      <div class="muted" style="font-size:12px;text-align:center;margin-top:6px">A bid says "at least this many dice show this face" among everyone's dice. Raise by bidding more dice, or the same number of a higher face. If you think the last bid is too high, call Liar. Ones count as every face when "Ones are wild" is on.</div>`);
-    const alive = () => pl.filter((p) => p.n > 0);
+      <div class="muted" style="font-size:12px;text-align:center;margin-top:6px">A bid says "at least this many dice show this face" among everyone's dice. Raise by bidding more dice, or the same number of a higher face. If you think the last bid is too high, call Liar. Ones count as every face when "Ones are wild" is on. With several humans, pass the phone when the cover screen asks.</div>`);
     const total = () => pl.reduce((a, p) => a + p.n, 0);
-    const nextAlive = (i) => { for (let k = 1; k <= pl.length; k++) { const j = (i + k) % pl.length; if (pl[j].n > 0) return j; } return i; };
+    const ns = () => pl.map((p) => p.n);
+    const kindsOf = () => pl.map((p) => (p.ai ? 'p' : 'h'));
+    const alive = () => pl.filter((p) => p.n > 0);
     const faceTxt = (f) => '⚀⚁⚂⚃⚄⚅'[f - 1];
+    const SMALL = 'width:30px;height:30px;min-width:30px;min-height:30px;padding:3px;border-radius:7px';
+    const seatName = (i) => esc(pl[i].name);
     function paintSetup() {
-      phase = 'setup'; $('#play', root).hidden = true;
-      $('#setup', root).innerHTML = `<div class="card"><b>Phone opponents</b>${seg('op', [[1, '1'], [2, '2'], [3, '3']], opp)}
+      phase = 'setup'; $('#play', root).hidden = true; $('#cover', root).hidden = true;
+      const hs = S.kinds.slice(0, S.np).filter((k) => k === 'h').length, g = gget(ID);
+      $('#setup', root).innerHTML = `<div class="card"><b>Players</b>${seg('np', [[2, '2'], [3, '3'], [4, '4']], S.np)}
+        ${seatRowsHTML(S)}
         <b>Dice each</b>${seg('dp', [[3, '3'], [4, '4'], [5, '5']], dpp)}
         <label style="display:flex;align-items:center;gap:10px;min-height:44px;padding:4px 0"><input type="checkbox" id="wild" ${wild ? 'checked' : ''} style="width:24px;height:24px"> Ones are wild</label>
-        <div class="stats">${stat('w', 'Games won', (gget(ID).w || 0) + '–' + (gget(ID).l || 0))}</div>
-        <button class="btn" id="start" style="width:100%">Start game</button></div>`;
+        <div class="stats">${stat('w', 'Games won (Player 1 seat)', (g.w || 0) + '–' + (g.l || 0))}${stat('gp', 'Games played', g.gp || 0)}</div>
+        <div class="muted" id="warn" role="status" aria-live="polite" style="font-size:13px;min-height:18px">${hs ? '' : 'Pick at least one human seat.'}</div>
+        <button class="btn" id="start" style="width:100%;min-height:48px"${hs ? '' : ' disabled'}>Start game</button></div>`;
     }
     function startGame() {
-      token++; const AI = ['Rosa', 'Max', 'Kit'];
-      pl = [{ name: 'You', ai: false, n: dpp, hand: [], risk: 0 }].concat(Array.from({ length: opp }, (_, i) => ({ name: AI[i], ai: true, n: dpp, hand: [], risk: [0, 0.6, -0.5][i] })));
-      over = false; $('#setup', root).innerHTML = ''; $('#play', root).hidden = false; newRound(0);
+      token++;
+      pl = L.seatList(S.np, S.kinds, S.names).map((s) => ({ name: s.name, ai: s.ai, n: dpp, hand: [], risk: s.ai ? [0, 0.6, -0.5, 0.2][s.pi] : 0 }));
+      h1 = pl.findIndex((p) => !p.ai); humans = pl.filter((p) => !p.ai).length;
+      over = false; $('#setup', root).innerHTML = ''; newRound(0, '');
     }
-    function newRound(starter) {
+    function newRound(starter, note) {
       pl.forEach((p) => { p.hand = Array.from({ length: p.n }, () => 1 + rnd(6)); });
-      prev = null; cur = starter; resolved = null; loser = -1; qty = 1; face = 2;
-      phase = pl[cur].ai ? 'ai' : 'bid'; msg = pl[cur].ai ? pl[cur].name + ' opens the bidding…' : 'You open: choose a bid';
-      paint(); if (pl[cur].ai) aiMove();
+      prev = null; cur = starter; resolved = null; loser = -1;
+      turnStart(note);
     }
+    /* A seat is up: phones play on their own; a human gets a pass-the-phone cover first when other humans are still in. */
+    function turnStart(note) {
+      const p = pl[cur];
+      if (p.ai) { phase = 'ai'; msg = (note ? note + '. ' : '') + p.name + (prev ? ' is thinking…' : ' opens the bidding…'); paint(); aiMove(); return; }
+      pendingNote = note || '';
+      if (L.ldNeedCover(ns(), kindsOf(), cur)) { phase = 'cover'; msg = 'Pass the phone to ' + p.name + '. Tap when only you can see the screen.'; paint(); return; }
+      beginBid();
+    }
+    function beginBid() {
+      const p = pl[cur]; phase = 'bid';
+      if (prev) { qty = Math.min(total(), prev.f === 6 ? prev.q + 1 : prev.q); face = prev.f === 6 ? 1 : prev.f + 1; } else { qty = 1; face = 2; }
+      msg = (pendingNote ? pendingNote + '. ' : '') + (prev ? p.name + ': raise or call Liar' : p.name + ' opens: choose a bid');
+      pendingNote = ''; paint();
+    }
+    /* Whose dice may be on screen right now: the human acting, or the only human when there is just one; nobody otherwise. */
+    const viewer = () => (phase === 'bid' ? cur : humans === 1 && phase !== 'cover' ? h1 : -1);
     function paint() {
-      const reveal = phase === 'reveal' || over;
-      $('#tb', root).innerHTML = '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">' + pl.slice(1).map((p, k) => {
-        const i = k + 1, hidden = p.hand.map((v) => (reveal && p.n > 0 ? dieHTML(v, { dis: true, hold: resolved && (v === prev.f || (wild && prev.f !== 1 && v === 1)), style: 'width:30px;height:30px;min-width:30px;min-height:30px;padding:3px;border-radius:7px' }) : '<span style="display:inline-block;width:30px;height:30px;border-radius:7px;background:var(--surface2);border:2px solid var(--line);text-align:center;line-height:26px;font-weight:700;color:var(--muted)">?</span>')).join('');
-        return '<div style="flex:1;min-width:100px;padding:8px;border-radius:12px;border:2px solid ' + (i === cur && !reveal ? 'var(--accent)' : 'var(--line)') + ';background:var(--surface);opacity:' + (p.n ? 1 : 0.45) + '"><div style="font-weight:700">' + p.name + ' <span class="muted" style="font-weight:400">· ' + p.n + ' dice</span></div><div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px;min-height:30px">' + (p.n ? hidden : 'out') + '</div></div>';
+      const cv = $('#cover', root), playEl = $('#play', root);
+      if (phase === 'cover') {
+        playEl.hidden = true; cv.hidden = false;
+        ['#tb', '#me', '#ctl', '#bid'].forEach((q) => { $(q, root).innerHTML = ''; }); /* nothing of the last player's screen stays in the page */
+        cv.innerHTML = '<div class="card" style="text-align:center;padding:24px 12px"><div class="msg" role="status" aria-live="polite" style="font-size:18px">Pass the phone to <b>' + seatName(cur) + '</b>. Tap when only you can see the screen.</div><button class="btn" id="show" style="width:100%;min-height:56px;margin-top:12px">Show my dice</button></div>';
+        return;
+      }
+      cv.hidden = true; cv.innerHTML = ''; playEl.hidden = false;
+      const reveal = phase === 'reveal' || over, view = L.ldView(pl.map((p) => p.hand), ns(), -1, reveal);
+      const hit = (v) => resolved && prev && (v === prev.f || (wild && prev.f !== 1 && v === 1));
+      $('#tb', root).innerHTML = '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">' + pl.map((p, i) => {
+        const dice = p.n ? (view[i] ? view[i].map((v) => dieHTML(v, { dis: true, hold: hit(v), style: SMALL })).join('') : p.hand.map(() => '<span role="img" aria-label="Hidden die" style="display:inline-block;width:30px;height:30px;border-radius:7px;background:var(--surface2);border:2px solid var(--line);text-align:center;line-height:26px;font-weight:700;color:var(--muted)">?</span>').join('')) : '<span class="muted">out</span>';
+        return '<div style="flex:1;min-width:100px;padding:8px;border-radius:12px;border:2px solid ' + (i === cur && !reveal && !over ? 'var(--accent)' : 'var(--line)') + ';background:var(--surface);opacity:' + (p.n ? 1 : 0.55) + '"><div style="font-weight:700">' + (i === cur && !reveal && !over && p.n ? '▶ ' : '') + seatName(i) + ' <span class="muted" style="font-weight:400">· ' + (p.n ? p.n + (p.n === 1 ? ' die' : ' dice') : 'out') + '</span></div><div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px;min-height:30px">' + dice + '</div></div>';
       }).join('') + '</div>';
       $('#msg', root).textContent = msg;
-      $('#bid', root).innerHTML = prev ? 'Current bid: <span style="font-size:22px">' + prev.q + ' × ' + faceTxt(prev.f) + '</span> <span class="muted" style="font-size:13px;font-weight:400">by ' + pl[prev.by].name + '</span>' : (phase === 'over' ? '' : 'No bid yet');
-      $('#me', root).innerHTML = pl[0].n ? pl[0].hand.map((v) => dieHTML(v, { dis: true, hold: reveal && resolved && (v === prev.f || (wild && prev.f !== 1 && v === 1)) })).join('') : '<span class="muted">You are out of dice</span>';
+      $('#bid', root).innerHTML = prev ? 'Current bid: <span style="font-size:22px">' + prev.q + ' × ' + faceTxt(prev.f) + '</span> <span class="muted" style="font-size:13px;font-weight:400">by ' + seatName(prev.by) + '</span>' : (phase === 'over' ? '' : 'No bid yet');
+      const me = viewer(), meEl = $('#me', root);
+      if (me >= 0 && pl[me].n > 0) {
+        $('#melab', root).textContent = (humans > 1 ? pl[me].name + ': your dice (under your cup)' : 'Your dice (under your cup)');
+        meEl.innerHTML = pl[me].hand.map((v) => dieHTML(v, { dis: true, hold: reveal && hit(v) })).join('');
+      } else if (me >= 0) { $('#melab', root).textContent = ''; meEl.innerHTML = '<span class="muted">' + seatName(me) + ' is out of dice</span>'; } else { $('#melab', root).textContent = ''; meEl.innerHTML = ''; }
       const c = $('#ctl', root);
       if (phase === 'bid' && !over) {
         const b = { q: qty, f: face }, ok = L.ldValid(b, prev, total());
         c.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin:6px 0"><button class="btn alt" data-a="qm" aria-label="Fewer dice" style="min-width:48px;min-height:48px;font-size:22px">−</button><b style="font-size:26px;min-width:40px;text-align:center">' + qty + '</b><button class="btn alt" data-a="qp" aria-label="More dice" style="min-width:48px;min-height:48px;font-size:22px">+</button><span class="muted">dice showing</span></div>' +
           '<div class="dice" id="fc">' + [1, 2, 3, 4, 5, 6].map((f) => dieHTML(f, { i: f, hold: f === face })).join('') + '</div>' +
           '<div class="acts"><button class="btn" data-a="bid"' + (ok ? '' : ' disabled') + '>' + (ok ? 'Bid ' + qty + ' × ' + faceTxt(face) : 'Bid must be higher') + '</button>' + (prev ? '<button class="btn danger" data-a="liar">Liar!</button>' : '') + '<button class="btn alt" data-a="hint">💡 Hint</button></div>';
-      } else if (phase === 'reveal') c.innerHTML = '<div class="acts"><button class="btn" data-a="next">' + (alive().length > 1 && pl[0].n > 0 ? 'Next round' : 'See result') + '</button></div>';
+      } else if (phase === 'reveal') c.innerHTML = '<div class="acts"><button class="btn" data-a="next">' + (willEnd() ? 'See result' : 'Next round') + '</button></div>';
       else if (phase === 'over') c.innerHTML = '<div class="acts"><button class="btn" data-a="again">Play again</button></div>';
       else c.innerHTML = '';
     }
     function place(q, f) {
-      prev = { q, f, by: cur }; msg = pl[cur].name + (pl[cur].ai ? ' bids ' : ' bid ') + q + ' × ' + faceTxt(f);
-      cur = nextAlive(cur);
-      if (pl[cur].ai) { phase = 'ai'; msg += '. ' + pl[cur].name + ' is thinking…'; paint(); aiMove(); } else { phase = 'bid'; qty = Math.min(total(), f === 6 ? q + 1 : q); face = f === 6 ? 1 : f + 1; msg += '. Raise or call Liar'; paint(); }
+      const by = cur, note = pl[by].name + (pl[by].ai ? ' bids ' : ' bids ') + q + ' × ' + faceTxt(f);
+      prev = { q, f, by }; cur = L.ldNextAlive(ns(), cur);
+      turnStart(note);
     }
     function challenge() {
-      const by = prev.by, hands = pl.map((p) => p.hand), r = L.ldResolve(prev, hands, wild);
-      resolved = r; loser = r.bidderRight ? cur : by;
-      msg = pl[cur].name + (pl[cur].ai ? ' calls' : ' call') + ' Liar! There ' + (r.actual === 1 ? 'is 1 die' : 'are ' + r.actual + ' dice') + ' showing ' + faceTxt(prev.f) + (wild && prev.f !== 1 ? ' (with wild ones)' : '') + '. ' + (r.bidderRight ? pl[by].name + (by === 0 ? ' were' : ' was') + ' right: ' : 'The bid was too high: ') + (pl[loser].name === 'You' ? 'you lose' : pl[loser].name + ' loses') + ' a die.';
+      const by = prev.by, o = L.ldChallenge(prev, cur, pl.map((p) => p.hand), wild);
+      resolved = o; loser = o.loser;
+      msg = pl[cur].name + ' calls Liar! There ' + (o.actual === 1 ? 'is 1 die' : 'are ' + o.actual + ' dice') + ' showing ' + faceTxt(prev.f) + (wild && prev.f !== 1 ? ' (with wild ones)' : '') + '. ' + (o.bidderRight ? pl[by].name + ' was right: ' : 'The bid was too high: ') + pl[loser].name + ' loses a die.';
       phase = 'reveal'; paint();
     }
     function aiMove() {
@@ -2319,17 +2437,20 @@ reg('liarsdice', "Liar's Dice", '🥃', 'Bluff against 1 to 3 phone players: bid
         else if (prev) challenge(); else place(1, 2);
       }, 1100);
     }
+    const willEnd = () => loser >= 0 && L.ldWinner(pl.map((p, i) => (i === loser ? p.n - 1 : p.n))) >= 0;
     function afterReveal() {
       pl[loser].n--;
-      if (pl[0].n === 0 || alive().length === 1) { endGame(); return; }
-      const starter = pl[loser].n > 0 ? loser : nextAlive(loser);
-      newRound(starter);
+      if (L.ldWinner(ns()) >= 0) { endGame(); return; }
+      const starter = pl[loser].n > 0 ? loser : L.ldNextAlive(ns(), loser);
+      newRound(starter, pl[loser].n > 0 ? '' : pl[loser].name + ' is out of dice');
     }
     function endGame() {
-      over = true; phase = 'over'; const w = alive()[0], s = gget(ID);
-      if (w === pl[0]) { s.w = (s.w || 0) + 1; msg = '🎉 You win the game!'; } else { s.l = (s.l || 0) + 1; msg = pl[0].n === 0 ? 'You are out of dice. ' + w.name + ' wins.' : w.name + ' wins.'; }
-      gput(ID, { w: s.w || 0, l: s.l || 0 }); paint();
+      over = true; phase = 'over'; const w = L.ldWinner(ns()), s = gget(ID);
+      msg = '🏁 ' + pl[w].name + ' wins the game!';
+      if (h1 >= 0) { s.gp = (s.gp || 0) + 1; if (w === h1) { s.gw = (s.gw || 0) + 1; s.w = (s.w || 0) + 1; } else s.l = (s.l || 0) + 1; gput(ID, { w: s.w || 0, l: s.l || 0, gp: s.gp, gw: s.gw || 0 }); }
+      paint();
     }
+    $('#cover', root).onclick = (e) => { if (e.target.closest('#show') && phase === 'cover') beginBid(); };
     $('#ctl', root).onclick = (e) => {
       const b = e.target.closest('button'); if (!b || b.disabled) return;
       if (b.dataset.d) { face = +b.dataset.d; paint(); return; }
@@ -2339,20 +2460,20 @@ reg('liarsdice', "Liar's Dice", '🥃', 'Bluff against 1 to 3 phone players: bid
         else if (a === 'bid') { if (L.ldValid({ q: qty, f: face }, prev, total())) place(qty, face); }
         else if (a === 'liar' && prev) challenge();
         else if (a === 'hint') {
-          if (prev) { const p = L.ldChance(prev, pl[0].hand, total(), wild); msg = 'Hint: the last bid is true about ' + Math.round(p * 100) + '% of the time' + (p < 0.35 ? '. Calling Liar looks good.' : p > 0.6 ? '. It is likely true: raise.' : '. It is close: your call.'); }
-          else { const c = L.ldAI(pl[0].hand, total(), null, wild, 0); msg = 'Hint: try bidding ' + c.q + ' × ' + faceTxt(c.f); qty = c.q; face = c.f; }
+          const hand = pl[cur].hand;
+          if (prev) { const p = L.ldChance(prev, hand, total(), wild); msg = 'Hint: the last bid is true about ' + Math.round(p * 100) + '% of the time' + (p < 0.35 ? '. Calling Liar looks good.' : p > 0.6 ? '. It is likely true: raise.' : '. It is close: your call.'); }
+          else { const c = L.ldAI(hand, total(), null, wild, 0); msg = 'Hint: try bidding ' + c.q + ' × ' + faceTxt(c.f); qty = c.q; face = c.f; }
           paint();
         }
       } else if (phase === 'reveal' && a === 'next') afterReveal();
       else if (phase === 'over' && a === 'again') startGame();
     };
     $('#menu', root).onclick = () => { token++; paintSetup(); };
-    $('#setup', root).addEventListener('click', (e) => {
-      const b = e.target.closest('button'); if (!b) return;
-      if (b.id === 'start') { wild = $('#wild', root).checked; gput(ID, { opp, wild, dpp }); startGame(); }
-      else if (b.parentNode && b.parentNode.id === 'op') { opp = +b.dataset.v; paintSetup(); }
+    bindSeatSetup($('#setup', root), S, paintSetup, (b) => {
+      if (b.id === 'start') { wild = $('#wild', root).checked; gput(ID, { np: S.np, kinds: S.kinds, names: S.names, wild, dpp }); startGame(); }
       else if (b.parentNode && b.parentNode.id === 'dp') { dpp = +b.dataset.v; paintSetup(); }
     });
+    $('#setup', root).addEventListener('change', (e) => { if (e.target.id === 'wild') wild = e.target.checked; });
     paintSetup();
     return () => { token++; T.stop(); };
   });

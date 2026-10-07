@@ -504,6 +504,102 @@ test("liar's dice: the phone AI never makes an illegal bid over thousands of gam
   for (let k = 0; k < 200; k++) { const m = L.ldAI(rollN(5), 15, null, true, 0); assert(m.action === 'bid' && m.q >= 1 && m.q <= 15); }
 });
 
+test('multi-seat: names, saved setup, standings, ties and ranking', () => {
+  assert.strictEqual(L.cleanName('  Bob   the <b>builder</b> long name ', 'x'), 'Bob the bbui');
+  assert.strictEqual(L.cleanName('', 'Player 1'), 'Player 1'); assert.strictEqual(L.cleanName(null, 'P'), 'P'); assert.strictEqual(L.cleanName('<>', 'P'), 'P');
+  assert(L.cleanName('x'.repeat(40), 'P').length <= 12);
+  assert.deepStrictEqual(L.seatList(4, ['h', 'p', 'h', 'p'], ['', '', '', '']).map((s) => s.name), ['Player 1', 'Phone 1', 'Player 2', 'Phone 2']);
+  assert.deepStrictEqual(L.seatList(3, ['h', 'h', 'p'], ['Ann', 'Ann', '']).map((s) => s.name), ['Ann 1', 'Ann 2', 'Phone 1'], 'duplicate names are made unique');
+  assert.deepStrictEqual(L.seatList(2, ['h', 'p'], []).map((s) => s.ai), [false, true]);
+  /* saved setup: defaults, bad data, at least one human */
+  assert.deepStrictEqual(L.normSeats({}, { np: 1, min: 1 }), { np: 1, kinds: ['h', 'p', 'p', 'p'], names: ['', '', '', ''] });
+  assert.strictEqual(L.normSeats({ np: 1 }, { np: 2, min: 2 }).np, 2); assert.strictEqual(L.normSeats({ np: 9 }, { np: 2, min: 2 }).np, 2);
+  assert.strictEqual(L.normSeats({ np: 3, kinds: ['p', 'p', 'p', 'p'] }, { np: 2, min: 2 }).kinds[0], 'h');
+  assert.strictEqual(L.normSeats(null, { np: 2, min: 2 }).np, 2); assert.strictEqual(L.normSeats({ names: [5, '<i>', 'ok'] }, { np: 2, min: 2 }).names[1], 'i');
+  /* standings */
+  let s = L.dfStandings([200, 250, 250, 100]);
+  assert.deepStrictEqual(s.winners, [1, 2]); assert.strictEqual(s.top, 250); assert.deepStrictEqual(s.order.map((o) => o.rank), [1, 1, 3, 4]);
+  s = L.dfStandings([10]); assert.deepStrictEqual(s.winners, [0]); assert.strictEqual(s.order[0].rank, 1);
+  s = L.dfStandings([0, 0]); assert.deepStrictEqual(s.winners, [0, 1]);
+  assert.deepStrictEqual([1, 2, 3, 4, 11, 12, 13, 21].map(L.ordinal), ['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st']);
+});
+test("multi-seat: Liar's Dice turn order, elimination, hidden information", () => {
+  assert.strictEqual(L.ldNextAlive([3, 0, 2], 0), 2); assert.strictEqual(L.ldNextAlive([3, 0, 2], 2), 0); assert.strictEqual(L.ldNextAlive([0, 0, 4], 2), 2);
+  assert.strictEqual(L.ldWinner([0, 2, 0]), 1); assert.strictEqual(L.ldWinner([1, 2, 0]), -1); assert.strictEqual(L.ldWinner([0, 0, 0]), -1);
+  const hands = [[1, 2], [2, 3], [4, 4]];
+  /* bidder right: the challenger loses; bidder wrong: the bidder loses */
+  assert.deepStrictEqual(L.ldChallenge({ q: 3, f: 2, by: 0 }, 1, hands, true), { actual: 3, bidderRight: true, loser: 1 });
+  assert.deepStrictEqual(L.ldChallenge({ q: 4, f: 2, by: 2 }, 0, hands, true), { actual: 3, bidderRight: false, loser: 2 });
+  /* only the viewer sees their own dice before the reveal */
+  const v = L.ldView(hands, [2, 2, 2], 1, false);
+  assert.strictEqual(v[0], null); assert.deepStrictEqual(v[1], [2, 3]); assert.strictEqual(v[2], null);
+  assert(L.ldView(hands, [2, 2, 2], -1, false).every((x) => x === null));
+  assert(L.ldView(hands, [2, 2, 2], -1, true).every((x) => Array.isArray(x)));
+  const v2 = L.ldView(hands, [2, 2, 2], 1, true); v2[0].push(9); assert.strictEqual(hands[0].length, 2, 'views are copies');
+  /* the cover appears for a human only while 2 or more humans are in the game */
+  assert(L.ldNeedCover([2, 2, 2], ['h', 'h', 'p'], 0)); assert(L.ldNeedCover([2, 2, 2], ['h', 'h', 'p'], 1));
+  assert(!L.ldNeedCover([2, 2, 2], ['h', 'h', 'p'], 2), 'phones never need a cover');
+  assert(!L.ldNeedCover([2, 2], ['h', 'p'], 0), 'a lone human keeps the single-player screen');
+  assert(!L.ldNeedCover([2, 0, 2], ['h', 'h', 'p'], 0), 'a lone human left in the game needs no cover');
+});
+test('multi-seat: simulated full games of 2-4 seats, humans and phones, always end with a valid winner', () => {
+  const rollN = (n) => Array.from({ length: n }, () => 1 + Math.floor(Math.random() * 6));
+  const patterns = [];
+  for (let np = 2; np <= 4; np++) for (let m = 0; m < (1 << np); m++) { const k = Array.from({ length: np }, (_, i) => ((m >> i) & 1 ? 'h' : 'p')); if (k.includes('h')) patterns.push(k); }
+  /* Liar's Dice */
+  let games = 0, covers = 0, leaks = 0;
+  for (let g = 0; g < 1200; g++) {
+    const kinds = patterns[g % patterns.length], np = kinds.length, wild = g % 2 === 0, dpp = 3 + (g % 3);
+    const seats = L.seatList(np, kinds, []), ns = Array(np).fill(dpp), hands = Array(np).fill(null).map(() => []);
+    let starter = 0, guard = 0;
+    while (L.ldWinner(ns) < 0) {
+      assert(++guard < 800, 'game did not end');
+      for (let i = 0; i < np; i++) hands[i] = rollN(ns[i]);
+      const total = ns.reduce((a, b) => a + b, 0);
+      let cur = starter, prev = null, loser = -1, steps = 0;
+      while (loser < 0) {
+        assert(++steps < 500); assert(ns[cur] > 0, 'a seat without dice was asked to act');
+        if (L.ldNeedCover(ns, kinds, cur)) covers++;
+        /* what the screen may show while this seat is up: nobody else's dice */
+        const view = L.ldView(hands, ns, cur, false); view.forEach((x, i) => { if (i !== cur && x) leaks++; });
+        let m;
+        if (seats[cur].ai) m = L.ldAI(hands[cur], total, prev, wild, 0);
+        else { /* scripted human: random legal bid, or a challenge about a third of the time */
+          const raises = L.ldRaises(prev, total);
+          m = prev && (!raises.length || Math.random() < 0.35) ? { action: 'challenge' } : (raises.length ? Object.assign({ action: 'bid' }, raises[Math.floor(Math.random() * Math.min(raises.length, 6))]) : { action: 'challenge' });
+        }
+        if (m.action === 'challenge') { assert(prev); loser = L.ldChallenge(prev, cur, hands, wild).loser; }
+        else { assert(L.ldValid(m, prev, total), 'illegal bid'); prev = { q: m.q, f: m.f, by: cur }; cur = L.ldNextAlive(ns, cur); }
+      }
+      ns[loser]--; assert(ns[loser] >= 0);
+      starter = ns[loser] > 0 ? loser : L.ldNextAlive(ns, loser);
+    }
+    const w = L.ldWinner(ns); assert(w >= 0 && w < np && ns[w] > 0 && ns.filter((n) => n > 0).length === 1); games++;
+  }
+  assert.strictEqual(leaks, 0, 'another seat\'s dice were visible'); assert(covers > 0);
+  console.log('     liar\'s dice: ' + games + ' mixed human/phone games over ' + patterns.length + ' seat patterns, ' + covers + ' pass-the-phone covers');
+  /* Dice Five */
+  const all = patterns.concat([['h']]); let dg = 0, ties = 0;
+  for (let g = 0; g < 400; g++) {
+    const kinds = all[g % all.length], np = kinds.length, seats = L.seatList(np, kinds, []), sheets = seats.map(() => L.dfNewSheet());
+    for (let round = 0; round < 13; round++) for (let t = 0; t < np; t++) {
+      let dice = rollN(5), left = 2;
+      while (left > 0) {
+        const hold = seats[t].ai ? L.dfAIHold(sheets[t], dice, left, 1) : dice.map(() => Math.random() < 0.5);
+        if (hold.every(Boolean)) break;
+        dice = dice.map((v, i) => (hold[i] ? v : 1 + Math.floor(Math.random() * 6))); left--;
+      }
+      const legal = L.dfLegal(sheets[t], dice), cat = seats[t].ai ? L.dfAIPick(sheets[t], dice) : legal[Math.floor(Math.random() * legal.length)].cat;
+      assert(legal.some((o) => o.cat === cat)); sheets[t] = L.dfApply(sheets[t], cat, dice).sheet;
+    }
+    assert(sheets.every(L.dfDone));
+    const totals = sheets.map(L.dfTotal), st = L.dfStandings(totals);
+    assert(st.winners.length >= 1 && st.winners.every((i) => totals[i] === Math.max(...totals)) && st.order.length === np && st.order[0].rank === 1);
+    assert.strictEqual(st.winners.length, totals.filter((x) => x === st.top).length); if (st.winners.length > 1) ties++; dg++;
+  }
+  console.log('     dice five: ' + dg + ' mixed games (1 to 4 seats), ' + ties + ' ties');
+});
+
 // @@TESTS@@
 
 console.log(passed + ' test group(s) passed' + (process.exitCode ? ', with failures' : ''));
