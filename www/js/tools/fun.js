@@ -331,12 +331,13 @@ L.makeTeams = function (names, k) {
   return teams;
 };
 L.pickUnique = (n, k) => shuffle([...Array(n).keys()].map(x => x + 1)).slice(0, k);
-L.mathQ = function (lvl) {
-  const op = pick(lvl === 1 ? ['+', '-'] : ['+', '-', '×']);
+L.mathQ = function (lvl, R) {
+  R = R || rnd;                       // R(n) gives an int 0..n-1; a seeded one makes every player get the same questions
+  const op = ['+', '-', '×'].slice(0, lvl === 1 ? 2 : 3)[R(lvl === 1 ? 2 : 3)];
   let a, b;
-  if (op === '×') { a = 2 + rnd(lvl === 2 ? 9 : 11); b = 2 + rnd(lvl === 2 ? 9 : 11); return { text: a + ' × ' + b, ans: a * b }; }
+  if (op === '×') { a = 2 + R(lvl === 2 ? 9 : 11); b = 2 + R(lvl === 2 ? 9 : 11); return { text: a + ' × ' + b, ans: a * b }; }
   const m = lvl === 1 ? 20 : lvl === 2 ? 99 : 499;
-  a = 1 + rnd(m); b = 1 + rnd(m);
+  a = 1 + R(m); b = 1 + R(m);
   if (op === '-') { if (b > a) { const t = a; a = b; b = t; } return { text: a + ' − ' + b, ans: a - b }; }
   return { text: a + ' + ' + b, ans: a + b };
 };
@@ -353,6 +354,91 @@ L.scrambleWord = function (w) {
   let s;
   do { s = shuffle(w.split('')).join(''); } while (s === w);
   return s;
+};
+
+/* ---------- multiplayer helpers (pure, used by Memory, Quiz, RPS and Math Sprint) ---------- */
+/* A seat name is plain text of at most 12 characters (no control characters or angle brackets). */
+L.cleanName = (s) => String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 12).trim();
+/* Display names for the first n seats. seats = [{ h: human?, name }]. Blank names become "Player 1.." / "Phone 1.."; repeated names get a number. */
+L.seatNames = function (seats, n) {
+  const out = [], seen = {}; let hc = 0, pc = 0;
+  for (let i = 0; i < n; i++) {
+    const s = seats[i] || {}; let nm = L.cleanName(s.name);
+    const def = s.h ? 'Player ' + (++hc) : 'Phone ' + (++pc);
+    if (!nm) nm = def;
+    const k = nm.toLowerCase(); seen[k] = (seen[k] || 0) + 1;
+    if (seen[k] > 1) nm = nm.slice(0, 9) + ' ' + seen[k];
+    out.push(nm);
+  }
+  return out;
+};
+/* Checks a stored setup: o = { min, max, def, opts: { key: { items: [[value, label]], def } } }. Returns { n, seats[max], opt }. */
+L.cleanSetup = function (raw, o) {
+  raw = raw && typeof raw === 'object' ? raw : {};
+  const n = Math.max(o.min, Math.min(o.max, Math.round(+raw.n) || o.def)), seats = [];
+  for (let i = 0; i < o.max; i++) {
+    const s = Array.isArray(raw.seats) && raw.seats[i] && typeof raw.seats[i] === 'object' ? raw.seats[i] : {};
+    seats.push({ h: s.h == null ? (i < 2 ? 1 : 0) : (s.h ? 1 : 0), name: L.cleanName(s.name) });
+  }
+  const opt = {};
+  Object.keys(o.opts || {}).forEach((k) => {
+    const vals = o.opts[k].items.map((x) => String(x[0])), v = raw.opt && raw.opt[k];
+    opt[k] = vals.includes(String(v)) ? String(v) : String(o.opts[k].def);
+  });
+  return { n, seats, opt };
+};
+L.winners = (scores) => { const m = Math.max.apply(null, scores); return scores.map((s, i) => (s === m ? i : -1)).filter((i) => i >= 0); };
+/* "Ana wins with 7 points" or "Tie between Ana, Bo and Cy with 7 points" (words as well as the emoji, so nothing depends on colour). */
+L.verdict = function (names, scores, unit) {
+  const w = L.winners(scores), top = scores[w[0]], u = unit ? ' ' + unit + (top === 1 ? '' : 's') : '';
+  if (w.length === 1) return '🏆 ' + names[w[0]] + ' wins with ' + top + u;
+  const l = w.map((i) => names[i]);
+  return '🤝 Tie between ' + (l.length > 1 ? l.slice(0, -1).join(', ') + ' and ' + l[l.length - 1] : l[0]) + ' with ' + top + u;
+};
+/* Seeded integer source: R(n) is 0..n-1 and the same seed always gives the same sequence. */
+L.seededRn = function (seed) {
+  let a = seed | 0;
+  return function (n) {
+    if (n <= 1) return 0;
+    a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return Math.floor(((t ^ t >>> 14) >>> 0) / 4294967296 * n);
+  };
+};
+/* Memory: the chance a phone remembers a card it has seen, by level (1 easy, 2 normal, 3 hard). r() gives 0..1. */
+L.MEM_P = { 1: 0.3, 2: 0.6, 3: 0.9 };
+L.memObserve = function (known, idx, face, p, r) { if (r() < p) known[idx] = face; };
+L.memPick1 = function (cards, matched, known, p, r) {
+  const free = cards.map((c, i) => i).filter((i) => !matched[i]), byFace = {};
+  Object.keys(known).forEach((k) => { const i = +k; if (!matched[i]) (byFace[known[k]] = byFace[known[k]] || []).push(i); });
+  const faces = Object.keys(byFace);
+  for (let f = 0; f < faces.length; f++) if (byFace[faces[f]].length >= 2 && r() < p) return byFace[faces[f]][0];
+  const fresh = free.filter((i) => !(i in known)), pool = fresh.length ? fresh : free;
+  return pool[Math.floor(r() * pool.length) % pool.length];
+};
+L.memPick2 = function (first, cards, matched, known, p, r) {
+  const free = cards.map((c, i) => i).filter((i) => !matched[i] && i !== first);
+  const mate = free.filter((i) => known[i] === cards[first]);
+  if (mate.length && r() < p) return mate[0];
+  const fresh = free.filter((i) => !(i in known)), pool = fresh.length ? fresh : free;
+  return pool[Math.floor(r() * pool.length) % pool.length];
+};
+/* Quiz: chance a phone answers correctly, by level. */
+L.QUIZ_P = { 1: 0.45, 2: 0.7, 3: 0.9 };
+L.phoneCorrect = (level, r) => r() < (L.QUIZ_P[level] || 0.7);
+/* Math Sprint: a phone's score for one 30 second sprint. qlvl = question level 1..3, level = phone level 1..3, r() gives 0..1. */
+L.sprintPhone = function (level, qlvl, r) {
+  const secs = { 1: 2.6, 2: 4.2, 3: 6.5 }[qlvl] || 4.2, speed = { 1: 0.55, 2: 0.85, 3: 1.2 }[level] || 0.85;
+  return Math.max(0, Math.round(30 / secs * speed * (0.8 + 0.4 * r())));
+};
+/* Rock Paper Scissors: hands are 0 rock, 1 paper, 2 scissors. A seat scores one point for every other seat it beats. */
+L.rpsBeats = (a, b) => (a - b + 3) % 3 === 1;
+L.rpsRound = (ch) => ch.map((a, i) => ch.reduce((s, b, j) => s + (j !== i && L.rpsBeats(a, b) ? 1 : 0), 0));
+/* mode: 'f5' first to 5 points (ties at the top play on), 'r3' / 'r5' / 'r7' a fixed number of rounds. rounds = rounds played so far. */
+L.rpsOver = function (mode, scores, rounds) {
+  const m = /^r(\d+)$/.exec(mode);
+  if (m) return rounds >= +m[1];
+  return (Math.max.apply(null, scores) >= 5 && L.winners(scores).length === 1) || rounds >= 30;
 };
 
 /* ---------- shared UI helpers ---------- */
@@ -461,6 +547,90 @@ function reg(id, name, icon, desc, keys, render, needs) {
 }
 function bump(node) { node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); }
 function restart(node, cls) { node.classList.remove(cls); void node.offsetWidth; node.classList.add(cls); }
+
+/* ---------- multiplayer shell shared by Memory, Quiz, RPS and Math Sprint ----------
+   dual(solo, mp): the tool opens in its normal solo mode; solo(el, toMP) shows a "Play with friends" button that calls toMP, and
+   mp(el, toSolo) shows the seat setup (number of players, each seat Human or Phone, names) and then the game. */
+const frac = () => rnd(1000000) / 1000000;
+const LVL3 = [['1', 'Easy'], ['2', 'Normal'], ['3', 'Hard']];
+function dual(solo, mp) {
+  return function (el) {
+    let stop = null;
+    const toSolo = () => { if (stop) stop(); stop = solo(el, toMP); };
+    const toMP = () => { if (stop) stop(); stop = mp(el, toSolo); };
+    toSolo();
+    return () => { if (stop) stop(); stop = null; };
+  };
+}
+const MPBTN = '<div class="gap"></div><button class="btn alt" id="mpb" style="width:100%;min-height:48px">👥 Play with friends</button>';
+function live(root) { $$('.msg', root).forEach((m) => { m.setAttribute('role', 'status'); m.setAttribute('aria-live', 'polite'); }); }
+/* A scoreboard card: the seat whose turn it is gets an arrow and the word "now" as well as bold text. */
+function scoreHTML(names, seats, scores, cur, unit) {
+  return names.map((nm, i) => '<div style="display:flex;justify-content:space-between;align-items:center;min-height:34px;font-weight:' + (i === cur ? 800 : 500) + '">' +
+    '<span>' + (i === cur ? '▶ ' : '') + esc(nm) + (seats[i].h || /^phone/i.test(nm) ? '' : ' (phone)') + (i === cur ? ' - now' : '') + '</span><b>' + (scores[i] == null ? '–' : scores[i]) + (unit ? ' ' + unit : '') + '</b></div>').join('');
+}
+function againBtn(ctx, label) {
+  const b = document.createElement('button'); b.className = 'btn big-btn'; b.id = 'again'; b.textContent = label || 'Play again';
+  b.onclick = () => ctx.again(); ctx.root.appendChild(b); return b;
+}
+/* o = { id, title, min, max, def, opts: { key: { label, items: [[value, label]], def } }, begin(ctx) }
+   ctx = { root, T, seats: [{h, name}], names, n, opt, inProgress(), again() }. The last setup is kept under Store 'fun3.<id>'. */
+function mpShell(el, back, o) {
+  const T = tracker(), cfg = L.cleanSetup(Store.get('fun3.' + o.id, null), o), keys = Object.keys(o.opts || {});
+  let G = null, ctx = null;
+  const seatRow = (i) => '<div class="row" id="seat' + i + '" style="gap:8px;align-items:flex-end">' +
+    '<label class="f" style="flex:1">Seat ' + (i + 1) + ' is<select id="st' + i + '" style="min-height:44px"><option value="1">Human</option><option value="0">Phone</option></select></label>' +
+    '<label class="f" style="flex:2">Name of seat ' + (i + 1) + '<input id="nm' + i + '" type="text" maxlength="12" autocomplete="off" style="min-height:44px"></label></div>';
+  const root = mount(el, `
+    <div id="mpsetup">
+      <div class="card">
+        <div style="font-weight:700">${esc(o.title)}</div>
+        <label class="f">Number of players<select id="mpn" style="min-height:44px">${Array.from({ length: o.max - o.min + 1 }, (_, k) => '<option value="' + (o.min + k) + '">' + (o.min + k) + ' players</option>').join('')}</select></label>
+        ${Array.from({ length: o.max }, (_, i) => seatRow(i)).join('')}
+        ${keys.map((k) => '<div class="muted" style="margin-top:8px">' + esc(o.opts[k].label) + '</div>' + seg('x_' + k, o.opts[k].items, cfg.opt[k])).join('')}
+      </div>
+      <div class="msg" id="mpmsg"></div>
+      <button class="btn big-btn" id="mpgo">Start game</button>
+      <div class="gap"></div>
+      <button class="btn alt" id="mpback" style="width:100%;min-height:48px">Back to solo</button>
+    </div>
+    <div id="mpplay" hidden><div id="mpg"></div><div class="gap"></div>
+      <button class="btn alt" id="mpmenu" style="width:100%;min-height:48px">Change players</button></div>`);
+  const save = () => Store.set('fun3.' + o.id, cfg);
+  function refresh() {
+    const defs = L.seatNames(cfg.seats.map((s) => ({ h: s.h })), cfg.n);
+    for (let i = 0; i < o.max; i++) {
+      $('#seat' + i, root).style.display = i < cfg.n ? '' : 'none';
+      $('#nm' + i, root).placeholder = defs[i] || '';
+    }
+  }
+  $('#mpn', root).value = String(cfg.n);
+  for (let i = 0; i < o.max; i++) { $('#st' + i, root).value = cfg.seats[i].h ? '1' : '0'; $('#nm' + i, root).value = cfg.seats[i].name; }
+  $('#mpn', root).onchange = (e) => { cfg.n = Math.max(o.min, Math.min(o.max, +e.target.value || o.min)); save(); refresh(); };
+  for (let i = 0; i < o.max; i++) {
+    $('#st' + i, root).onchange = (e) => { cfg.seats[i].h = e.target.value === '1' ? 1 : 0; save(); refresh(); };
+    $('#nm' + i, root).oninput = (e) => { cfg.seats[i].name = L.cleanName(e.target.value); save(); };
+  }
+  keys.forEach((k) => onSeg(root, 'x_' + k, (v) => { cfg.opt[k] = v; save(); }));
+  refresh();
+  function start() {
+    const seats = cfg.seats.slice(0, cfg.n).map((s) => ({ h: !!s.h, name: s.name }));
+    if (!seats.some((s) => s.h)) { $('#mpmsg', root).textContent = 'Choose at least one Human seat.'; return; }
+    save(); if (G) G.stop(); G = tracker();
+    $('#mpsetup', root).hidden = true; $('#mpplay', root).hidden = false;
+    const g = $('#mpg', root); g.innerHTML = '';
+    ctx = { root: g, T: G, seats, names: L.seatNames(seats, cfg.n), n: cfg.n, opt: Object.assign({}, cfg.opt), inProgress: () => false, again: start };
+    o.begin(ctx); live(g);
+  }
+  $('#mpgo', root).onclick = start;
+  $('#mpmenu', root).onclick = () => {
+    if (!sure(ctx && ctx.inProgress(), 'Leave this game? The scores will be lost.')) return;
+    if (G) { G.stop(); G = null; } ctx = null;
+    $('#mpplay', root).hidden = true; $('#mpsetup', root).hidden = false; $('#mpmsg', root).textContent = '';
+  };
+  $('#mpback', root).onclick = () => back();
+  return () => { if (G) G.stop(); G = null; T.stop(); };
+}
 
 /* =====================================================================
    1. Dice Roller
@@ -805,14 +975,9 @@ reg('tictactoe', 'Tic-Tac-Toe', '⭕', 'Play against an unbeatable phone or a fr
 /* =====================================================================
    6. Memory Match
    ===================================================================== */
-reg('memory', 'Memory Match', '🃏', 'Flip cards to find all the matching pairs in three grid sizes. Counts moves and time and saves your best.',
-  ['memory', 'cards', 'pairs', 'match', 'concentration'], function (el) {
-    const T = tracker();
-    const EMO = ['🐶', '🐱', '🦊', '🐼', '🐸', '🦄', '🐙', '🦋', '🍕', '🍩', '🚀', '⚽', '🌈', '🎸', '🍉'];
-    const SIZES = { '3x4': [3, 4], '4x4': [4, 4], '4x5': [4, 5] };
-    let size = Store.get('fun.memory.size', '4x4'), cards, open, locked, matched, moves, t0, tick = 0, secs;
-    const root = mount(el, `
-      <style>
+const MEM_EMO = ['🐶', '🐱', '🦊', '🐼', '🐸', '🦄', '🐙', '🦋', '🍕', '🍩', '🚀', '⚽', '🌈', '🎸', '🍉'];
+const MEM_SIZES = { '3x4': [3, 4], '4x4': [4, 4], '4x5': [4, 5] };
+const MEMCSS = `
         .fn .mc{padding:0;border:0;background:transparent;perspective:600px;aspect-ratio:1}
         .fn .mc .in{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .45s cubic-bezier(.3,1.3,.5,1)}
         .fn .mc.up .in{transform:rotateY(180deg)}
@@ -820,13 +985,20 @@ reg('memory', 'Memory Match', '🃏', 'Flip cards to find all the matching pairs
         .fn .mc .back{background:linear-gradient(145deg,var(--accent),#ff6bd6);color:var(--accent-t);font-weight:800;box-shadow:var(--shadow)}
         .fn .mc .front{background:var(--surface);border:2px solid var(--line);transform:rotateY(180deg)}
         .fn .mc.ok .front{border-color:var(--ok);background:var(--surface2);animation:fnpulse .5s}
-      </style>
+      `;
+reg('memory', 'Memory Match', '🃏', 'Flip cards to find all the matching pairs in three grid sizes. Counts moves and time and saves your best. Play with friends or the phone on 2 to 4 seats.',
+  ['memory', 'cards', 'pairs', 'match', 'concentration', 'multiplayer', 'players', 'friends'], dual(function (el, toMP) {
+    const T = tracker();
+    const EMO = MEM_EMO, SIZES = MEM_SIZES;
+    let size = Store.get('fun.memory.size', '4x4'), cards, open, locked, matched, moves, t0, tick = 0, secs;
+    const root = mount(el, `
+      <style>${MEMCSS}</style>
       ${seg('sz', [['3x4', '3 × 4'], ['4x4', '4 × 4'], ['4x5', '4 × 5']], size)}
       <div class="card"><div class="stats">${stat('mv', 'Moves', 0)}${stat('tm', 'Time', '0:00')}${stat('bs', 'Best', '–')}</div></div>
       <div class="gap"></div>
       <div id="grid" style="display:grid;gap:8px"></div>
       <div class="msg" id="msg"></div>
-      <button class="btn big-btn" id="new">New game</button>`);
+      <button class="btn big-btn" id="new">New game</button>${MPBTN}`);
     function best() { const b = hsGet('memory.best', {})[size]; return b ? b.moves + ' / ' + fmtT(b.secs) : '–'; }
     function setup() {
       T.reset(); const [c, r] = SIZES[size], n = c * r / 2;
@@ -864,10 +1036,69 @@ reg('memory', 'Memory Match', '🃏', 'Flip cards to find all the matching pairs
     const askMem = () => sure(moves > 0 && matched < cards.length / 2, 'Start a new game? Your current game will be lost.');
     onSeg(root, 'sz', v => { size = v; Store.set('fun.memory.size', size); setup(); }, askMem);
     $('#new', root).onclick = () => { if (askMem()) setup(); };
+    $('#mpb', root).onclick = () => { if (askMem()) toMP(); };
     keepTime(T, d => { if (t0) t0 += d; });
     setup();
     return () => T.stop();
-  });
+  }, memoryMP));
+
+/* Memory with friends: 2 to 4 seats take turns flipping two cards, a match earns another turn. Phone seats only remember a seen card
+   with the chance set by the level, so they can be beaten. */
+function memoryMP(el, back) {
+  return mpShell(el, back, { id: 'memory', title: 'Memory Match: play with friends', min: 2, max: 4, def: 2,
+    opts: { size: { label: 'Grid size', items: [['3x4', '3 × 4'], ['4x4', '4 × 4'], ['4x5', '4 × 5']], def: '4x4' },
+      lvl: { label: 'Phone memory', items: LVL3, def: '2' } }, begin: memoryGame });
+}
+function memoryGame(ctx) {
+  const { root, T, seats, names, n } = ctx, p = L.MEM_P[ctx.opt.lvl] || 0.6;
+  const [cols, rows] = MEM_SIZES[ctx.opt.size] || [4, 4], pairs = cols * rows / 2;
+  const cards = shuffle(MEM_EMO.slice(0, pairs).concat(MEM_EMO.slice(0, pairs)));
+  const matched = cards.map(() => false), known = names.map(() => ({})), scores = names.map(() => 0);
+  let turn = 0, open = [], locked = true, done = false, found = 0, flips = 0;
+  ctx.inProgress = () => !done && flips > 0;
+  root.innerHTML = '<style>' + MEMCSS + '</style><div class="card" id="sb"></div><div class="gap"></div>' +
+    '<div class="msg" id="msg"></div><div id="grid" style="display:grid;gap:8px;grid-template-columns:repeat(' + cols + ',1fr)">' +
+    cards.map((e, i) => '<button class="mc" data-i="' + i + '" aria-label="Card ' + (i + 1) + ', face down"><div class="in"><div class="f back">?</div><div class="f front">' + e + '</div></div></button>').join('') + '</div>';
+  const paint = () => { $('#sb', root).innerHTML = scoreHTML(names, seats, scores, done ? -1 : turn, 'pairs'); };
+  const say = (t) => { $('#msg', root).textContent = t; };
+  const btn = (i) => $('.mc[data-i="' + i + '"]', root);
+  const lab = (i, st) => btn(i).setAttribute('aria-label', 'Card ' + (i + 1) + ', ' + (st === 'down' ? 'face down' : cards[i] + (st === 'ok' ? ', matched' : '')));
+  function startTurn(note) {
+    locked = !seats[turn].h; paint();
+    say((note ? note + ' ' : '') + names[turn] + (seats[turn].h ? ': flip two cards' : ' is playing'));
+    if (!seats[turn].h) T.to(phone1, 800);
+  }
+  function flip(i) {
+    btn(i).classList.add('up'); lab(i, 'up'); open.push(i); flips++;
+    seats.forEach((s, k) => { if (!s.h) L.memObserve(known[k], i, cards[i], p, frac); });
+    if (open.length === 2) { locked = true; T.to(resolve, 900); }
+  }
+  function resolve() {
+    const a = open[0], b = open[1];
+    if (cards[a] === cards[b]) {
+      matched[a] = matched[b] = true; scores[turn]++; found++; open = []; buzz(25);
+      [a, b].forEach((i) => { btn(i).classList.add('ok'); lab(i, 'ok'); });
+      if (found === pairs) return finish();
+      startTurn('Match for ' + names[turn] + '!');
+    } else {
+      [a, b].forEach((i) => { btn(i).classList.remove('up'); lab(i, 'down'); });
+      open = []; turn = (turn + 1) % n; startTurn('No match.');
+    }
+  }
+  function phone1() { if (done) return; flip(L.memPick1(cards, matched, known[turn], p, frac)); T.to(phone2, 800); }
+  function phone2() { if (done) return; flip(L.memPick2(open[0], cards, matched, known[turn], p, frac)); }
+  function finish() {
+    done = true; locked = true; paint(); say(L.verdict(names, scores, 'pair')); bump($('#msg', root)); buzz(80);
+    if (L.winners(scores).some((i) => seats[i].h)) celebrate(root, T);
+    againBtn(ctx);
+  }
+  $('#grid', root).onclick = (e) => {
+    const bt = e.target.closest('.mc'); if (!bt || locked || done || !seats[turn].h) return;
+    const i = +bt.dataset.i; if (bt.classList.contains('up') || matched[i]) return;
+    flip(i);
+  };
+  startTurn();
+}
 
 /* =====================================================================
    7. Scoreboard
@@ -992,8 +1223,8 @@ reg('eightball', 'Magic 8-Ball', '🎱', 'Ask a yes or no question, then shake t
 /* =====================================================================
    9. Rock Paper Scissors
    ===================================================================== */
-reg('rps', 'RPS Showdown', '✂️', 'Beat the phone at rock, paper, scissors and build a winning streak.',
-  ['rock', 'paper', 'scissors', 'rps', 'hands'], function (el) {
+reg('rps', 'RPS Showdown', '✂️', 'Beat the phone at rock, paper, scissors and build a winning streak, or play a pass-the-phone series with friends on 2 to 4 seats.',
+  ['rock', 'paper', 'scissors', 'rps', 'hands', 'multiplayer', 'players', 'friends'], dual(function (el, toMP) {
     const T = tracker();
     const H = ['✊', '✋', '✌️'], NAME = ['Rock', 'Paper', 'Scissors'];
     let st = Store.get('fun.rps.stats', { w: 0, l: 0, d: 0, streak: 0, best: 0 }), busy = false;
@@ -1008,7 +1239,7 @@ reg('rps', 'RPS Showdown', '✂️', 'Beat the phone at rock, paper, scissors an
       <div class="gap"></div>
       <div class="card"><div class="stats">${stat('w', 'Wins', st.w)}${stat('d', 'Draws', st.d)}${stat('l', 'Losses', st.l)}</div>
       <div class="stats">${stat('sk', 'Streak 🔥', st.streak)}${stat('bs', 'Best streak', st.best)}</div></div>
-      <div class="gap"></div><button class="linkbtn" id="rst">Reset stats</button>`);
+      <div class="gap"></div><button class="linkbtn" id="rst">Reset stats</button>${MPBTN}`);
     function upd() { ['w', 'd', 'l'].forEach(k => { $('#' + k, root).textContent = st[k]; }); $('#sk', root).textContent = st.streak; $('#bs', root).textContent = st.best; }
     $('#pick', root).onclick = (e) => {
       const bt = e.target.closest('button'); if (!bt || busy) return;
@@ -1027,8 +1258,64 @@ reg('rps', 'RPS Showdown', '✂️', 'Beat the phone at rock, paper, scissors an
       }, 720);
     };
     $('#rst', root).onclick = () => { st = { w: 0, l: 0, d: 0, streak: 0, best: 0 }; Store.set('fun.rps.stats', st); upd(); };
+    $('#mpb', root).onclick = () => toMP();
     return () => T.stop();
-  });
+  }, rpsMP));
+
+/* RPS with friends: 2 to 4 seats. Humans choose one at a time behind a pass-the-phone cover, phones choose at random and everything
+   is revealed together. Each seat scores one point for every other seat it beats; a series is first to 5 points or 3 / 5 / 7 rounds. */
+const RPS_H = ['✊', '✋', '✌️'], RPS_N = ['Rock', 'Paper', 'Scissors'];
+function rpsMP(el, back) {
+  return mpShell(el, back, { id: 'rps', title: 'RPS Showdown: play with friends', min: 2, max: 4, def: 2,
+    opts: { series: { label: 'Series', items: [['f5', 'First to 5'], ['r3', '3 rounds'], ['r5', '5 rounds'], ['r7', '7 rounds']], def: 'f5' } }, begin: rpsGame });
+}
+function rpsGame(ctx) {
+  const { root, T, seats, names, n } = ctx, mode = ctx.opt.series, humans = seats.map((s, i) => (s.h ? i : -1)).filter((i) => i >= 0);
+  const scores = names.map(() => 0);
+  let round = 0, picks = [], queue = [], over = false, midRound = false;
+  ctx.inProgress = () => !over && (round > 0 || midRound);
+  root.innerHTML = '<div class="card" id="sb"></div><div class="gap"></div><div id="view"></div>';
+  const view = $('#view', root), rl = () => (/^r(\d+)$/.exec(mode) ? ' of ' + /^r(\d+)$/.exec(mode)[1] : ' (first to 5 points)');
+  const paint = () => { $('#sb', root).innerHTML = '<div class="muted">Round ' + Math.min(round + 1, 99) + rl() + '</div>' + scoreHTML(names, seats, scores, -1, 'pts'); };
+  function roundStart() {
+    midRound = true; picks = names.map((x, i) => (seats[i].h ? null : rnd(3)));
+    queue = humans.slice(); paint(); nextHuman();
+  }
+  function nextHuman() {
+    if (!queue.length) return reveal();
+    const h = queue.shift();
+    if (humans.length > 1) cover(h); else pickView(h);
+  }
+  function cover(h) {
+    view.innerHTML = '<div class="card center"><div style="font-size:52px" aria-hidden="true">🙈</div>' +
+      '<div class="msg" id="msg" style="font-size:20px">Pass the phone to ' + esc(names[h]) + '. Tap when only you can see the screen.</div></div><div class="gap"></div>' +
+      '<button class="btn big-btn" id="rdy">I am ' + esc(names[h]) + ': show my moves</button>';
+    live(view); $('#rdy', view).onclick = () => pickView(h);
+  }
+  function pickView(h) {
+    view.innerHTML = '<div class="msg" id="msg" style="font-size:20px">' + esc(names[h]) + ', choose your move</div>' +
+      '<div class="row" id="pick" style="gap:10px">' + RPS_H.map((x, i) => '<button class="btn alt" data-i="' + i + '" aria-label="' + RPS_N[i] + '" style="font-size:44px;padding:12px 0;min-height:64px;border-radius:20px">' + x + '</button>').join('') + '</div>';
+    live(view);
+    $('#pick', view).onclick = (e) => {
+      const b = e.target.closest('button'); if (!b) return;
+      picks[h] = +b.dataset.i; view.innerHTML = ''; nextHuman();      // the choice leaves the screen at once
+    };
+  }
+  function reveal() {
+    const pts = L.rpsRound(picks); round++; midRound = false; pts.forEach((v, i) => { scores[i] += v; });
+    over = L.rpsOver(mode, scores, round); paint();
+    $('#sb', root).firstChild.textContent = 'After round ' + round;
+    view.innerHTML = '<div class="card">' + names.map((nm, i) => '<div style="display:flex;justify-content:space-between;align-items:center;min-height:44px"><span>' + esc(nm) + '</span>' +
+      '<span><span style="font-size:30px" aria-hidden="true">' + RPS_H[picks[i]] + '</span> ' + RPS_N[picks[i]] + ' &nbsp; <b>+' + pts[i] + '</b></span></div>').join('') + '</div>' +
+      '<div class="msg" id="msg" style="font-size:18px">' + esc('Round ' + round + ': ' + names.map((nm, i) => nm + ' ' + RPS_N[picks[i]] + ' +' + pts[i]).join(', ') + (pts.every((v) => v === pts[0]) ? ' - no one ahead this round' : '')) +
+      (over ? '<br>' + esc(L.verdict(names, scores, 'point')) : '') + '</div><div class="gap"></div>' +
+      '<button class="btn big-btn" id="nx">' + (over ? 'Play again' : 'Next round') + '</button>';
+    live(view); buzz(30);
+    if (over && L.winners(scores).some((i) => seats[i].h)) celebrate(root, T);
+    $('#nx', view).onclick = () => { if (over) ctx.again(); else roundStart(); };
+  }
+  roundStart();
+}
 
 /* =====================================================================
    10. 2048
@@ -1631,8 +1918,8 @@ reg('numguess', 'Number Guess', '🔮', 'The phone picks a secret number. Guess 
 /* =====================================================================
    19. Math Sprint
    ===================================================================== */
-reg('mathsprint', 'Math Sprint', '➕', 'Answer as many arithmetic questions as you can in 30 seconds. Three difficulty levels and saved best scores.',
-  ['math', 'sprint', 'arithmetic', 'quick', 'brain', 'timed'], function (el) {
+reg('mathsprint', 'Math Sprint', '➕', 'Answer as many arithmetic questions as you can in 30 seconds. Three difficulty levels and saved best scores. Take turns with friends or the phone on 2 to 4 seats.',
+  ['math', 'sprint', 'arithmetic', 'quick', 'brain', 'timed', 'multiplayer', 'players', 'friends'], dual(function (el, toMP) {
     const T = tracker(), DUR = 30000;
     let lvl = Store.get('fun.math.lvl', '1'), q, typed = '', run = false, score = 0, wrongN = 0, t0 = 0, loop = 0;
     const root = mount(el, `
@@ -1644,7 +1931,7 @@ reg('mathsprint', 'Math Sprint', '➕', 'Answer as many arithmetic questions as 
       <div class="mid" id="ans" style="min-height:44px;color:var(--accent);letter-spacing:3px"></div>
       <div class="msg" id="msg"></div>
       <div class="keys" id="keys">${['1', '2', '3', '⌫', '4', '5', '6', 'C', '7', '8', '9', '0'].map(k => '<button data-k="' + k + '" class="' + (k === '⌫' || k === 'C' ? 'op' : '') + '">' + k + '</button>').join('')}</div>
-      <div class="gap"></div><button class="btn big-btn" id="go">Start (30 s)</button>`);
+      <div class="gap"></div><button class="btn big-btn" id="go">Start (30 s)</button>${MPBTN}`);
     const best = () => hsGet('math.best', {})[lvl] || '–';
     function next() { q = L.mathQ(+lvl); typed = ''; $('#q', root).textContent = q.text + ' = ?'; $('#ans', root).textContent = ''; }
     function end() {
@@ -1681,9 +1968,72 @@ reg('mathsprint', 'Math Sprint', '➕', 'Answer as many arithmetic questions as 
     keepTime(T, d => { if (run) t0 += d; });
     onSeg(root, 'lv', v => { if (run) abort(); lvl = v; Store.set('fun.math.lvl', lvl); $('#bs', root).textContent = best(); });
     $('#go', root).onclick = start;
+    $('#mpb', root).onclick = () => { if (run) abort(); toMP(); };
     $('#bs', root).textContent = best();
     return () => T.stop();
-  });
+  }, mathMP));
+
+/* Math Sprint with friends: 2 to 4 seats play one 30 second sprint each, in turn, on the same questions (one shared seed).
+   Phone seats get a score from a simple speed model by level. */
+function mathMP(el, back) {
+  return mpShell(el, back, { id: 'mathsprint', title: 'Math Sprint: play with friends', min: 2, max: 4, def: 2,
+    opts: { q: { label: 'Questions', items: [['1', 'Easy'], ['2', 'Medium'], ['3', 'Hard']], def: '1' }, lvl: { label: 'Phone speed', items: LVL3, def: '2' } }, begin: mathGame });
+}
+function mathGame(ctx) {
+  const { root, T, seats, names, n } = ctx, DUR = 30000, qlvl = +ctx.opt.q || 1, plvl = +ctx.opt.lvl || 2, seed = 1 + rnd(1000000000);
+  const scores = names.map(() => null);
+  let turn = -1, run = false, q = null, rn = null, typed = '', cs = 0, wrongN = 0, t0 = 0, done = false;
+  ctx.inProgress = () => !done && (run || turn > 0);
+  root.innerHTML = '<div class="card" id="sb"></div><div class="gap"></div>' +
+    '<div class="card"><div class="stats">' + stat('cs', 'Score', 0) + stat('wr', 'Misses', 0) + '</div>' +
+    '<div class="progress" style="height:10px;margin-top:6px"><i id="bar" style="display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--accent),#ff6bd6);border-radius:9px"></i></div></div><div class="gap"></div>' +
+    '<div class="msg" id="turn"></div><div class="big" id="q" style="font-size:46px;min-height:70px">Ready?</div><div class="mid" id="ans" style="min-height:44px;color:var(--accent);letter-spacing:3px"></div>' +
+    '<div class="msg" id="msg"></div>' +
+    '<div class="keys" id="keys">' + ['1', '2', '3', '⌫', '4', '5', '6', 'C', '7', '8', '9', '0'].map((k) => '<button data-k="' + k + '" class="' + (k === '⌫' || k === 'C' ? 'op' : '') + '">' + k + '</button>').join('') + '</div>' +
+    '<div class="gap"></div><button class="btn big-btn" id="go"></button>';
+  const paint = () => { $('#sb', root).innerHTML = scoreHTML(names, seats, scores, done ? -1 : turn, ''); };
+  function nextQ() { q = L.mathQ(qlvl, rn); typed = ''; $('#q', root).textContent = q.text + ' = ?'; $('#ans', root).textContent = ''; }
+  /* moves to the next human seat; phone seats are played out on the way */
+  function advance(prefix) {
+    const notes = prefix ? [prefix] : [];
+    for (turn++; turn < n && !seats[turn].h; turn++) { scores[turn] = L.sprintPhone(plvl, qlvl, frac); notes.push(names[turn] + ' scored ' + scores[turn] + '.'); }
+    $('#cs', root).textContent = 0; $('#wr', root).textContent = 0; $('#bar', root).style.width = '100%';
+    if (turn >= n) {
+      done = true; turn = n; paint(); $('#q', root).textContent = 'All done'; $('#ans', root).textContent = '';
+      $('#turn', root).textContent = ''; $('#msg', root).textContent = notes.concat(L.verdict(names, scores, 'correct answer')).join(' '); bump($('#msg', root)); buzz(80);
+      $('#go', root).hidden = true;
+      if (L.winners(scores).some((i) => seats[i].h)) celebrate(root, T);
+      againBtn(ctx); return;
+    }
+    paint(); $('#q', root).textContent = 'Ready?'; $('#ans', root).textContent = '';
+    $('#turn', root).textContent = names[turn] + ': your 30 second sprint';
+    $('#msg', root).textContent = notes.join(' '); $('#go', root).textContent = 'Start ' + names[turn] + ' (30 s)'; $('#go', root).disabled = false;
+  }
+  function endSprint() {
+    run = false; T.reset(); $('#bar', root).style.width = '0%'; scores[turn] = cs; buzz(100);
+    advance(names[turn] + ' scored ' + cs + '.');
+  }
+  function key(k) {
+    if (!run) return;
+    if (k === '⌫') typed = typed.slice(0, -1); else if (k === 'C') typed = ''; else if (typed.length < 4) typed += k;
+    $('#ans', root).textContent = typed;
+    if (typed.length === String(q.ans).length) {
+      if (+typed === q.ans) { cs++; $('#cs', root).textContent = cs; bump($('#cs', root)); buzz(8); nextQ(); }
+      else { wrongN++; $('#wr', root).textContent = wrongN; restart($('#ans', root), 'shake'); buzz(40); typed = ''; T.to(() => { $('#ans', root).textContent = ''; }, 200); }
+    }
+  }
+  function startSprint() {
+    if (run || done || turn < 0 || turn >= n) return;
+    T.reset(); cs = 0; wrongN = 0; run = true; t0 = Date.now(); rn = L.seededRn(seed); $('#go', root).disabled = true;
+    $('#cs', root).textContent = 0; $('#wr', root).textContent = 0; $('#msg', root).textContent = ''; $('#turn', root).textContent = names[turn] + ' is playing'; nextQ();
+    T.iv(() => { const left = DUR - (Date.now() - t0); $('#bar', root).style.width = Math.max(0, left / DUR * 100) + '%'; if (left <= 0) endSprint(); }, 100);
+  }
+  $('#keys', root).onpointerdown = (e) => { const b = e.target.closest('button'); if (b) { e.preventDefault(); key(b.dataset.k); } };
+  T.on(window, 'keydown', (e) => { if (/^[0-9]$/.test(e.key)) key(e.key); else if (e.key === 'Backspace') key('⌫'); });
+  keepTime(T, (d) => { if (run) t0 += d; });
+  $('#go', root).onclick = startSprint;
+  advance();
+}
 
 /* =====================================================================
    20. Truth or Dare
@@ -2091,8 +2441,8 @@ const QUIZ = [
   ['Which vitamin do we get from sunlight?', 'Vitamin D', 'Vitamin C', 'Vitamin A', 'Vitamin B12'], ['Which language has the most native speakers?', 'Mandarin Chinese', 'English', 'Spanish', 'Hindi'],
   ['What is 50 in Roman numerals?', 'L', 'X', 'C', 'D'], ['Which star is closest to Earth?', 'The Sun', 'Proxima Centauri', 'Sirius', 'Polaris']
 ];
-reg('quiz', 'Trivia Quiz', '❓', 'Ten random general-knowledge questions per round from 40 built-in questions, with a saved best score.',
-  ['quiz', 'trivia', 'questions', 'knowledge', 'test'], function (el) {
+reg('quiz', 'Trivia Quiz', '❓', 'Ten random general-knowledge questions per round from 40 built-in questions, with a saved best score. Pass and play with friends or the phone on 2 to 6 seats.',
+  ['quiz', 'trivia', 'questions', 'knowledge', 'test', 'multiplayer', 'players', 'friends'], dual(function (el, toMP) {
     const T = tracker(), ROUND = 10;
     let order, qi, score, locked, best = hsGet('quiz.best', 0), cur;
     const root = mount(el, `
@@ -2103,7 +2453,7 @@ reg('quiz', 'Trivia Quiz', '❓', 'Ten random general-knowledge questions per ro
       <div class="gap"></div>
       <div id="opts" style="display:grid;gap:8px"></div>
       <div class="msg" id="msg"></div>
-      <button class="btn big-btn" id="next" hidden>Next ➜</button>`);
+      <button class="btn big-btn" id="next" hidden>Next ➜</button>${MPBTN}`);
     function start() { order = shuffle([...Array(QUIZ.length).keys()]).slice(0, ROUND); qi = 0; score = 0; $('#sc', root).textContent = 0; show(); }
     function show() {
       locked = false; const q = QUIZ[order[qi]];
@@ -2134,9 +2484,58 @@ reg('quiz', 'Trivia Quiz', '❓', 'Ten random general-knowledge questions per ro
       if (qi < ROUND - 1) { qi++; show(); return; }
       finish();
     };
+    $('#mpb', root).onclick = () => { if (sure(qi > 0 && !finished, 'Leave this quiz? Your answers so far will be lost.')) toMP(); };
     start();
     return () => T.stop();
-  });
+  }, quizMP));
+
+/* Quiz with friends (pass and play): 5 questions per seat from the shared set, seats answer in turn; a phone seat answers
+   correctly with the chance set by the level. */
+function quizMP(el, back) {
+  return mpShell(el, back, { id: 'quiz', title: 'Trivia Quiz: play with friends', min: 2, max: 6, def: 2,
+    opts: { lvl: { label: 'Phone skill', items: LVL3, def: '2' } }, begin: quizGame });
+}
+function quizGame(ctx) {
+  const { root, T, seats, names, n } = ctx, PER = 5, total = PER * n;
+  const order = shuffle([...Array(QUIZ.length).keys()]).slice(0, total), scores = names.map(() => 0);
+  let qi = 0, cur = [], locked = true, over = false;
+  ctx.inProgress = () => !over && qi > 0;
+  root.innerHTML = '<div class="card" id="sb"></div><div class="gap"></div><div class="msg" id="turn"></div>' +
+    '<div id="q" class="card" style="min-height:96px;display:grid;place-items:center;text-align:center;font-size:20px;font-weight:700"></div><div class="gap"></div>' +
+    '<div id="opts" style="display:grid;gap:8px"></div><div class="msg" id="msg"></div><button class="btn big-btn" id="next" hidden>Next ➜</button>';
+  const seat = () => qi % n, paint = () => { $('#sb', root).innerHTML = scoreHTML(names, seats, scores, over ? -1 : seat(), 'pts'); };
+  function show() {
+    const q = QUIZ[order[qi]], s = seat(); cur = shuffle(q.slice(1)); locked = !seats[s].h; paint();
+    $('#turn', root).textContent = 'Question ' + (qi + 1) + ' of ' + total + ': ' + names[s] + (seats[s].h ? ', your turn' : ' is thinking');
+    $('#q', root).textContent = q[0]; bump($('#q', root));
+    $('#opts', root).innerHTML = cur.map((o, i) => '<button class="btn alt" data-i="' + i + '" style="text-align:left;min-height:50px;font-size:17px">' + esc(o) + '</button>').join('');
+    $('#msg', root).textContent = ''; $('#next', root).hidden = true;
+    if (!seats[s].h) T.to(() => {
+      const right = cur.indexOf(q[1]), wrong = [0, 1, 2, 3].filter((i) => i !== right);
+      answer(L.phoneCorrect(ctx.opt.lvl, frac) ? right : wrong[Math.floor(frac() * wrong.length) % wrong.length]);
+    }, 900);
+  }
+  function answer(i) {
+    if (locked && seats[seat()].h) return; locked = true;
+    const q = QUIZ[order[qi]], s = seat(), ok = cur[i] === q[1];
+    $$('#opts button', root).forEach((x, k) => {
+      if (cur[k] === q[1]) { x.style.background = 'var(--ok)'; x.style.color = '#fff'; x.textContent = '✔ ' + cur[k]; }
+      else if (k === i) { x.style.background = 'var(--danger)'; x.style.color = '#fff'; x.textContent = '✘ ' + cur[k]; }
+    });
+    if (ok) scores[s]++;
+    $('#msg', root).textContent = names[s] + (ok ? ': ✅ Correct!' : ': ❌ Wrong, it was ' + q[1]); bump($('#msg', root)); buzz(ok ? 20 : 60);
+    paint(); const nx = $('#next', root); nx.hidden = false; nx.textContent = qi === total - 1 ? 'See result' : 'Next ➜';
+  }
+  $('#opts', root).onclick = (e) => { const b = e.target.closest('button'); if (!b || locked || over) return; answer(+b.dataset.i); };
+  $('#next', root).onclick = () => {
+    if (over) return;
+    if (qi < total - 1) { qi++; show(); return; }
+    over = true; paint(); $('#opts', root).innerHTML = ''; $('#turn', root).textContent = 'Round over';
+    $('#q', root).textContent = L.verdict(names, scores, 'point'); $('#msg', root).textContent = ''; $('#next', root).hidden = true;
+    buzz(80); if (L.winners(scores).some((k) => seats[k].h)) celebrate(root, T); againBtn(ctx);
+  };
+  show();
+}
 
 /* =====================================================================
    29. Finger Chooser

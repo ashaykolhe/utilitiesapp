@@ -60,8 +60,9 @@
 - category: fun
 - plan: free
 - needs: none
-- what: Flip cards to find matching emoji pairs on 3x4, 4x4 or 4x5 grids. Counts moves and time and saves the best result per size. New game / restart and level changes ask first when a game is in progress, so a stray tap cannot throw it away. The clock does not count time while the app is in the background. A short confetti burst celebrates a win (skipped when the phone is set to reduce motion).
+- what: Flip cards to find matching emoji pairs on 3x4, 4x4 or 4x5 grids. Counts moves and time and saves the best result per size. New game / restart and level changes ask first when a game is in progress, so a stray tap cannot throw it away. The clock does not count time while the app is in the background. A short confetti burst celebrates a win (skipped when the phone is set to reduce motion). Play with friends: the "Play with friends" button opens a seat set-up (2 to 4 players, each seat Human or Phone, editable names of up to 12 characters, grid size, phone memory Easy / Normal / Hard; the last set-up is remembered). Seats take turns flipping two cards and a match earns another turn; phone seats only remember a seen card with a chance set by the level, so they can be beaten. Scores are shown per seat (the seat to play is marked with an arrow and the word "now") and the end shows the winner or a tie. Solo mode (moves, time, best) is unchanged.
 - test:
+  0. Tap Play with friends, choose 3 players (seats 1 and 2 Human, seat 3 Phone), name them Ann and Bob, level Hard, Start. Ann flips two different cards: they flip back and the turn passes to Bob; Bob flips a pair: he scores and plays again. The phone plays its own turns after a short pause. At the end the winner (or "Tie between ...") is shown with a Play again button. Setting every seat to Phone and tapping Start shows "Choose at least one Human seat." Leave and reopen the tool: the last set-up is still there. Change players asks before abandoning a game in progress.
   1. Tap two cards: matching ones stay up with a green border, others flip back after ~0.7 s.
   2. Timer starts at the first flip; Moves counts pairs tried.
   3. Clear the board: message shows moves and time and Best updates. Changing size starts a new game.
@@ -95,8 +96,9 @@
 - category: fun
 - plan: free
 - needs: none
-- what: Rock paper scissors against the phone with a shaking hands animation, win/draw/loss counts and a current and best winning streak (saved).
+- what: Rock paper scissors against the phone with a shaking hands animation, win/draw/loss counts and a current and best winning streak (saved). Play with friends: 2 to 4 seats, each Human or Phone, editable names (12 characters), series First to 5 points or 3 / 5 / 7 rounds (last set-up remembered). Humans choose secretly one at a time behind a pass-the-phone cover ("Pass the phone to <Name>. Tap when only you can see the screen."), phones choose at random, then all choices are revealed together. Each seat scores 1 point per other seat it beats in that round. A single human playing phones gets no cover screen. Solo vs the phone stays the default with its streak stats.
 - test:
+  0. Tap Play with friends, 3 players (Human, Human, Phone), series 3 rounds, Start. A cover asks you to pass the phone to Player 1: no hands are visible. Tap the ready button, pick a hand: the screen at once shows the cover for Player 2 and nothing about Player 1's choice. After Player 2 picks, all three hands are revealed with the points of the round (+0 / +1 / +2); totals add up and after round 3 the winner or tie is announced with Play again. Try First to 5 and a game with one Human and two Phones (no cover).
   1. Tap a hand: both fists bounce 3 times, then reveal; the message says who won.
   2. Win twice in a row: Streak shows 2; a loss resets it to 0 while Best streak keeps the record.
   3. Reset stats clears everything.
@@ -212,8 +214,9 @@
 - category: fun
 - plan: free
 - needs: none
-- what: Answer as many arithmetic questions as possible in 30 seconds with a built-in number pad. Auto-checks when you type enough digits. Three levels, best saved. The clock does not count time while the app is in the background. A new best celebrates with confetti.
+- what: Answer as many arithmetic questions as possible in 30 seconds with a built-in number pad. Auto-checks when you type enough digits. Three levels, best saved. The clock does not count time while the app is in the background. A new best celebrates with confetti. Play with friends: 2 to 4 seats (Human or Phone, editable names, question level, phone speed Easy / Normal / Hard; last set-up remembered) each play one 30-second sprint in turn on exactly the same questions (one shared seed); phone seats get a score from a simple speed model by level. Per-seat scores and the winner or a tie are shown. Background time does not count.
 - test:
+  0. Tap Play with friends, 3 players (Human, Human, Phone), Start. Player 1 taps Start and answers some questions, then Player 2 starts: the same questions appear in the same order. Minimise the app for 20 seconds mid-sprint: the bar does not lose that time. After the last human the phone seat scores itself and the winner or "Tie between ..." is shown with Play again. Change players asks before leaving a sprint.
   1. Tap Start and answer using the keypad: right answers advance instantly and increase Score.
   2. A wrong answer shakes, counts as a miss and clears your input.
   3. When the bar runs out Time! shows your score; Best updates per level.
@@ -306,8 +309,9 @@
 - category: fun
 - plan: free
 - needs: none
-- what: Ten random questions per round from 40 built-in general knowledge questions with four options each. Correct answer shown in green; best score saved. A perfect round celebrates with confetti.
+- what: Ten random questions per round from 40 built-in general knowledge questions with four options each. Correct answer shown in green; best score saved. A perfect round celebrates with confetti. Play with friends (pass and play): 2 to 6 seats (Human or Phone, editable names of 12 characters, phone skill Easy / Normal / Hard; last set-up remembered) take turns, each answering 5 different questions from the shared set (the question goes to seat 1, 2, 3 ... in turn); a phone seat answers correctly with a probability set by its level. A scoreboard shows every seat and the end shows the winner or a tie.
 - test:
+  0. Tap Play with friends, 3 players (Human, Human, Phone), Start. The header says "Question 1 of 15: <name>, your turn" and passes to the next seat each question; the phone answers by itself after a second and tapping an answer during its turn does nothing. After question 15 the verdict (winner or tie) and a Play again button appear. Choose 6 players: 30 questions.
   1. Tap an answer: right turns green with Correct, wrong turns red and shows the right answer.
   2. Tap Next 10 times: final score. Play again gives a new random round.
 
