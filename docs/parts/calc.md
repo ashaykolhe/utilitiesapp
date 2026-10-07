@@ -9,9 +9,11 @@
   2. Set loan 1,000,000, rate 10, tenure 10 years: EMI is about 13,215.07.
   3. Set rate 0, loan 1200, tenure 12 months: EMI is 100.00 and total interest is 0.00.
   4. Switch "Tenure in" to Months and enter 6: the table shows 6 rows ending with balance 0.00.
-  5. Clear the loan amount: the result is replaced by "Enter the values above." with no error.
+  5. Clear the loan amount: the result is replaced by "Enter the values above." with no error. A field that is filled but gives no answer (for example a 0 where a positive number is needed) says "These values give no result".
   6. Limits: type 250 in the interest field: a red "Maximum is 200" appears under it, the result says "enter a value from 0 up to 200", and leaving the field sets it back to 200. Tenure 101 years shows "Maximum is 100"; switching the unit to Months allows up to 1200. Letters, e and + cannot be typed.
   7. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  8. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
+  9. Remembered inputs: type a loan of 123456, leave the tool and open it again: the loan amount is still there (the same for every calculator with number fields, except date fields that start at today).
 
 ## Billing
 - id: billing
@@ -41,6 +43,7 @@
   4. Save an event "Trip" a week from now: "in 7 days". Save one in the past: "N days ago". Save one today: "Today".
   5. Close and reopen: the events are still listed. Delete one with the cross.
   6. History: change the "To" date and wait 2 seconds: the clock button appears and lists "Days from ... to ..."; pressing Add or Subtract lists the date it gives. Opening the tool adds nothing.
+  7. Add or subtract days with the Days field cleared shows "Enter a date and number of days" (it no longer treats an empty field as 0).
 
 ## Tally Counter
 - id: tally
@@ -68,6 +71,7 @@
   3. Min 10 and Max 1 (reversed): still works, giving a number from 1 to 10.
   4. Enter three names, tap Pick one: one of them is shown. Tap Shuffle: the lines are reordered. With an empty list a message asks to add items.
   5. Pick a random date between two dates: a date inside the range and its weekday appear.
+  6. Min, Max and How many are remembered next time. Tap a drawn number, the picked name or the random date: it is copied ("Copied" message).
 
 ## Percentage
 - id: percent
@@ -82,6 +86,8 @@
   4. Value 250 and 12%: plus 280, minus 220, percent itself 30.
   5. "X is what % of Y" with Y = 0 and "percent change" from 0 show the prompt instead of an error.
   6. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  7. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
+  8. "X is what % of Y" with Y = 0 says "Y cannot be 0"; "Percent change" from 0 says a change from 0 cannot be shown as a percentage. Big results use thousands separators.
 
 ## Discount & GST
 - id: gst
@@ -94,6 +100,7 @@
   2. Price 1180, discount 0, tax 18%, "Including tax": price before tax 1,000.00, tax 180.00, final 1,180.00.
   3. Discount above 100 or a negative number shows the prompt, not a wrong result.
   4. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  5. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Tip Splitter
 - id: tip
@@ -106,6 +113,7 @@
   2. Bill 100, tip 15%, 3 people, "Round each share up": each pays 39.00, total 117.00, tip total 17.00.
   3. People 0 or blank shows the prompt instead of dividing by zero.
   4. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  5. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Age Calculator
 - id: age
@@ -118,8 +126,9 @@
   2. Set "Age on" to a birthday itself: it says "Today! Turning N".
   3. Birth date 2000-02-29: it works in non-leap years (birthday counts as Mar 1).
   4. The date fields accept 1900 to 2200 only; a date outside that shows an "Earliest is..." or "Latest is..." message.
-  4. Set "Age on" earlier than the birth date: shows the prompt, no error.
+  4a. Set "Age on" earlier than the birth date: it says "Date of birth is after the Age on date." Birthday one day away reads "1 day", not "1 days".
   5. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  6. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Investment
 - id: invest
@@ -134,6 +143,7 @@
   4. Set return to 0 for the SIP: value equals the amount invested.
   5. Years 0 or empty: shows the prompt.
   6. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  7. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Scientific
 - id: sci
@@ -149,6 +159,7 @@
   4a. A decimal comma works: type 0,5+1 and the preview shows 1.5 (or 1,5 in a comma locale). Tap = on 1/3 then tap +, 1, =: the box shows plain digits and the sum works.
   5. M+ stores the current result (shown as "M = ..." at the top), MR inserts it, MC clears it. Tap the display to type with the keyboard.
   6. History: type sqrt(16)+2 and press = (or Enter): the clock button appears and lists "sqrt(16)+2" with 6; copy works. Live typing before = adds nothing. Trig results are labelled [DEG] or [RAD].
+  7. Tap the grey "= result" line under the display: the number is copied (nothing is copied for an error). The symbol keys have spoken names for screen readers (for example "Divide", "Square root").
 
 ## Fuel Cost
 - id: fuel
@@ -163,6 +174,7 @@
   4. Mileage: 420 km with 30 L gives 14.00 km/L and 7.14 L per 100 km.
   5. Efficiency 0 shows the prompt.
   6. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  7. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Marks & GPA
 - id: marks
@@ -176,6 +188,7 @@
   3. Add a line of garbage text: it is ignored, the rest still calculates.
   4. Empty box shows the prompt.
   5. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  6. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Time Calc
 - id: timecalc
@@ -190,6 +203,7 @@
   4. Start 22:00, End 06:00: 8:00 and a "passes midnight" note.
   5. Break longer than the shift shows an error message.
   6. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  7. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Work Days
 - id: workdays
@@ -204,6 +218,7 @@
   4. Choose "Fri + Sat" weekend: the result skips Fridays and Saturdays instead.
   5. End date before start date shows the prompt.
   6. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  7. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Salary Convert
 - id: pay
@@ -217,6 +232,7 @@
   2. Change "Per" to Year and enter 60,000: per hour 28.85.
   3. Hours per week 0 shows the prompt.
   4. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  5. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Loan Compare
 - id: loancmp
@@ -229,6 +245,7 @@
   2. Make both offers identical: shows "Same total cost".
   3. Months 0 shows the prompt.
   4. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  5. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Fractions
 - id: fraction
@@ -242,6 +259,7 @@
   3. Enter "1 1/2" and "0.25" with +: result 7/4.
   4. Divide by 0 shows "Cannot divide by zero"; typing "abc" shows a prompt.
   5. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  6. Close and reopen the tool: the two fractions and the operation are as you left them.
 
 ## Ratio
 - id: ratio
@@ -253,8 +271,9 @@
   1. 24 : 36 simplifies to 2 : 3.
   2. Proportion 3 : 5 = 12 : x gives x = 20.
   3. Split 1000 as 2 : 3: A gets 400.00 and B gets 600.00.
-  4. Decimals in the simplify box show "Use whole numbers".
+  4. Decimals in the simplify box show "Use whole numbers"; a 0 shows "A and B cannot be 0". Proportion with a = 0 says "a cannot be 0"; splitting with both shares 0 says so too.
   5. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  6. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Statistics
 - id: stats
@@ -268,6 +287,7 @@
   3. 1 2 3 4: mode shows "none".
   4. A single number: sample deviation shows a dash. Text with stray letters is skipped.
   5. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  6. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Prime Check
 - id: prime
@@ -280,6 +300,7 @@
   2. 97 gives "Yes, prime", next prime 101, previous 89.
   3. 999999937 is reported prime almost instantly.
   4. 1, a decimal or a negative number shows the prompt.
+  3. Close and reopen the tool: the last valid number is shown and analysed.
 
 ## GCD & LCM
 - id: gcdlcm
@@ -290,8 +311,9 @@
 - test:
   1. 12, 18, 30 gives GCD 6 and LCM 180.
   2. 4 6 10 gives GCD 2 and LCM 60.
-  3. A single number, a zero or a decimal shows the prompt.
+  3. A single number says "Enter at least two whole numbers"; a zero or a decimal says "Use whole numbers from 1 to 1,000,000,000,000".
   4. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  5. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Quadratic
 - id: quad
@@ -305,6 +327,7 @@
   3. a=1, b=0, c=1: roots 0 + 1i and 0 - 1i.
   4. a=0, b=2, c=-4: "Linear: x = 2". a=0 and b=0 shows a message.
   5. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  6. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Area & Volume
 - id: shapes
@@ -318,6 +341,7 @@
   3. Sphere radius 3: volume 113.09734. Cone radius 3 height 4: slant height 5.
   4. Change shape: the input boxes change to match. Zero or empty values show a prompt.
   5. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  6. Close and reopen the tool: the shape and the sizes you entered are still there; choosing another shape starts with its own default sizes.
 
 ## Triangle
 - id: triangle
@@ -331,6 +355,7 @@
   3. Switch to "Two sides and the angle": 3, 4 and 90 degrees gives side c = 5.
   4. Angle 0 or 180 shows an error message.
   5. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  6. Close and reopen the tool: the mode (three sides or two sides and an angle) and the numbers are remembered.
 
 ## Power Cost
 - id: powercost
@@ -342,6 +367,7 @@
   1. 1500 W, 1 unit, 2 h/day, 8 per kWh: 3 kWh per day, 24.00 per day, 90 kWh and 720.00 per month, 8,760.00 per year.
   2. Hours per day above 24 shows the prompt.
   3. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  4. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Cooking Units
 - id: cooking
@@ -355,6 +381,7 @@
   3. Switch ingredient to honey with the same 1 cup: 340 g.
   4. Amount 0 shows the prompt.
   5. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  6. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Size Converter
 - id: sizes
@@ -368,6 +395,7 @@
   3. Women's clothing UK 10: US 6, EU 38.
   4. Chest 40 inches: 101.6 cm, EU 50, letter M.
   5. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  6. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Break-even
 - id: breakeven
@@ -380,6 +408,7 @@
   2. Add profit target 20,000: 700 units needed.
   3. Price equal to or below variable cost shows an explanatory message.
   4. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  5. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Markup & Margin
 - id: margin
@@ -390,8 +419,9 @@
 - test:
   1. Cost 80, price 100: margin 20%, markup 25%, profit 20.
   2. Cost 80, 25% margin: price 106.67. Cost 80, 25% markup: price 100.
-  3. A margin of 100% or more shows the prompt.
+  3. A margin of 100% in "Price I need" says "A margin must be below 100% of the price".
   4. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  5. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Simple Interest
 - id: interest
@@ -404,6 +434,7 @@
   2. Change time to 6 months at the same inputs (time 6): interest 1,750.00.
   3. Negative values show the prompt.
   4. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  5. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## FD / RD
 - id: fdrd
@@ -416,6 +447,7 @@
   2. RD 5,000 per month at 6.5% for 24 months: maturity a little above 120,000 deposited (interest roughly 8,000).
   3. Zero months or years shows the prompt.
   4. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  5. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Net Worth
 - id: networth
@@ -428,6 +460,7 @@
   2. Amounts with commas (1,500) and decimals (80.50) are read correctly; lines without a number are ignored.
   3. Close and reopen: the lists are still there.
   4. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  5. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Growth Rate
 - id: cagr
@@ -440,6 +473,7 @@
   2. 100 to 200 over 1 year: 100% per year.
   3. Zero or negative values show the prompt.
   4. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+  5. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## Number Words
 - id: numwords
@@ -453,4 +487,4 @@
   3. 12.5 gives "... and fifty hundredths"; -5 starts with "Minus".
   4. 0 gives "Zero". A number of one quadrillion or more shows the prompt.
   5. History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
-
+  6. Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.

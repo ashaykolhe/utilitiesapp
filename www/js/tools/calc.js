@@ -563,6 +563,7 @@ if (typeof Tools === 'undefined') { if (typeof module !== 'undefined') module.ex
 
 /* ================= UI helpers ================= */
 const fx = L.fx, sig = L.sig;
+const grp = (n, p = 10) => (Number.isFinite(n) ? n.toLocaleString(undefined, { maximumSignificantDigits: p }) : '—'); // display with thousands separators
 const reg = (o) => Tools.register(Object.assign({ cat: 'calculate', needs: [] }, o));
 const rows = (list) => list.map((r) => `<div class="item"><span class="grow muted">${esc(r[0])}</span><b style="text-align:right;word-break:break-all">${esc(r[1])}</b></div>`).join('');
 const big = (label, value) => `<div class="center muted">${esc(label)}</div><div class="mid" style="word-break:break-all">${esc(value)}</div>`;
@@ -622,7 +623,7 @@ function multi(el, id, sections, name) {
   // a saved value is reused only when it still fits the field's limits (older versions had none)
   const fits = (f, v) => { if ((f.t || 'number') !== 'number') return true; if (v === '') return true; const n = +v; return Number.isFinite(n) && n >= (typeof f.min === 'function' ? f.min() : f.min) && n <= (typeof f.max === 'function' ? f.max() : f.max); };
   const initial = (f, i) => (typeof saved[i + '.' + f.k] === 'string' && f.keep !== false && fits(f, saved[i + '.' + f.k]) ? saved[i + '.' + f.k] : dflt(f));
-  el.innerHTML = sections.map((s, i) => `<div class="card list" data-s="${i}">${s.title ? `<b>${esc(s.title)}</b>` : ''}${s.note ? `<div class="muted" style="font-size:13px">${esc(s.note)}</div>` : ''}${s.fields.map((f) => (Array.isArray(f) ? `<div class="row">${f.map((g) => fieldHtml(g, initial(g, i))).join('')}</div>` : fieldHtml(f, initial(f, i)))).join('')}<div class="list" data-r></div></div>`).join('');
+  el.innerHTML = sections.map((s, i) => `<div class="card list" data-s="${i}">${s.title ? `<b>${esc(s.title)}</b>` : ''}${s.note ? `<div class="muted" style="font-size:13px">${esc(s.note)}</div>` : ''}${s.fields.map((f) => (Array.isArray(f) ? `<div class="row">${f.map((g) => fieldHtml(g, initial(g, i))).join('')}</div>` : fieldHtml(f, initial(f, i)))).join('')}<div class="list" data-r aria-live="polite"></div></div>`).join('');
   // limits that depend on a unit selector (years / months / days ...): data-by names the selector, the table gives min and max per unit
   const byFields = sections.map((s) => s.fields.flat().filter((f) => f.by));
   const applyBy = (card) => byFields[+card.dataset.s].forEach((f) => {
@@ -649,8 +650,11 @@ function multi(el, id, sections, name) {
     try { html = sections[i].calc(v); } catch (e) { html = null; }
     if (outOfRange) html = '<div class="status">' + esc(outOfRange.l) + ': enter a value from ' + esc(outOfRange.a) + ' up to ' + esc(outOfRange.b) + '.</div>';
     if (html && /(NaN|Infinity|undefined)/.test(html.replace(/<[^>]*>/g, ' '))) html = BIG;
-    out.innerHTML = html || '<div class="muted center" style="font-size:13px">Enter the values above.</div>';
+    // an empty field asks for values; filled fields that still give no result (a zero where a positive number is needed) say so
+    const filled = $$('[data-k]', card).every((x) => x.tagName === 'SELECT' || x.value.trim() !== '');
+    out.innerHTML = html || (filled ? '<div class="muted center" style="font-size:13px">These values give no result. Check for a zero or negative number where a positive one is needed.</div>' : '<div class="muted center" style="font-size:13px">Enter the values above.</div>');
     card._ok = !!html && !outOfRange && !out.querySelector('.status') && html !== BIG;
+    if (card._ok) out.insertAdjacentHTML('beforeend', '<button class="btn alt" type="button" data-copy>Copy result</button>');
     return v;
   };
   /* Headline of a result: the big number (with its caption), or the first rows, or the text card. */
@@ -677,6 +681,23 @@ function multi(el, id, sections, name) {
     const s = sections[i], custom = typeof s.lab === 'function' ? s.lab(read(card)) : '';
     hk.add(custom || labelOf(i, card), v);
   };
+  /* Plain text of a shown result (big number, rows, table lines, text card), for the Copy result button. */
+  const resultText = (i, out) => {
+    const tx = (n) => n.textContent.replace(/\s+/g, ' ').trim(), lines = [];
+    $$('.mid, .item, tr, .card', out).forEach((n) => {
+      if (n.classList.contains('mid')) { const c = n.previousElementSibling; lines.push((c && c.classList.contains('muted') ? tx(c) + ': ' : '') + tx(n)); } else if (n.classList.contains('item')) lines.push(tx(n.firstElementChild) + ': ' + tx(n.lastElementChild));
+      else if (n.tagName === 'TR') lines.push($$('th,td', n).map(tx).join(' | ')); else lines.push(tx(n));
+    });
+    const card = $$('.card', el)[i];
+    const sc = sections[i], custom = typeof sc.lab === 'function' ? sc.lab(read(card)) : '';
+    return (custom || labelOf(i, card)) + '\n' + lines.join('\n');
+  };
+  el.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('[data-copy]');
+    if (!b) return;
+    const card = b.closest('.card'), i = +card.dataset.s;
+    copyText(resultText(i, $('[data-r]', card)));
+  });
   const all = () => sections.forEach((s, i) => run(i));
   el.addEventListener('input', (e) => {
     const card = e.target.closest && e.target.closest('.card');
@@ -749,7 +770,7 @@ reg({ id: 'billing', pro: true, proKey: 'trackers', name: 'Billing', icon: '📃
     const prev = editing ? list.find((x) => x.id === editing) : null;
     let no = prev ? prev.no : null;
     if (!no) { no = Store.get('billing.next', 1); }
-    return { id: editing || Date.now(), no, date: prev && prev.date ? prev.date : todayStr(), biz: c.biz, cust: $('#cust', el).value.trim(), cur: c.cur, items: clean().map((i) => ({ d: i.d.trim(), q: i.q, p: i.p })), tax: c.tax, dt: c.dt, dv: c.dv };
+    return { id: editing || Date.now() * 1000 + Math.floor(Math.random() * 1000), no, date: prev && prev.date ? prev.date : todayStr(), biz: c.biz, cust: $('#cust', el).value.trim(), cur: c.cur, items: clean().map((i) => ({ d: i.d.trim(), q: i.q, p: i.p })), tax: c.tax, dt: c.dt, dv: c.dv };
   };
   const text = () => L.invoiceText(record());
   const drawSaved = () => {
@@ -830,7 +851,7 @@ reg({ id: 'days', name: 'Days Counter', icon: '📆', desc: 'Days between two da
     $('#r1', el).innerHTML = big(b < a ? 'Days (To is earlier)' : 'Days', String(d)) + rows([['Weeks', Math.floor(d / 7) + ' w ' + (d % 7) + ' d'], ['Years, months, days', y.y + 'y ' + y.m + 'm ' + y.d + 'd'], ['Total weeks', sig(d / 7, 5)], ['Total hours', fx(d * 24, 0)]]);
   };
   const r2 = (sign, quiet) => {
-    const s = L.pd($('#s', el).value), n = Math.round(Valid.num($('#n', el).value));
+    const s = L.pd($('#s', el).value), nn = Valid.num($('#n', el).value), n = nn === null ? NaN : Math.round(nn);
     if (!ok(s, n)) { $('#r2', el).innerHTML = '<div class="muted center">Enter a date and number of days.</div>'; return; }
     const r = s + sign * n;
     if (Math.abs(n) > 2.9e6 || !(r >= L.pd('1000-01-01') && r <= L.pd('9999-12-31'))) { $('#r2', el).innerHTML = '<div class="status">That date is out of range (years 1000 to 9999).</div>'; return; }
@@ -855,7 +876,7 @@ reg({ id: 'days', name: 'Days Counter', icon: '📆', desc: 'Days between two da
       const n = $('#en', el).value.trim() || 'Event', d = $('#ed', el).value, list = events();
       if (!ok(L.pd(d))) { toast('Pick a date'); return; }
       if (list.length >= 50) { toast('Max 50 events'); return; }
-      list.push({ id: String(Date.now()), n, d }); Store.set('days.events', list); $('#en', el).value = ''; drawEv();
+      list.push({ id: Date.now() + '-' + Math.floor(Math.random() * 1e6), n, d }); Store.set('days.events', list); $('#en', el).value = ''; drawEv();
     } else if (b.dataset.del) { Store.set('days.events', events().filter((x) => x.id !== b.dataset.del)); drawEv(); }
   });
   r1(true); r2(1, true); drawEv();
@@ -868,7 +889,7 @@ reg({ id: 'tally', name: 'Tally Counter', icon: '🔘', desc: 'Big plus and minu
   if (!st.list.length) st.list = [{ n: 'Counter 1', v: 0 }];
   st.sel = Math.min(st.sel, st.list.length - 1);
   let armed = null, armT = null;
-  el.innerHTML = `<div class="card"><div class="center muted" id="nm"></div><div class="big" id="v" style="font-size:clamp(28px,15vw,72px);word-break:break-all"></div>
+  el.innerHTML = `<div class="card"><div class="center muted" id="nm"></div><div class="big" id="v" aria-live="polite" style="font-size:clamp(28px,15vw,72px);word-break:break-all"></div>
     <div class="row"><button class="btn alt" id="minus" aria-label="Subtract" style="min-height:96px;font-size:44px">−</button><button class="btn" id="plus" aria-label="Add" style="min-height:96px;font-size:44px">+</button></div></div>
     <div class="row"><label class="f">Step<input id="step" type="number" inputmode="numeric" step="1" min="1" max="1000000" value="${esc(st.step)}"></label><button class="btn alt" id="reset" style="align-self:flex-end">Reset</button></div>
     <div class="card list"><b>Counters</b><div class="list" id="list"></div>
@@ -913,20 +934,26 @@ reg({ id: 'tally', name: 'Tally Counter', icon: '🔘', desc: 'Big plus and minu
 
 /* ================= 5. Random ================= */
 reg({ id: 'random', name: 'Random', icon: '🎰', desc: 'Random numbers (with a no-repeat option), pick or shuffle items from a list, and random dates.', keys: ['dice', 'draw', 'lottery', 'pick', 'shuffle', 'raffle'], render(el) {
-  const drawn = new Set();
+  const drawn = new Set(), cfg = Store.get('random.cfg', {});
+  const cv = (k, d, lo, hi) => { const n = parseFloat(cfg[k]); return Number.isFinite(n) && n >= lo && n <= hi ? String(Math.round(n)) : d; };
   el.innerHTML = `<div class="card list"><b>Random number</b>
-    <div class="row"><label class="f">Min<input id="mn" type="number" inputmode="numeric" step="1" min="-1000000000" max="1000000000" value="1"></label><label class="f">Max<input id="mx" type="number" inputmode="numeric" step="1" min="-1000000000" max="1000000000" value="100"></label><label class="f">How many<input id="cnt" type="number" inputmode="numeric" step="1" value="1" min="1" max="500"></label></div>
+    <div class="row"><label class="f">Min<input id="mn" type="number" inputmode="numeric" step="1" min="-1000000000" max="1000000000" value="${cv('mn', '1', -1e9, 1e9)}"></label><label class="f">Max<input id="mx" type="number" inputmode="numeric" step="1" min="-1000000000" max="1000000000" value="${cv('mx', '100', -1e9, 1e9)}"></label><label class="f">How many<input id="cnt" type="number" inputmode="numeric" step="1" value="${cv('cnt', '1', 1, 500)}" min="1" max="500"></label></div>
     <label class="item"><input id="nr" type="checkbox" style="width:22px;height:22px;flex:0 0 auto"><span class="grow">No repeats until all are drawn</span></label>
     <button class="btn" id="gn">Draw</button><div class="mid" id="rn" style="word-break:break-word"></div><button class="btn alt" id="rst">Reset no-repeat list</button></div>
     <div class="card list"><b>Pick or shuffle a list</b><label class="f">One item per line<textarea id="li" rows="5" maxlength="3000" placeholder="Anna&#10;Ben&#10;Chloe"></textarea></label>
     <div class="row"><button class="btn" id="pk">Pick one</button><button class="btn alt" id="sh">Shuffle</button></div><div class="mid" id="rl" style="word-break:break-word"></div></div>
     <div class="card list"><b>Random date</b><div class="row"><label class="f">From<input id="d1" type="date" min="1900-01-01" max="2200-12-31" value="${L.ds(L.today())}"></label><label class="f">To<input id="d2" type="date" min="1900-01-01" max="2200-12-31" value="${L.ds(L.today() + 365)}"></label></div>
-    <button class="btn" id="gd">Pick a date</button><div class="mid" id="rd"></div><div class="center muted" id="rw"></div></div>`;
+    <button class="btn" id="gd">Pick a date</button><div class="mid" id="rd"></div><div class="center muted" id="rw"></div></div>
+    <div class="muted center" style="font-size:12px">Tap a result to copy it.</div>`;
+  ['#rn', '#rl', '#rd'].forEach((q) => { const r = $(q, el); r.style.cursor = 'pointer'; r.title = 'Tap to copy'; });
+  el.addEventListener('input', (e) => { if (['mn', 'mx', 'cnt'].includes(e.target.id)) Store.set('random.cfg', { mn: $('#mn', el).value, mx: $('#mx', el).value, cnt: $('#cnt', el).value }); });
   const key = () => $('#mn', el).value + ':' + $('#mx', el).value;
   let lastKey = '';
   const out = (id, t) => { $(id, el).textContent = t; };
   const lines = () => $('#li', el).value.split('\n').map((x) => x.trim()).filter(Boolean);
   el.addEventListener('click', (e) => {
+    const r = e.target.closest && e.target.closest('#rn, #rl, #rd');
+    if (r && r.textContent.trim() && r.textContent !== 'Shuffled') { copyText(r.textContent.trim()); return; }
     const b = e.target.closest('button');
     if (!b) return;
     if (b.id === 'gn') {
@@ -965,10 +992,10 @@ reg({ id: 'random', name: 'Random', icon: '🎰', desc: 'Random numbers (with a 
 
 /* ================= 6. Percentage ================= */
 simple({ id: 'percent', name: 'Percentage', icon: '％', desc: 'X% of Y, X is what percent of Y, percent change, and add or subtract a percentage.', keys: ['percent', 'increase', 'decrease', 'change', 'ratio'], sections: [
-  sec('What is X% of Y?', [[N('x', 'X (%)', 15, -1e6, 1e6), N('y', 'Y', 200, -1e12, 1e12)]], (v) => ok(v.x, v.y) ? big('Result', sig(v.x * v.y / 100)) : null),
-  sec('X is what % of Y?', [[N('x', 'X', 30, -1e12, 1e12), N('y', 'Y', 120, -1e12, 1e12)]], (v) => ok(v.x, v.y) && v.y !== 0 ? big('Percentage', sig(v.x / v.y * 100) + '%') : null),
-  sec('Percent change', [[N('a', 'From', 80, -1e12, 1e12), N('b', 'To', 100, -1e12, 1e12)]], (v) => { if (!ok(v.a, v.b) || v.a === 0) return null; const c = L.pctChange(v.a, v.b); return big(c >= 0 ? 'Increase' : 'Decrease', sig(Math.abs(c), 8) + '%'); }),
-  sec('Add or subtract a percentage', [[N('v', 'Value', 250, -1e12, 1e12), N('p', 'Percent', 12, -1e6, 1e6)]], (v) => ok(v.v, v.p) ? rows([['Plus ' + sig(v.p) + '%', sig(v.v * (1 + v.p / 100))], ['Minus ' + sig(v.p) + '%', sig(v.v * (1 - v.p / 100))], ['The percent itself', sig(v.v * v.p / 100)]]) : null)
+  sec('What is X% of Y?', [[N('x', 'X (%)', 15, -1e6, 1e6), N('y', 'Y', 200, -1e12, 1e12)]], (v) => ok(v.x, v.y) ? big('Result', grp(v.x * v.y / 100)) : null),
+  sec('X is what % of Y?', [[N('x', 'X', 30, -1e12, 1e12), N('y', 'Y', 120, -1e12, 1e12)]], (v) => ok(v.x, v.y) ? (v.y === 0 ? '<div class="status">Y cannot be 0.</div>' : big('Percentage', sig(v.x / v.y * 100) + '%')) : null),
+  sec('Percent change', [[N('a', 'From', 80, -1e12, 1e12), N('b', 'To', 100, -1e12, 1e12)]], (v) => { if (!ok(v.a, v.b)) return null; if (v.a === 0) return '<div class="status">A change from 0 cannot be shown as a percentage.</div>'; const c = L.pctChange(v.a, v.b); return big(c >= 0 ? 'Increase' : 'Decrease', sig(Math.abs(c), 8) + '%'); }),
+  sec('Add or subtract a percentage', [[N('v', 'Value', 250, -1e12, 1e12), N('p', 'Percent', 12, -1e6, 1e6)]], (v) => ok(v.v, v.p) ? rows([['Plus ' + sig(v.p) + '%', grp(v.v * (1 + v.p / 100))], ['Minus ' + sig(v.p) + '%', grp(v.v * (1 - v.p / 100))], ['The percent itself', grp(v.v * v.p / 100)]]) : null)
 ] });
 
 /* ================= 7. Discount & GST ================= */
@@ -995,10 +1022,11 @@ simple({ id: 'age', name: 'Age Calculator', icon: '🎈', desc: 'Exact age in ye
   { k: 'dob', l: 'Date of birth', t: 'date', v: '1995-06-15', min: '1900-01-01', max: '2200-12-31' }, { k: 'on', l: 'Age on', t: 'date', v: todayStr, keep: false, min: '1900-01-01', max: '2200-12-31' }
 ], (v) => {
   const a = L.pd(v.dob), b = L.pd(v.on);
-  if (!ok(a, b) || b < a) return null;
+  if (!ok(a, b)) return null;
+  if (b < a) return '<div class="status">Date of birth is after the "Age on" date.</div>';
   const r = L.age(a, b);
   return big('Age', r.y + ' years ' + r.m + ' months ' + r.d + ' days') + rows([['Total days lived', fx(r.days, 0)], ['Total weeks', fx(Math.floor(r.days / 7), 0)], ['Total months', fx(r.y * 12 + r.m, 0)], ['Born on a', L.DAYS[L.dow(a)]],
-    ['Next birthday', r.nextIn === 0 ? 'Today! Turning ' + r.turning : r.nextIn + ' days (' + L.DAYS[L.dow(r.next)] + ', turning ' + r.turning + ')']]);
+    ['Next birthday', r.nextIn === 0 ? 'Today! Turning ' + r.turning : r.nextIn + (r.nextIn === 1 ? ' day (' : ' days (') + L.DAYS[L.dow(r.next)] + ', turning ' + r.turning + ')']]);
 })] });
 
 /* ================= 10. Investment ================= */
@@ -1025,12 +1053,13 @@ simple({ id: 'invest', name: 'Investment', icon: '🌱', desc: 'Compound interes
 reg({ id: 'sci', name: 'Scientific', icon: '🔬', desc: 'Scientific calculator with brackets, trig in degrees or radians, logs, roots, powers, factorial and memory keys.', keys: ['sin', 'cos', 'tan', 'log', 'sqrt', 'calculator', 'factorial', 'scientific'], needs: [], render(el) {
   const hk = kit('sci');
   let deg = true, mem = 0, ans = 0, shown = false, fresh = false; // fresh: the box holds a result, so a digit starts a new sum
+  const SPOKEN = { '⌫': 'Backspace', AC: 'Clear all', MC: 'Memory clear', MR: 'Memory recall', 'M+': 'Memory add', 'M−': 'Memory subtract', '÷': 'Divide', '×': 'Multiply', '−': 'Minus', '+': 'Plus', '=': 'Equals', '√': 'Square root', 'π': 'Pi', '^': 'Power', '!': 'Factorial', '%': 'Percent', '.': 'Decimal point', Ans: 'Previous answer', asin: 'Arc sine', acos: 'Arc cosine', atan: 'Arc tangent', ln: 'Natural log', log: 'Log base 10' };
   const layout = [['DEG', 'MC', 'MR', 'M+', 'M−'], ['sin', 'cos', 'tan', 'ln', 'log'], ['asin', 'acos', 'atan', '√', '^'], ['(', ')', '!', 'π', 'e'], ['7', '8', '9', '÷', '⌫'], ['4', '5', '6', '×', 'AC'], ['1', '2', '3', '−', 'Ans'], ['0', '.', '%', '+', '=']];
   el.innerHTML = `<div class="card"><div class="muted" id="st" style="min-height:20px;font-size:13px"></div>
     <input id="ex" type="text" autocomplete="off" aria-label="Expression" maxlength="200" style="font-size:24px;text-align:right">
-    <div class="mid" id="rs" style="text-align:right;min-height:40px;word-break:break-all"></div></div>
-    <div id="kp" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">${layout.flat().map((k) => `<button data-k="${k}" style="padding:14px 0;font-size:${k.length > 2 ? 15 : 19}px;border:1px solid var(--line);border-radius:12px;background:${'=÷×−+'.includes(k) && k ? 'var(--accent)' : 'var(--surface)'};color:${'=÷×−+'.includes(k) && k ? 'var(--accent-t)' : 'var(--text)'}">${k}</button>`).join('')}</div>
-    <div class="muted center" style="font-size:12px">Tip: tap the display to edit with the keyboard.</div>`;
+    <div class="mid" id="rs" aria-live="polite" title="Tap to copy" style="text-align:right;min-height:40px;word-break:break-all"></div></div>
+    <div id="kp" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">${layout.flat().map((k) => `<button data-k="${k}"${SPOKEN[k] ? ` aria-label="${SPOKEN[k]}"` : ''} style="padding:14px 0;font-size:${k.length > 2 ? 15 : 19}px;border:1px solid var(--line);border-radius:12px;background:${'=÷×−+'.includes(k) && k ? 'var(--accent)' : 'var(--surface)'};color:${'=÷×−+'.includes(k) && k ? 'var(--accent-t)' : 'var(--text)'}">${k}</button>`).join('')}</div>
+    <div class="muted center" style="font-size:12px">Tip: tap the display to edit with the keyboard. Tap the result to copy it.</div>`;
   const ex = $('#ex', el);
   const status = () => { $('#st', el).textContent = (deg ? 'DEG' : 'RAD') + (mem ? '   M = ' + sig(mem, 8) : ''); $('[data-k="DEG"]', el).textContent = deg ? 'DEG' : 'RAD'; };
   const preview = () => {
@@ -1047,6 +1076,7 @@ reg({ id: 'sci', name: 'Scientific', icon: '🔬', desc: 'Scientific calculator 
   // '=' and Enter: the result goes back into the box as plain text (L.num), never as locale text such as 0,333
   const equals = () => { shown = true; const src = ex.value.trim(), r = preview(); if (r !== null) { hk.add(src + (/sin|cos|tan/i.test(src) ? (deg ? ' [DEG]' : ' [RAD]') : ''), sig(r, 12)); ans = r; ex.value = L.num(r); fresh = true; shown = false; $('#rs', el).textContent = ''; } };
   el.addEventListener('click', (e) => {
+    if (e.target.id === 'rs') { const m = /^= (.+)$/.exec(e.target.textContent); if (m) copyText(m[1]); return; }
     const b = e.target.closest('[data-k]');
     if (!b) return;
     const k = b.dataset.k;
@@ -1144,9 +1174,12 @@ simple({ id: 'loancmp', name: 'Loan Compare', icon: '🆚', desc: 'Compare two l
 })] });
 
 reg({ id: 'fraction', name: 'Fractions', icon: '➗', desc: 'Add, subtract, multiply and divide fractions and mixed numbers, simplified with the decimal value.', keys: ['fraction', 'mixed number', 'simplify', 'numerator'], render(el) {
-  el.innerHTML = `<div class="card list"><label class="f">First (3/4, 1 1/2, 0.25 or 2)<input id="a" type="text" maxlength="30" value="3/4"></label>
+  const sv = Store.get('fraction.in', {}), pick = (k, d) => (typeof sv[k] === 'string' && sv[k].length <= 30 && L.pfrac(sv[k]) ? sv[k] : d);
+  const sop = ['+', '-', '*', '/'].includes(sv.o) ? sv.o : '+';
+  el.innerHTML = `<div class="card list"><label class="f">First (3/4, 1 1/2, 0.25 or 2)<input id="a" type="text" maxlength="30" value="${esc(pick('a', '3/4'))}"></label>
     <label class="f">Operation<select id="o"><option value="+">+  add</option><option value="-">−  subtract</option><option value="*">×  multiply</option><option value="/">÷  divide</option></select></label>
-    <label class="f">Second<input id="b" type="text" maxlength="30" value="2/3"></label><div class="list" id="r"></div></div>`;
+    <label class="f">Second<input id="b" type="text" maxlength="30" value="${esc(pick('b', '2/3'))}"></label><div class="list" id="r" aria-live="polite"></div></div>`;
+  $('#o', el).value = sop;
   const run = () => {
     const a = L.pfrac($('#a', el).value), b = L.pfrac($('#b', el).value);
     if (!a || !b) { $('#r', el).innerHTML = '<div class="muted center">Enter two valid fractions.</div>'; return; }
@@ -1155,14 +1188,14 @@ reg({ id: 'fraction', name: 'Fractions', icon: '➗', desc: 'Add, subtract, mult
   };
   const hk = kit('fraction');
   const run2 = () => { run(); const a = L.pfrac($('#a', el).value), b = L.pfrac($('#b', el).value); if (!a || !b) return; const o = $('#o', el).value, r = L.fop(a, b, o); if (r && !r.over) hk.soon('f', () => hk.add(L.fstr(a) + ' ' + ({ '+': '+', '-': '−', '*': '×', '/': '÷' })[o] + ' ' + L.fstr(b), L.fstr(r) + ' (' + sig(r.n / r.d, 10) + ')')); };
-  el.addEventListener('input', run2); run();
+  el.addEventListener('input', () => { run2(); Store.set('fraction.in', { a: $('#a', el).value, b: $('#b', el).value, o: $('#o', el).value }); }); run();
   return hk.stop;
 } });
 
 simple({ id: 'ratio', name: 'Ratio', icon: '⚗️', desc: 'Simplify a ratio, solve a proportion (a : b = c : x) and split an amount in a ratio.', keys: ['proportion', 'divide in ratio', 'simplify', 'scale'], sections: [
-  sec('Simplify a : b', [[N('a', 'A', 24, -1e12, 1e12, 1), N('b', 'B', 36, -1e12, 1e12, 1)]], (v) => { if (!ok(v.a, v.b) || !Number.isInteger(v.a) || !Number.isInteger(v.b) || !v.a || !v.b) return v.a === 0 || v.b === 0 ? null : '<div class="muted center">Use whole numbers.</div>'; const g = L.gcd(v.a, v.b); return big('Simplest form', v.a / g + ' : ' + v.b / g) + rows([['Decimal (a / b)', sig(v.a / v.b, 8)]]); }),
-  sec('Proportion  a : b = c : x', [[N('a', 'a', 3, -1e12, 1e12), N('b', 'b', 5, -1e12, 1e12)], N('c', 'c', 12, -1e12, 1e12)], (v) => ok(v.a, v.b, v.c) && v.a !== 0 ? big('x', sig(v.b * v.c / v.a, 10)) : null),
-  sec('Split an amount', [N('t', 'Total', 1000, 0, 1e12), [N('a', 'Share A', 2, 0, 1e9), N('b', 'Share B', 3, 0, 1e9)]], (v) => ok(v.t, v.a, v.b) && v.a + v.b > 0 && v.a >= 0 && v.b >= 0 ? rows([['A gets', fx(v.t * v.a / (v.a + v.b))], ['B gets', fx(v.t * v.b / (v.a + v.b))]]) : null)
+  sec('Simplify a : b', [[N('a', 'A', 24, -1e12, 1e12, 1), N('b', 'B', 36, -1e12, 1e12, 1)]], (v) => { if (!ok(v.a, v.b)) return null; if (!Number.isInteger(v.a) || !Number.isInteger(v.b)) return '<div class="status">Use whole numbers.</div>'; if (!v.a || !v.b) return '<div class="status">A and B cannot be 0.</div>'; const g = L.gcd(v.a, v.b); return big('Simplest form', v.a / g + ' : ' + v.b / g) + rows([['Decimal (a / b)', sig(v.a / v.b, 8)]]); }),
+  sec('Proportion  a : b = c : x', [[N('a', 'a', 3, -1e12, 1e12), N('b', 'b', 5, -1e12, 1e12)], N('c', 'c', 12, -1e12, 1e12)], (v) => ok(v.a, v.b, v.c) ? (v.a === 0 ? '<div class="status">a cannot be 0.</div>' : big('x', sig(v.b * v.c / v.a, 10))) : null),
+  sec('Split an amount', [N('t', 'Total', 1000, 0, 1e12), [N('a', 'Share A', 2, 0, 1e9), N('b', 'Share B', 3, 0, 1e9)]], (v) => ok(v.t, v.a, v.b) ? (v.a + v.b <= 0 ? '<div class="status">Share A and Share B cannot both be 0.</div>' : rows([['A gets', fx(v.t * v.a / (v.a + v.b))], ['B gets', fx(v.t * v.b / (v.a + v.b))]])) : null)
 ] });
 
 simple({ id: 'stats', name: 'Statistics', icon: '📉', desc: 'Mean, median, mode, range, variance and standard deviation of a list of numbers.', keys: ['average', 'mean', 'median', 'mode', 'deviation', 'variance'], sections: [sec('', [{ k: 'n', l: 'Numbers (spaces, new lines, or commas followed by a space)', t: 'textarea', rows: 4, v: '4, 8, 15, 16, 23, 42, 8' }], (v) => {
@@ -1175,10 +1208,12 @@ simple({ id: 'stats', name: 'Statistics', icon: '📉', desc: 'Mean, median, mod
 })] });
 
 reg({ id: 'prime', name: 'Prime Check', icon: '🔍', desc: 'Check whether a number is prime, see its prime factors and divisors, and find the nearest primes.', keys: ['factor', 'factorisation', 'divisors', 'prime number'], render(el) {
-  el.innerHTML = `<div class="card list"><label class="f">Whole number (up to 9,000,000,000,000,000)<input id="n" type="number" inputmode="numeric" step="1" min="2" max="9000000000000000" value="360"></label>
-    <button class="btn" id="go">Analyse</button><div class="list" id="r"></div></div>`;
+  const sn = parseFloat(Store.get('prime.n', '')), start = Number.isInteger(sn) && sn >= 2 && sn <= 9e15 ? String(sn) : '360';
+  el.innerHTML = `<div class="card list"><label class="f">Whole number (up to 9,000,000,000,000,000)<input id="n" type="number" inputmode="numeric" step="1" min="2" max="9000000000000000" value="${start}"></label>
+    <button class="btn" id="go">Analyse</button><div class="list" id="r" aria-live="polite"></div></div>`;
   const run = () => {
     const n = parseFloat($('#n', el).value), out = $('#r', el);
+    if (Number.isInteger(n) && n >= 2 && n <= 9e15) Store.set('prime.n', String(n));
     if (!Number.isInteger(n) || n < 2 || n > 9e15) { out.innerHTML = '<div class="muted center" style="font-size:13px">Enter a whole number from 2 to 9,000,000,000,000,000.</div>'; return; }
     const r = L.analyse(n), rs = [['Prime?', r.prime ? 'Yes, prime' : 'No, composite'], ['Prime factors', r.prime ? String(n) : r.factors.map((x) => x[1] > 1 ? x[0] + '^' + x[1] : x[0]).join(' × ')]];
     if (r.divisors) rs.push(['Divisors (' + r.divisors.length + ')', r.divisors.length > 40 ? r.divisors.slice(0, 40).join(', ') + ' ...' : r.divisors.join(', ')]);
@@ -1193,7 +1228,10 @@ reg({ id: 'prime', name: 'Prime Check', icon: '🔍', desc: 'Check whether a num
 simple({ id: 'gcdlcm', name: 'GCD & LCM', icon: '🧩', desc: 'Greatest common divisor and least common multiple of two or more whole numbers.', keys: ['hcf', 'gcf', 'lcm', 'multiple', 'common factor'], sections: [sec('', [{ k: 'n', l: 'Whole numbers (spaces or commas)', t: 'text', v: '12, 18, 30', len: 200 }], (v) => {
   const pn = L.parseNums(v.n), a = pn.nums.map(Math.abs);
   if (pn.bad !== null) return `<div class="status">"${esc(pn.bad.slice(0, 30))}" is not a whole number.</div>`;
-  if (a.length < 2 || a.length > 30 || a.some((x) => !Number.isInteger(x) || x === 0 || x > 1e12)) return null;
+  if (!a.length) return null;
+  if (a.length < 2) return '<div class="status">Enter at least two whole numbers.</div>';
+  if (a.length > 30) return '<div class="status">Up to 30 numbers.</div>';
+  if (a.some((x) => !Number.isInteger(x) || x === 0 || x > 1e12)) return '<div class="status">Use whole numbers from 1 to 1,000,000,000,000.</div>';
   const g = a.reduce(L.gcd), l = a.reduce(L.lcm);
   return rows([['GCD (HCF)', fx(g, 0)], ['LCM', l > 9e15 ? 'too large' : fx(l, 0)]]);
 })] });
@@ -1210,8 +1248,9 @@ simple({ id: 'quad', name: 'Quadratic', icon: '🎢', desc: 'Solve ax² + bx + c
 })] });
 
 reg({ id: 'shapes', name: 'Area & Volume', icon: '🔷', desc: 'Area, perimeter, surface area and volume of common 2D and 3D shapes.', keys: ['geometry', 'circle', 'cylinder', 'sphere', 'rectangle', 'cone', 'perimeter'], render(el) {
-  const names = Object.keys(L.shapes), hk = kit('shapes');
-  el.innerHTML = `<div class="card list"><label class="f">Shape<select id="s">${names.map((n) => `<option>${n}</option>`).join('')}</select></label><div class="list" id="f"></div><div class="list" id="r"></div></div>`;
+  const names = Object.keys(L.shapes), hk = kit('shapes'), sv = Store.get('shapes.st', {});
+  let restore = names.includes(sv.s) && Array.isArray(sv.v) ? sv.v : null;
+  el.innerHTML = `<div class="card list"><label class="f">Shape<select id="s">${names.map((n) => `<option${n === (restore && sv.s) ? ' selected' : ''}>${n}</option>`).join('')}</select></label><div class="list" id="f"></div><div class="list" id="r" aria-live="polite"></div></div>`;
   const run = (ev) => {
     const sh = L.shapes[$('#s', el).value], v = $$('input', el).map((i) => { const n = Valid.num(i.value); return n !== null && n <= +i.max ? n : NaN; });
     const good = v.length && v.every((x) => Number.isFinite(x) && x > 0);
@@ -1220,18 +1259,21 @@ reg({ id: 'shapes', name: 'Area & Volume', icon: '🔷', desc: 'Area, perimeter,
   };
   const build = () => {
     const sh = L.shapes[$('#s', el).value];
-    $('#f', el).innerHTML = sh.d.map((d, i) => `<label class="f">${esc(d)}<input type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="${[10, 5, 4][i]}"></label>`).join('');
+    $('#f', el).innerHTML = sh.d.map((d, i) => `<label class="f">${esc(d)}<input type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="${esc(restore && Number.isFinite(parseFloat(restore[i])) && restore[i] > 0 && restore[i] <= 1e9 ? restore[i] : [10, 5, 4][i])}"></label>`).join('');
+    restore = null;
     run();
   };
-  $('#s', el).onchange = build; el.addEventListener('input', (e) => { if (e.target.tagName === 'INPUT') run(e); });
+  $('#s', el).onchange = build; el.addEventListener('input', (e) => { if (e.target.tagName === 'INPUT') { run(e); Store.set('shapes.st', { s: $('#s', el).value, v: $$('#f input', el).map((i) => i.value) }); } });
   build();
   return hk.stop;
 } });
 
 reg({ id: 'triangle', name: 'Triangle', icon: '🔺', desc: 'Solve a triangle from three sides or from two sides and the angle between them: angles, area, type and radii.', keys: ['trigonometry', 'heron', 'angles', 'sides', 'geometry'], render(el) {
-  const hk = kit('triangle');
+  const hk = kit('triangle'), sv = Store.get('triangle.st', {}), sas0 = sv.m === 'sas';
+  const tv = (k, d) => { const n = parseFloat(sv[k]); return Number.isFinite(n) && n >= 0 && n <= (k === 'c' && sas0 ? 180 : 1e9) ? String(n) : d; };
   el.innerHTML = `<div class="card list"><label class="f">Known<select id="m"><option value="sss">Three sides (a, b, c)</option><option value="sas">Two sides and the angle between (a, b, C°)</option></select></label>
-    <div class="row"><label class="f"><span>Side a</span><input id="a" type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="3"></label><label class="f"><span>Side b</span><input id="b" type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="4"></label><label class="f"><span id="cl">Side c</span><input id="c" type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="5"></label></div><div class="list" id="r"></div></div>`;
+    <div class="row"><label class="f"><span>Side a</span><input id="a" type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="${tv('a', '3')}"></label><label class="f"><span>Side b</span><input id="b" type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="${tv('b', '4')}"></label><label class="f"><span id="cl">Side c</span><input id="c" type="number" inputmode="decimal" step="any" min="0" max="1000000000" value="${tv('c', sas0 ? '90' : '5')}"></label></div><div class="list" id="r" aria-live="polite"></div></div>`;
+  $('#m', el).value = sas0 ? 'sas' : 'sss';
   const run = (ev) => {
     const sas = $('#m', el).value === 'sas';
     $('#cl', el).textContent = sas ? 'Angle C (°)' : 'Side c';
@@ -1244,7 +1286,8 @@ reg({ id: 'triangle', name: 'Triangle', icon: '🔺', desc: 'Solve a triangle fr
     if (t && ev && ev.type) hk.soon('t', () => hk.add('Triangle ' + (sas ? 'a ' + sig(a) + ', b ' + sig(b) + ', C ' + sig(Valid.num($('#c', el).value)) + '°' : 'sides ' + sig(a) + ', ' + sig(b) + ', ' + sig(c)), 'Area ' + sig(t.area, 8) + '; ' + t.type));
     $('#r', el).innerHTML = t ? pre + rows([['Angle A', sig(t.A, 7) + '°'], ['Angle B', sig(t.B, 7) + '°'], ['Angle C', sig(t.C, 7) + '°'], ['Type', t.type], ['Area', sig(t.area, 8)], ['Perimeter', sig(t.perimeter, 8)], ['Inradius', sig(t.inradius, 6)], ['Circumradius', sig(t.circumradius, 6)]]) : '<div class="status">These sides cannot form a triangle.</div>';
   };
-  el.addEventListener('input', run); el.addEventListener('change', run); run();
+  const save = () => Store.set('triangle.st', { m: $('#m', el).value, a: $('#a', el).value, b: $('#b', el).value, c: $('#c', el).value });
+  el.addEventListener('input', (e) => { run(e); save(); }); el.addEventListener('change', (e) => { run(e); save(); }); run();
   return hk.stop;
 } });
 
@@ -1287,7 +1330,8 @@ simple({ id: 'breakeven', name: 'Break-even', icon: '🏁', desc: 'Units you mus
 simple({ id: 'margin', name: 'Markup & Margin', icon: '💹', desc: 'Profit, margin and markup from cost and price, or the selling price for a margin or markup you want.', keys: ['profit', 'selling price', 'cost', 'retail', 'gross margin'], sections: [
   sec('From cost and price', [[N('c', 'Cost', 80, 0, 1e12), N('p', 'Selling price', 100, 0, 1e12)]], (v) => { if (!ok(v.c, v.p) || v.c <= 0 || v.p <= 0) return null; const r = L.margin(v.c, v.p); return big('Margin', sig(r.margin, 6) + '%') + rows([['Markup', sig(r.markup, 6) + '%'], ['Profit', fx(r.profit)]]); }),
   sec('Price I need', [[N('c', 'Cost', 80, 0, 1e12), N('x', 'Percent', 25, 0, 1000)], S('m', 'Percent is', [['mg', 'Margin (of price)'], ['mk', 'Markup (on cost)']], 'mg')], (v) => {
-    if (!ok(v.c, v.x) || v.c <= 0 || v.x < 0 || (v.m === 'mg' && v.x >= 100)) return null;
+    if (!ok(v.c, v.x) || v.c <= 0 || v.x < 0) return null;
+    if (v.m === 'mg' && v.x >= 100) return '<div class="status">A margin must be below 100% of the price.</div>';
     const p = v.m === 'mg' ? v.c / (1 - v.x / 100) : v.c * (1 + v.x / 100);
     return big('Selling price', fx(p)) + rows([['Profit', fx(p - v.c)]]);
   })
