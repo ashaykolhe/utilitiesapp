@@ -578,21 +578,24 @@ const buzz = (ms) => { try { if (navigator.vibrate) navigator.vibrate(ms || 15);
 const cssv = (root, name) => getComputedStyle(root).getPropertyValue(name).trim() || '#888';
 const fmtT = (s) => Math.floor(s / 60) + ':' + pad(Math.floor(s % 60));
 
-/* Tracks every timer / frame / listener a tool starts so one stop() cleans up. */
+/* Tracks every timer / frame / listener a tool starts so one stop() cleans up.
+   Timeouts, intervals and animation frames have separate id pools in a browser (the same number can mean a timeout and a frame), so every
+   call returns its own handle and this map remembers which kind, and which real id, a handle stands for. clear(handle) can then never
+   cancel something else. */
 function tracker() {
-  const to = new Set(), iv = new Set(), raf = new Set(), ls = [], stops = []; let dead = false;
+  const live = new Map(), ls = [], stops = []; let dead = false, seq = 0;
+  const kill = (kind, id) => { if (kind === 'raf') cancelAnimationFrame(id); else if (kind === 'iv') clearInterval(id); else clearTimeout(id); };
   return {
-    to(fn, ms) { if (dead) return 0; const t = setTimeout(() => { to.delete(t); fn(); }, ms); to.add(t); return t; },
-    iv(fn, ms) { if (dead) return 0; const t = setInterval(fn, ms); iv.add(t); return t; },
-    raf(fn) { if (dead) return 0; const t = requestAnimationFrame((ts) => { raf.delete(t); fn(ts); }); raf.add(t); return t; },
+    to(fn, ms) { if (dead) return 0; const h = ++seq, id = setTimeout(() => { live.delete(h); fn(); }, ms); live.set(h, ['to', id]); return h; },
+    iv(fn, ms) { if (dead) return 0; const h = ++seq; live.set(h, ['iv', setInterval(fn, ms)]); return h; },
+    raf(fn) { if (dead) return 0; const h = ++seq, id = requestAnimationFrame((ts) => { live.delete(h); fn(ts); }); live.set(h, ['raf', id]); return h; },
     dead() { return dead; },
     onStop(fn) { stops.push(fn); },
-    clear(t) { clearTimeout(t); clearInterval(t); cancelAnimationFrame(t); to.delete(t); iv.delete(t); raf.delete(t); },
+    clear(h) { const e = live.get(h); if (e) { kill(e[0], e[1]); live.delete(h); } },
     on(target, ev, fn, opt) { if (dead) return; target.addEventListener(ev, fn, opt); ls.push([target, ev, fn, opt]); },
     stop() {
       dead = true;
-      to.forEach(clearTimeout); iv.forEach(clearInterval); raf.forEach(cancelAnimationFrame);
-      to.clear(); iv.clear(); raf.clear();
+      live.forEach(([kind, id]) => kill(kind, id)); live.clear();
       ls.forEach(([t, e, f, o]) => t.removeEventListener(e, f, o)); ls.length = 0; stops.forEach(f => f()); stops.length = 0;
     }
   };
@@ -611,6 +614,11 @@ const CSS = `
 .g2 .msg{min-height:30px;text-align:center;font-weight:700;font-size:17px;margin:6px 0}
 .g2 .cv{display:block;margin:8px auto;border-radius:18px;background:var(--surface2);border:1px solid var(--line);touch-action:none;width:100%}
 .g2 .pop{animation:g2pop .4s cubic-bezier(.2,1.7,.4,1) both}
+.g2{position:relative}
+.g2 .cf{position:absolute;left:0;right:0;top:0;height:0;overflow:visible;pointer-events:none;z-index:5}
+.g2 .cf i{position:absolute;top:-10px;font-style:normal;animation:g2cf 1.8s ease-in both}
+@keyframes g2cf{from{transform:translateY(0) rotate(0);opacity:1}to{transform:translateY(420px) rotate(260deg);opacity:0}}
+@media (prefers-reduced-motion:reduce){.g2 *{animation-duration:.01s!important;transition-duration:.01s!important}}
 .g2 .shake{animation:g2shake .45s}
 .g2 .rowb{display:flex;gap:8px;margin:8px 0}
 .g2 .rowb .btn{flex:1;min-height:46px}
@@ -626,14 +634,37 @@ const CSS = `
 `;
 function mount(el, html) {
   el.innerHTML = '<style>' + CSS + '</style><div class="g2">' + html + '</div>';
-  return $('.g2', el);
+  const root = $('.g2', el);
+  /* result lines are announced by screen readers when they change */
+  $$('.msg', root).forEach(m => { m.setAttribute('role', 'status'); m.setAttribute('aria-live', 'polite'); });
+  return root;
+}
+/* ctx.roundRect needs WebView 99+; older ones get a plain rectangle. */
+function rrect(c, x, y, w, h, r) { if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h); }
+/* Asks before throwing away a game that is in progress (only when `inProgress` is true). */
+function sure(inProgress, what) { return !inProgress || confirm(what || 'Start over? Your current game will be lost.'); }
+/* Timers count from Date.now(); while the app is in the background the clock must not keep running against the player. */
+function keepTime(T, shift) {
+  let at = 0;
+  T.on(document, 'visibilitychange', () => { if (document.hidden) at = Date.now(); else if (at) { shift(Date.now() - at); at = 0; } });
+}
+/* A short burst of confetti over a finished game (CSS only, removed by itself, skipped for people who asked for less motion). */
+function celebrate(root, T) {
+  try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { /* ignore */ }
+  const old = $('.cf', root); if (old) old.remove();
+  const box = document.createElement('div'); box.className = 'cf'; box.setAttribute('aria-hidden', 'true');
+  const em = ['\u{1F389}', '\u2728', '\u2B50', '\u{1F38A}', '\u{1F4AB}'];
+  box.innerHTML = Array.from({ length: 16 }, (_, i) => '<i style="left:' + ((i * 37 + 5) % 96) + '%;animation-delay:' + ((i * 53) % 400) + 'ms;font-size:' + (18 + (i * 7) % 14) + 'px">' + em[i % em.length] + '</i>').join('');
+  root.appendChild(box); T.to(() => box.remove(), 2200);
 }
 const seg = (id, items, cur) => '<div class="seg" id="' + id + '">' + items.map(([v, l]) =>
   '<button data-v="' + v + '" class="' + (String(v) === String(cur) ? 'on' : '') + '">' + l + '</button>').join('') + '</div>';
-function onSeg(root, id, cb) {
+function onSeg(root, id, cb, ask) {
   const s = $('#' + id, root);
   s.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
+    if (b.classList.contains('on')) return;
+    if (ask && !ask()) return;                 // the player chose to keep the game in progress
     $$('button', s).forEach(x => x.classList.toggle('on', x === b));
     cb(b.dataset.v);
   });
@@ -747,7 +778,7 @@ reg('dailychal', 'Daily Challenge', '\u{1F4C5}', 'A new small puzzle every day (
       if (vals.some(v => !v)) { msg.textContent = 'Fill in your answer first'; return; }
       if (L.dailyCheck(pz, vals)) {
         st = Object.assign(st, L.streakSolve(st, key)); st.solved = true; buzz(60);
-        restart($('#pz', root), 'pop');
+        restart($('#pz', root), 'pop'); celebrate(root, T);
       } else { st.tries++; msg.textContent = 'Not quite, try again'; restart($('#inp', root), 'shake'); buzz(40); }
       hsSet('dailychal', st); paint();
     }
@@ -763,7 +794,7 @@ reg('dailychal', 'Daily Challenge', '\u{1F4C5}', 'A new small puzzle every day (
 reg('wordguess', 'Word Guess', '\u{1F520}', 'Guess the hidden five-letter word in six tries. Tiles show colour and a pattern mark so it works for colour-blind players, and you can share your result as an emoji grid.',
   ['wordle', 'word', 'guess', 'letters', 'puzzle', 'five letter'], function (el) {
     const T = tracker(), KB = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
-    let answer, rows, cur, over, cb = hsGet('wordguess.cb', true);
+    let answer, rows, cur, over, gen = 0, cb = hsGet('wordguess.cb', true);
     let ws = hsGet('wordguess', { played: 0, won: 0, streak: 0, best: 0, dist: [0, 0, 0, 0, 0, 0] });
     const root = mount(el, `
       <style>
@@ -823,7 +854,7 @@ reg('wordguess', 'Word Guess', '\u{1F520}', 'Guess the hidden five-letter word i
         ws.dist.map((n, i) => '<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin:2px 0"><span style="width:10px">' + (i + 1) + '</span><div style="height:14px;border-radius:4px;background:var(--accent);min-width:14px;width:' + Math.round(n * 100 / mx * 0.85 + 5) + '%;color:var(--accent-t);padding:0 5px;font-weight:700">' + n + '</div></div>').join('');
     }
     function newGame() {
-      answer = WORDS[rnd(WORDS.length)]; rows = []; cur = ''; over = false;
+      gen++; answer = WORDS[rnd(WORDS.length)]; rows = []; cur = ''; over = false;
       $('#msg', root).textContent = 'Type or tap a five-letter word'; $('#shr', root).hidden = true; draw();
     }
     function submit() {
@@ -836,9 +867,11 @@ reg('wordguess', 'Word Guess', '\u{1F520}', 'Guess the hidden five-letter word i
         over = true; ws.played++;
         if (won) { ws.won++; ws.streak++; ws.best = Math.max(ws.best, ws.streak); ws.dist[rows.length - 1]++; } else ws.streak = 0;
         hsSet('wordguess', ws);
+        const g = gen;
         T.to(() => {
+          if (g !== gen) return;   // a new word was started meanwhile
           $('#msg', root).innerHTML = won ? '\u{1F389} ' + ['Genius!', 'Magnificent!', 'Impressive!', 'Splendid!', 'Great!', 'Phew!'][rows.length - 1] : 'The word was <b>' + answer.toUpperCase() + '</b>';
-          $('#shr', root).hidden = false; showStats();
+          $('#shr', root).hidden = false; showStats(); if (won) celebrate(root, T);
         }, 1400);
       } else $('#msg', root).textContent = '';
     }
@@ -853,7 +886,7 @@ reg('wordguess', 'Word Guess', '\u{1F520}', 'Guess the hidden five-letter word i
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'Enter') key('Enter'); else if (e.key === 'Backspace') key('Back'); else if (/^[a-zA-Z]$/.test(e.key)) key(e.key.toLowerCase());
     });
-    $('#new', root).onclick = newGame;
+    $('#new', root).onclick = () => { if (sure(!over && rows.length > 0, 'Start a new word? Your guesses so far will be lost.')) newGame(); };
     $('#pal', root).onclick = () => { cb = !cb; hsSet('wordguess.cb', cb); palette(); };
     $('#shr', root).onclick = () => {
       const won = rows.length && rows[rows.length - 1].marks.every(m => m === 'g');
@@ -924,14 +957,15 @@ reg('mastermind', 'Mastermind', '\u{1F9D0}', 'Crack the secret colour code. Afte
       if (f.b === P.len) {
         over = true; const n = rows.length;
         if (!best[lv] || n < best[lv]) { best[lv] = n; hsSet('mastermind.best', best); }
-        $('#msg', root).textContent = '\u{1F389} Cracked it in ' + n + (n === 1 ? ' guess!' : ' guesses!');
+        $('#msg', root).textContent = '\u{1F389} Cracked it in ' + n + (n === 1 ? ' guess!' : ' guesses!'); celebrate(root, T);
       } else if (rows.length >= P.tries) {
         over = true; $('#msg', root).innerHTML = 'Out of guesses. The code was ' + code.map(c => '<span style="color:' + MM_COL[c] + ';font-weight:800">' + MM_SYM[c] + '</span>').join(' ');
       } else $('#msg', root).textContent = f.b + ' black, ' + f.w + ' white';
       paint();
     };
-    $('#new', root).onclick = newGame;
-    onSeg(root, 'lv', (v) => { lv = +v; hsSet('mastermind.lv', lv); newGame(); });
+    const askMm = () => sure(!over && rows.length > 0, 'Start a new code? Your guesses so far will be lost.');
+    $('#new', root).onclick = () => { if (askMm()) newGame(); };
+    onSeg(root, 'lv', (v) => { lv = +v; hsSet('mastermind.lv', lv); newGame(); }, askMm);
     newGame();
     return () => T.stop();
   });
@@ -969,7 +1003,7 @@ reg('pegsol', 'Peg Solitaire', '♟️', 'The classic English board: jump pegs o
       if (!L.pegMoves(b).length) {
         if (left < best) { best = left; hsSet('pegsol.best', best); $('#bs', root).textContent = best; }
         m.textContent = left === 1 ? (b[24] === 1 ? '\u{1F3C6} Perfect! One peg in the centre!' : '\u{1F389} One peg left, well done!') : 'No moves left, ' + left + ' pegs remain. Undo or restart.';
-        if (left === 1) buzz(80);
+        if (left === 1) { buzz(80); celebrate(root, T); }
       } else m.textContent = sel < 0 ? 'Tap a peg, then a glowing hole' : '';
     }
     function newGame() { b = L.pegStart(); hist = []; sel = -1; moves = 0; paint(); status(); }
@@ -980,7 +1014,7 @@ reg('pegsol', 'Peg Solitaire', '♟️', 'The classic English board: jump pegs o
       if (b[i] === 1 && L.pegMoves(b).some(m => m.f === i)) { sel = sel === i ? -1 : i; paint(); status(); } else if (b[i] === 1) { sel = -1; paint(); $('#msg', root).textContent = 'That peg cannot jump'; } else { sel = -1; paint(); status(); }
     });
     $('#undo', root).onclick = () => { if (hist.length) { b = hist.pop(); moves = Math.max(0, moves - 1); sel = -1; paint(); status(); } };
-    $('#new', root).onclick = newGame;
+    $('#new', root).onclick = () => { if (sure(moves > 0 && L.pegMoves(b).length > 0, 'Restart? The pegs you have jumped will be put back.')) newGame(); };
     newGame();
     return () => T.stop();
   });
@@ -1047,7 +1081,7 @@ reg('nonogram', 'Nonogram', '\u{1F530}', 'Picross puzzles: use the number clues 
         done = true; T.clear(timer); const s = Math.round((Date.now() - t0) / 1000); buzz(80);
         if (!best[n] || s < best[n]) { best[n] = s; hsSet('nonogram.best', best); }
         $('#bs', root).textContent = fmtT(best[n]); $('#tm', root).textContent = fmtT(s);
-        $('#msg', root).textContent = '\u{1F389} Solved in ' + fmtT(s) + '!';
+        $('#msg', root).textContent = '\u{1F389} Solved in ' + fmtT(s) + '!'; celebrate(root, T);
         $$('td.c', root).forEach((td, i) => { td.style.animation = 'g2pop .5s ' + (i % n * 0.04 + ((i / n) | 0) * 0.03) + 's both'; });
       }
     }
@@ -1056,11 +1090,13 @@ reg('nonogram', 'Nonogram', '\u{1F530}', 'Picross puzzles: use the number clues 
     wrap.addEventListener('pointermove', (e) => { if (!down) return; const t = document.elementFromPoint(e.clientX, e.clientY); if (t && t.closest) apply(t.closest('td.c')); });
     T.on(window, 'pointerup', () => { down = false; paintVal = null; });
     T.on(window, 'pointercancel', () => { down = false; paintVal = null; });
-    onSeg(root, 'sz', (v) => { n = +v; hsSet('nonogram.n', n); load(false); });
-    onSeg(root, 'sr', (v) => { source = v; hsSet('nonogram.src', v); load(false); });
+    const askNg = () => sure(!done && g.some(r => r.some(v => v === 1)), 'Leave this puzzle? The cells you filled will be lost.');
+    onSeg(root, 'sz', (v) => { n = +v; hsSet('nonogram.n', n); load(false); }, askNg);
+    onSeg(root, 'sr', (v) => { source = v; hsSet('nonogram.src', v); load(false); }, askNg);
     onSeg(root, 'md', (v) => { mode = v; });
-    $('#new', root).onclick = () => load(true);
-    $('#clr', root).onclick = () => { g = sol.map(r => r.map(() => 0)); done = false; t0 = 0; T.clear(timer); $('#tm', root).textContent = '0:00'; build(); $('#msg', root).textContent = 'Cleared'; };
+    $('#new', root).onclick = () => { if (askNg()) load(true); };
+    keepTime(T, d => { if (t0) t0 += d; });
+    $('#clr', root).onclick = () => { if (!sure(!done && g.some(r => r.some(v => v)), 'Clear the grid?')) return; g = sol.map(r => r.map(() => 0)); done = false; t0 = 0; T.clear(timer); $('#tm', root).textContent = '0:00'; build(); $('#msg', root).textContent = 'Cleared'; };
     load(false);
     return () => T.stop();
   });
@@ -1136,7 +1172,7 @@ reg('blockstack', 'Block Stack', '\u{1F9CA}', 'A falling-blocks game: move and r
       }
     }
     function cell(x, y, col, a) {
-      ctx.globalAlpha = a == null ? 1 : a; ctx.fillStyle = col; ctx.beginPath(); ctx.roundRect(x * CW + 1, y * CW + 1, CW - 2, CW - 2, 5); ctx.fill();
+      ctx.globalAlpha = a == null ? 1 : a; ctx.fillStyle = col; ctx.beginPath(); rrect(ctx, x * CW + 1, y * CW + 1, CW - 2, CW - 2, 5); ctx.fill();
       ctx.fillStyle = 'rgba(255,255,255,.28)'; ctx.fillRect(x * CW + 4, y * CW + 3, CW - 8, 4); ctx.globalAlpha = 1;
     }
     function draw() {
@@ -1158,7 +1194,7 @@ reg('blockstack', 'Block Stack', '\u{1F9CA}', 'A falling-blocks game: move and r
       ctx.fillText('NEXT', W * CW + SB / 2, 22);
       if (next) {
         const m = L.BS_SHAPES[next], id = L.BS_KEYS.indexOf(next) + 1, ox = W * CW + (SB - m[0].length * 20) / 2, oy = 40;
-        m.forEach((r, ry) => r.forEach((v, rx) => { if (v) { ctx.fillStyle = BS_COL[id]; ctx.beginPath(); ctx.roundRect(ox + rx * 20, oy + ry * 20, 18, 18, 4); ctx.fill(); } }));
+        m.forEach((r, ry) => r.forEach((v, rx) => { if (v) { ctx.fillStyle = BS_COL[id]; ctx.beginPath(); rrect(ctx, ox + rx * 20, oy + ry * 20, 18, 18, 4); ctx.fill(); } }));
       }
     }
     const loop = gameLoop(T, step, draw, (p) => {
@@ -1255,9 +1291,9 @@ reg('breakout', 'Breakout', '\u{1F3B3}', 'Bounce the ball off your paddle to sma
     function draw() {
       ctx.clearRect(0, 0, W, H); ctx.fillStyle = cssv(root, '--surface2'); ctx.fillRect(0, 0, W, H);
       if (!bricks) return;
-      bricks.forEach(b => { ctx.fillStyle = b.col; ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 4); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(b.x + 3, b.y + 2, b.w - 6, 4); });
+      bricks.forEach(b => { ctx.fillStyle = b.col; ctx.beginPath(); rrect(ctx, b.x, b.y, b.w, b.h, 4); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,.25)'; ctx.fillRect(b.x + 3, b.y + 2, b.w - 6, 4); });
       parts.forEach(p => { ctx.globalAlpha = Math.max(0, p.t * 2); ctx.fillStyle = p.col; ctx.fillRect(p.x, p.y, 4, 4); }); ctx.globalAlpha = 1;
-      ctx.fillStyle = cssv(root, '--accent'); ctx.beginPath(); ctx.roundRect(pad_.x - pad_.w / 2, PY, pad_.w, PH, 6); ctx.fill();
+      ctx.fillStyle = cssv(root, '--accent'); ctx.beginPath(); rrect(ctx, pad_.x - pad_.w / 2, PY, pad_.w, PH, 6); ctx.fill();
       if (ball) { ctx.fillStyle = cssv(root, '--text'); ctx.beginPath(); ctx.arc(ball.x, ball.y, R, 0, 7); ctx.fill(); }
       if (ball && ball.stuck && state === 'run') { ctx.fillStyle = cssv(root, '--muted'); ctx.font = '600 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('Tap to launch', W / 2, H / 2 + 60); }
     }
@@ -1321,8 +1357,8 @@ reg('pong', 'Pong', '\u{1F3D3}', 'Table tennis against the phone: drag your padd
       ctx.strokeStyle = cssv(root, '--line'); ctx.setLineDash([10, 10]); ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, H / 2); ctx.lineTo(W, H / 2); ctx.stroke(); ctx.setLineDash([]);
       if (!sc) return;
       ctx.fillStyle = cssv(root, '--muted'); ctx.font = '800 54px sans-serif'; ctx.textAlign = 'center'; ctx.globalAlpha = .35; ctx.fillText(sc[1], W / 2, H / 2 - 40); ctx.fillText(sc[0], W / 2, H / 2 + 80); ctx.globalAlpha = 1;
-      ctx.fillStyle = cssv(root, '--danger'); ctx.beginPath(); ctx.roundRect(ai - PW / 2, 18, PW, PH, 6); ctx.fill();
-      ctx.fillStyle = cssv(root, '--accent'); ctx.beginPath(); ctx.roundRect(me - PW / 2, H - 30, PW, PH, 6); ctx.fill();
+      ctx.fillStyle = cssv(root, '--danger'); ctx.beginPath(); rrect(ctx, ai - PW / 2, 18, PW, PH, 6); ctx.fill();
+      ctx.fillStyle = cssv(root, '--accent'); ctx.beginPath(); rrect(ctx, me - PW / 2, H - 30, PW, PH, 6); ctx.fill();
       if (ball) { ctx.fillStyle = cssv(root, '--text'); ctx.globalAlpha = wait > 0 ? .5 + Math.sin(wait * 20) * .3 : 1; ctx.beginPath(); ctx.arc(ball.x, ball.y, R, 0, 7); ctx.fill(); ctx.globalAlpha = 1; }
     }
     const loop = gameLoop(T, step, draw, (p) => { if (state === 'run') overlay(wrap, p ? '<b>Paused</b><button class="btn">Resume</button>' : '', p ? () => loop.resume() : null); });
@@ -1405,7 +1441,7 @@ reg('dodge', 'Dodge', '☄️', 'Steer your ship left and right to dodge falling
     T.on(window, 'keydown', (e) => { if (e.key === 'ArrowLeft') tx = (tx == null ? px : tx) - 30; else if (e.key === 'ArrowRight') tx = (tx == null ? px : tx) + 30; });
     $('#pz', root).onclick = () => { if (state === 'run') loop.toggle(); };
     $('#tl', root).onclick = () => setTilt(!tilt);
-    if (tilt) { tilt = false; setTilt(true); } else tiltBtn();
+    { const wantTilt = tilt; tilt = false; tiltBtn(); if (wantTilt) setTilt(true); }   // the button always has a label, even while a permission request is pending or refused
     px = W / 2; objs = []; score = 0; t = 0;
     overlay(wrap, '<b>Dodge</b><div>Drag to steer. Collect stars, avoid rocks.</div><button class="btn">Start</button>', start);
     return () => { T.stop(); window.removeEventListener('deviceorientation', onOrient); };
@@ -1505,7 +1541,7 @@ reg('gemmatch', 'Gem Match', '\u{1F4A0}', 'A match-3 puzzle: swap neighbouring f
       if (busy || over) return; const m = L.gmFindMove(b, N); if (!m) return;
       m.forEach(i => { els[i].classList.remove('hint'); void els[i].offsetWidth; els[i].classList.add('hint'); });
     };
-    $('#new', root).onclick = newGame;
+    $('#new', root).onclick = () => { if (sure(!over && moves < MOVES, 'Start a new game? Your score so far will be lost.')) newGame(); };
     T.on(window, 'resize', sizeFont);
     newGame(); T.to(sizeFont, 60);
     return () => T.stop();
@@ -1548,6 +1584,7 @@ reg('dotsboxes', 'Dots and Boxes', '\u{1F4E6}', 'Take turns drawing lines betwee
     function finish() {
       over = true; const a = s.box.filter(v => v === 1).length, b = s.box.filter(v => v === 2).length;
       if (a > b) { wins++; hsSet('dotsboxes.w', wins); $('#wn', root).textContent = wins; }
+      if (a > b) celebrate(root, T);
       $('#msg', root).textContent = a > b ? '\u{1F389} You win ' + a + ' to ' + b : a < b ? 'The phone wins ' + b + ' to ' + a : 'A draw, ' + a + ' each'; buzz(80);
     }
     function aiTurn() {
@@ -1567,9 +1604,10 @@ reg('dotsboxes', 'Dots and Boxes', '\u{1F4E6}', 'Take turns drawing lines betwee
       if (n > 0) { $('#msg', root).textContent = 'Box! Go again'; } else { turn = 2; $('#msg', root).textContent = 'Phone is thinking...'; aiTurn(); }
     });
     function newGame() { gen++; s = L.dbNew(size, size); turn = 1; over = false; last = -1; paint(); $('#msg', root).textContent = 'Tap between two dots to draw a line'; }
-    onSeg(root, 'sz', (v) => { size = +v; hsSet('dotsboxes.n', size); newGame(); });
+    const askDb = () => sure(!over && s.e.some(Boolean), 'Start a new game? The lines you have drawn will be lost.');
+    onSeg(root, 'sz', (v) => { size = +v; hsSet('dotsboxes.n', size); newGame(); }, askDb);
     onSeg(root, 'lv', (v) => { lv = +v; hsSet('dotsboxes.lv', lv); });
-    $('#new', root).onclick = newGame;
+    $('#new', root).onclick = () => { if (askDb()) newGame(); };
     newGame();
     return () => T.stop();
   });
@@ -1606,6 +1644,7 @@ reg('reversi', 'Reversi', '\u{1F317}', 'Outflank the phone\'s discs to flip them
       over = true; const c = L.rvCount(b); st.played++;
       if (c.b > c.w) { st.wins++; st.bestDiff = Math.max(st.bestDiff, c.b - c.w); }
       hsSet('reversi', st); $('#wn', root).textContent = st.wins; paint(); buzz(80);
+      if (c.b > c.w) celebrate(root, T);
       $('#msg', root).textContent = c.b > c.w ? '\u{1F389} You win ' + c.b + ' to ' + c.w : c.b < c.w ? 'The phone wins ' + c.w + ' to ' + c.b : 'A draw, ' + c.b + ' each';
     }
     function afterMove(next) {
@@ -1633,7 +1672,7 @@ reg('reversi', 'Reversi', '\u{1F317}', 'Outflank the phone\'s discs to flip them
     });
     function newGame() { gen++; b = L.rvStart(); turn = 1; over = false; last = -1; flips = []; thinking = false; paint(); $('#msg', root).textContent = 'You are black. Tap a dot to play.'; }
     onSeg(root, 'lv', (v) => { lv = +v; hsSet('reversi.lv', lv); });
-    $('#new', root).onclick = newGame;
+    $('#new', root).onclick = () => { if (sure(!over && L.rvCount(b).b + L.rvCount(b).w > 5, 'Start a new game? The current one will be lost.')) newGame(); };
     newGame();
     return () => T.stop();
   });
@@ -1644,7 +1683,7 @@ reg('reversi', 'Reversi', '\u{1F317}', 'Outflank the phone\'s discs to flip them
 reg('stroop', 'Stroop Test', '\u{1F58A}\uFE0F', 'A colour-word brain test: tap the colour the word is printed in, not the word it spells. 30 seconds, with accuracy and average reaction time saved as your best.',
   ['colour', 'color', 'reaction', 'focus', 'brain', 'interference', 'words'], function (el) {
     const T = tracker(), DUR = 30;
-    let trial, t0 = 0, left, correct, wrong, rts, run = false, iv = 0, best = hsGet('stroop.best', { c: 0, rt: 0 });
+    let trial, t0 = 0, t1 = 0, left, correct, wrong, rts, run = false, iv = 0, best = hsGet('stroop.best', { c: 0, rt: 0 });
     const root = mount(el, `
       <div class="stats">${stat('tl', 'Seconds', DUR)}${stat('ok', 'Correct', 0)}${stat('bs', 'Best', best.c)}</div>
       <div class="progress" style="height:8px;border-radius:99px;background:var(--surface2);overflow:hidden"><div id="pb" style="height:100%;width:100%;background:var(--accent);transition:width .25s linear"></div></div>
@@ -1659,7 +1698,7 @@ reg('stroop', 'Stroop Test', '\u{1F58A}\uFE0F', 'A colour-word brain test: tap t
     }
     function start() {
       left = DUR; correct = 0; wrong = 0; rts = []; run = true; $('#ok', root).textContent = 0; $('#tl', root).textContent = DUR; $('#go', root).disabled = true; $('#msg', root).textContent = 'Go!';
-      nextTrial(); const t1 = Date.now();
+      nextTrial(); t1 = Date.now();
       iv = T.iv(() => {
         left = Math.max(0, DUR - (Date.now() - t1) / 1000); $('#tl', root).textContent = Math.ceil(left); $('#pb', root).style.width = left / DUR * 100 + '%';
         if (left <= 0) finish();
@@ -1678,6 +1717,7 @@ reg('stroop', 'Stroop Test', '\u{1F58A}\uFE0F', 'A colour-word brain test: tap t
       if (i === trial.ink) { correct++; rts.push(performance.now() - t0); $('#ok', root).textContent = correct; buzz(8); } else { wrong++; restart($('#word', root), 'shake'); buzz(40); }
       nextTrial();
     });
+    keepTime(T, d => { if (run) { t1 += d; t0 += d; } });
     $('#go', root).onclick = start;
     return () => T.stop();
   });
@@ -1731,7 +1771,7 @@ reg('mazerun', 'Maze Runner', '\u{1F6A7}', 'A new random maze every level, alway
         solved = true; T.clear(timer); const sec = Math.round((Date.now() - t0) / 1000);
         if (level > best.lv) { best.lv = level; hsSet('mazerun.best', best); $('#bs', root).textContent = level; }
         $('#tm', root).textContent = fmtT(sec); $('#msg', root).innerHTML = '\u{1F389} Level ' + level + ' done in ' + fmtT(sec) + ' (' + steps + ' steps, shortest ' + shortest + ')';
-        buzz(80); const lvAt = level; T.to(() => { if (level === lvAt) { level++; build(); } }, 1600);
+        buzz(80); celebrate(root, T); const lvAt = level; T.to(() => { if (level === lvAt) { level++; build(); } }, 1600);
       }
     }
     let sx = 0, sy = 0, down = false;
@@ -1743,7 +1783,8 @@ reg('mazerun', 'Maze Runner', '\u{1F6A7}', 'A new random maze every level, alway
     $$('button[data-d]', root).forEach(b => { b.onpointerdown = (e) => { e.preventDefault(); go(+b.dataset.d); }; });
     T.on(window, 'keydown', (e) => { const d = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 }[e.key]; if (d != null) { e.preventDefault(); go(d); } });
     $('#rs', root).onclick = () => { pos = 0; steps = 0; trail = [0]; solved = false; t0 = 0; T.clear(timer); $('#tm', root).textContent = '0:00'; draw(); };
-    $('#nw', root).onclick = build;
+    $('#nw', root).onclick = () => { if (sure(!solved && steps > 0, 'Make a new maze? Your run so far will be lost.')) build(); };
+    keepTime(T, d => { if (t0) t0 += d; });
     build();
     return () => T.stop();
   });
@@ -1872,7 +1913,7 @@ reg('game24', '24 Game', '\u{1F55B}', 'Make exactly 24 from four numbers using +
       if (items.length === 1) {
         if (items[0][0] === 24 && items[0][1] === 1) {
           solved = true; T.clear(timer); const sec = Math.round((Date.now() - t0) / 1000); st.solved++; st.streak++; if (!st.best || sec < st.best) st.best = sec; hsSet('game24', st);
-          $('#sv', root).textContent = st.solved; $('#bs', root).textContent = fmtT(st.best); $('#msg', root).textContent = '\u{1F389} 24! Solved in ' + fmtT(sec); buzz(80); restart($('#cards', root), 'pop');
+          $('#sv', root).textContent = st.solved; $('#bs', root).textContent = fmtT(st.best); $('#msg', root).textContent = '\u{1F389} 24! Solved in ' + fmtT(sec); buzz(80); restart($('#cards', root), 'pop'); celebrate(root, T);
         } else { $('#msg', root).textContent = 'That makes ' + L.frStr(items[0]) + ', not 24. Undo and try again.'; restart($('#cards', root), 'shake'); buzz(40); }
       }
     }
@@ -1886,6 +1927,7 @@ reg('game24', '24 Game', '\u{1F55B}', 'Make exactly 24 from four numbers using +
     $('#rst', root).onclick = () => { if (!solved) { items = nums.map(n => [n, 1]); hist = []; selA = -1; op = ''; $('#msg', root).textContent = ''; paint(); } };
     $('#hint', root).onclick = () => { $('#msg', root).textContent = 'One way: ' + L.solve24(nums) + ' = 24'; st.streak = 0; };
     $('#nw', root).onclick = deal;
+    keepTime(T, d => { if (t0) t0 += d; });
     deal();
     return () => T.stop();
   });
@@ -1912,7 +1954,7 @@ reg('blackjack', 'Blackjack', '♠️', 'Single-player blackjack against the dea
       <div id="bets" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap"></div>
       <div id="acts" class="rowb"></div>`);
     function save() { bestC = Math.max(bestC, chips); hsSet('blackjack', { chips, best: bestC }); $('#ch', root).textContent = chips; $('#bs', root).textContent = bestC; $('#bt', root).textContent = bet; }
-    const cardHtml = (c, back) => back ? '<span class="bj-card back">?</span>' : '<span class="bj-card ' + (c.s % 3 === 1 ? 'r' : '') + '">' + RANKS[c.r] + '<small>' + SUITS[c.s] + '</small></span>';
+    const cardHtml = (c, back) => back ? '<span class="bj-card back">?</span>' : '<span class="bj-card ' + ((c.s === 1 || c.s === 2) ? 'r' : '') + '">' + RANKS[c.r] + '<small>' + SUITS[c.s] + '</small></span>';
     function draw1() { if (shoe.length < 60) shoe = L.bjShoe(6); return { r: shoe.pop(), s: rnd(4) }; }
     function paintHands() {
       $('#dh', root).innerHTML = dealer.map((c, i) => cardHtml(c, hidden && i === 1)).join(''); $('#ph', root).innerHTML = player.map(c => cardHtml(c)).join('');
@@ -1980,7 +2022,7 @@ reg('hilo', 'Higher or Lower', '↕️', 'Will the next card be higher or lower?
       <div class="rowb"><button class="btn" id="hi" style="min-height:58px;font-size:18px">▲ Higher</button><button class="btn alt" id="lo" style="min-height:58px;font-size:18px">▼ Lower</button></div>
       <div class="rowb"><button class="btn alt" id="new">New game</button></div>`);
     const mkDeck = () => shuffle([].concat(...[0, 1, 2, 3].map(s => [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map(r => ({ r, s })))));
-    const card = (c, cls) => c ? '<span class="hl-c ' + (c.s % 3 === 1 ? 'r ' : '') + (cls || '') + '">' + RANKS[c.r] + '<small>' + SUITS[c.s] + '</small></span>' : '<span class="hl-c back ' + (cls || '') + '">?</span>';
+    const card = (c, cls) => c ? '<span class="hl-c ' + ((c.s === 1 || c.s === 2) ? 'r ' : '') + (cls || '') + '">' + RANKS[c.r] + '<small>' + SUITS[c.s] + '</small></span>' : '<span class="hl-c back ' + (cls || '') + '">?</span>';
     function paint(nx) {
       $('#cc', root).innerHTML = card(cur, 'fl'); $('#nc', root).innerHTML = nx ? card(nx, 'fl') : card(null);
       $('#st', root).textContent = streak; $('#bs', root).textContent = best; $('#lf', root).textContent = deck.length;
@@ -2011,7 +2053,7 @@ reg('digitspan', 'Digit Span', '\u{1F9F6}', 'A memory span test: watch a sequenc
     const T = tracker();
     let gen = 0;
     const later = (fn, ms) => { const g = gen; T.to(() => { if (g === gen) fn(); }, ms); };
-    let mode = hsGet('digitspan.mode', 'f'), len, seq, ans, phase = 'idle', strikes, best = hsGet('digitspan.best', { f: 0, b: 0 });
+    let mode = hsGet('digitspan.mode', 'f'), len, seq, ans, phase = 'idle', strikes, passed = 0, best = hsGet('digitspan.best', { f: 0, b: 0 });
     const root = mount(el, `
       ${seg('md', [['f', 'Forwards'], ['b', 'Backwards']], mode)}
       <div class="stats">${stat('ln', 'Length', 3)}${stat('sk', 'Strikes', '0 / 2')}${stat('bs', 'Best', best[mode])}</div>
@@ -2038,11 +2080,11 @@ reg('digitspan', 'Digit Span', '\u{1F9F6}', 'A memory span test: watch a sequenc
       if (ans.length < len) { $('#msg', root).textContent = 'Need ' + len + ' digits'; return; }
       phase = 'check';
       if (L.dsCheck(seq, ans, mode === 'b')) {
-        if (len > best[mode]) { best[mode] = len; hsSet('digitspan.best', best); } $('#msg', root).textContent = '✅ Correct! Next: ' + (len + 1) + ' digits'; buzz(30); len++; hud(); later(show, 1100);
+        if (len > best[mode]) { best[mode] = len; hsSet('digitspan.best', best); } $('#msg', root).textContent = '✅ Correct! Next: ' + (len + 1) + ' digits'; buzz(30); passed = len; len++; hud(); later(show, 1100);
       } else {
         strikes++; buzz(80); restart($('#dg', root), 'shake'); hud();
         const right = (mode === 'b' ? seq.slice().reverse() : seq).join(' ');
-        if (strikes >= 2) { phase = 'idle'; $('#msg', root).innerHTML = 'Game over. It was <b>' + right + '</b>. You reached ' + (len - 1 > 0 ? len - 1 : 0) + ' digits'; $('#go', root).disabled = false; $('#go', root).textContent = 'Play again'; }
+        if (strikes >= 2) { phase = 'idle'; $('#msg', root).innerHTML = 'Game over. It was <b>' + right + '</b>. You remembered ' + passed + (passed === 1 ? ' digit' : ' digits') + ' in a row'; $('#go', root).disabled = false; $('#go', root).textContent = 'Play again'; }
         else { $('#msg', root).innerHTML = 'Not quite: it was <b>' + right + '</b>. One more try at ' + len; later(show, 1800); }
       }
     }
@@ -2052,8 +2094,8 @@ reg('digitspan', 'Digit Span', '\u{1F9F6}', 'A memory span test: watch a sequenc
       paintAns(); if (ans.length === len && k !== 'back') later(submit, 250);
     });
     T.on(window, 'keydown', (e) => { if (phase !== 'input') return; if (/^[0-9]$/.test(e.key) && ans.length < len) { ans.push(+e.key); paintAns(); if (ans.length === len) later(submit, 250); } else if (e.key === 'Backspace') { ans.pop(); paintAns(); } else if (e.key === 'Enter') submit(); });
-    $('#go', root).onclick = () => { if (phase === 'idle') { len = 3; strikes = 0; hud(); show(); } };
-    onSeg(root, 'md', (v) => { mode = v; hsSet('digitspan.mode', v); gen++; phase = 'idle'; len = 3; strikes = 0; $('#go', root).disabled = false; $('#dg', root).textContent = '?'; hud(); });
+    $('#go', root).onclick = () => { if (phase === 'idle') { len = 3; strikes = 0; passed = 0; hud(); show(); } };
+    onSeg(root, 'md', (v) => { mode = v; hsSet('digitspan.mode', v); gen++; phase = 'idle'; len = 3; strikes = 0; passed = 0; $('#go', root).disabled = false; $('#dg', root).textContent = '?'; hud(); });
     len = 3; strikes = 0; hud();
     return () => T.stop();
   });
@@ -2101,7 +2143,7 @@ reg('typingfalls', 'Typing Falls', '\u{1F327}️', 'Words rain down: type each o
       words.forEach((o, i) => {
         const act = i === m.prefix;
         ctx.fillStyle = act ? cssv(root, '--accent') : cssv(root, '--surface'); ctx.strokeStyle = act ? cssv(root, '--accent') : cssv(root, '--line'); ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.roundRect(o.x, o.y - 14, o.tw, 28, 14); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); rrect(ctx, o.x, o.y - 14, o.tw, 28, 14); ctx.fill(); ctx.stroke();
         const done = act ? typed : ''; const rest = o.w.slice(done.length);
         ctx.fillStyle = act ? '#fde68a' : cssv(root, '--text'); ctx.fillText(done, o.x + 10, o.y + 1);
         ctx.fillStyle = act ? cssv(root, '--accent-t') : cssv(root, '--text'); ctx.fillText(rest, o.x + 10 + ctx.measureText(done).width, o.y + 1);

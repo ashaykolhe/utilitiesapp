@@ -376,6 +376,8 @@ function tracker() {
     raf(fn) { const h = ++seq, id = requestAnimationFrame((ts) => { live.delete(h); fn(ts); }); live.set(h, ['raf', id]); return h; },
     clear(h) { const e = live.get(h); if (e) { kill(e[0], e[1]); live.delete(h); } },
     on(target, ev, fn, opt) { target.addEventListener(ev, fn, opt); ls.push([target, ev, fn, opt]); },
+    /* Cancels timers and frames but keeps the listeners (a game restarting itself must not lose its keyboard handler). */
+    reset() { live.forEach(([kind, id]) => kill(kind, id)); live.clear(); },
     stop() {
       live.forEach(([kind, id]) => kill(kind, id)); live.clear();
       ls.forEach(([t, e, f, o]) => t.removeEventListener(e, f, o)); ls.length = 0;
@@ -397,6 +399,11 @@ const CSS = `
 .fn .stats span{font-size:12px;color:var(--muted)}
 .fn .chip{display:inline-block;padding:6px 12px;border-radius:99px;background:var(--surface2);font-weight:600;font-size:14px}
 .fn .pop{animation:fnpop .4s cubic-bezier(.2,1.7,.4,1) both}
+.fn{position:relative}
+.fn .cf{position:absolute;left:0;right:0;top:0;height:0;overflow:visible;pointer-events:none;z-index:5}
+.fn .cf i{position:absolute;top:-10px;font-style:normal;animation:fncf 1.8s ease-in both}
+@keyframes fncf{from{transform:translateY(0) rotate(0);opacity:1}to{transform:translateY(420px) rotate(260deg);opacity:0}}
+@media (prefers-reduced-motion:reduce){.fn *{animation-duration:.01s!important;transition-duration:.01s!important}}
 .fn .shake{animation:fnshake .45s}
 .fn .pulse{animation:fnpulse 1s ease-in-out infinite}
 .fn .cv{display:block;margin:8px auto;border-radius:18px;background:var(--surface2);border:1px solid var(--line);touch-action:none;width:100%}
@@ -415,14 +422,35 @@ const CSS = `
 `;
 function mount(el, html) {
   el.innerHTML = '<style>' + CSS + '</style><div class="fn">' + html + '</div>';
-  return $('.fn', el);
+  const root = $('.fn', el);
+  /* result lines are announced by screen readers when they change */
+  $$('.msg', root).forEach(m => { m.setAttribute('role', 'status'); m.setAttribute('aria-live', 'polite'); });
+  return root;
+}
+/* Asks before throwing away a game that is in progress (only when `inProgress` is true). */
+function sure(inProgress, what) { return !inProgress || confirm(what || 'Start over? Your current game will be lost.'); }
+/* Timers count from Date.now(); when the app is in the background the clock must not keep running against the player. */
+function keepTime(T, shift) {
+  let at = 0;
+  T.on(document, 'visibilitychange', () => { if (document.hidden) at = Date.now(); else if (at) { shift(Date.now() - at); at = 0; } });
+}
+/* A short burst of confetti over a finished game (CSS only, removed by itself, skipped for people who asked for less motion). */
+function celebrate(root, T) {
+  try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return; } catch (e) { /* ignore */ }
+  const old = $('.cf', root); if (old) old.remove();
+  const box = document.createElement('div'); box.className = 'cf'; box.setAttribute('aria-hidden', 'true');
+  const em = ['🎉', '✨', '⭐', '🎊', '💫'];
+  box.innerHTML = Array.from({ length: 16 }, (_, i) => '<i style="left:' + ((i * 37 + 5) % 96) + '%;animation-delay:' + ((i * 53) % 400) + 'ms;font-size:' + (18 + (i * 7) % 14) + 'px">' + em[i % em.length] + '</i>').join('');
+  root.appendChild(box); T.to(() => box.remove(), 2200);
 }
 const seg = (id, items, cur) => '<div class="seg" id="' + id + '">' + items.map(([v, l]) =>
   '<button data-v="' + v + '" aria-pressed="' + (String(v) === String(cur)) + '" class="' + (String(v) === String(cur) ? 'on' : '') + '">' + l + '</button>').join('') + '</div>';
-function onSeg(root, id, cb) {
+function onSeg(root, id, cb, ask) {
   const s = $('#' + id, root);
   s.addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
+    if (b.classList.contains('on')) return;
+    if (ask && !ask()) return;                 // the player chose to keep the game in progress
     $$('button', s).forEach(x => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
     cb(b.dataset.v);
   });
@@ -707,13 +735,13 @@ reg('reactiontimer', 'Reaction Timer', '🚦', 'Wait for the screen to turn gree
 reg('tictactoe', 'Tic-Tac-Toe', '⭕', 'Play against an unbeatable phone or a friend, with a running scoreboard.',
   ['noughts', 'crosses', 'xo', 'tictactoe', 'minimax'], function (el) {
     const T = tracker();
-    let mode = Store.get('fun.ttt.mode', 'ai'), me = 'X', b, turn, over, score = Store.get('fun.ttt.score', { w: 0, l: 0, d: 0, x: 0, o: 0, dd: 0 });
+    let mode = Store.get('fun.ttt.mode', 'ai'), lvl = Store.get('fun.ttt.lvl', 'hard'), me = 'X', b, turn, over, score = Store.get('fun.ttt.score', { w: 0, l: 0, d: 0, x: 0, o: 0, dd: 0 });
     const X = '<svg viewBox="0 0 40 40" width="70%" height="70%"><path d="M8 8L32 32M32 8L8 32" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" fill="none" style="stroke-dasharray:40;animation:fnxo .35s ease-out both"/></svg>';
     const O = '<svg viewBox="0 0 40 40" width="70%" height="70%"><circle cx="20" cy="20" r="12" stroke="#ff6b9d" stroke-width="6" fill="none" stroke-linecap="round" style="stroke-dasharray:76;animation:fnxo .4s ease-out both"/></svg>';
     const root = mount(el, `
       <style>@keyframes fnxo{from{stroke-dashoffset:80}to{stroke-dashoffset:0}}</style>
       ${seg('mode', [['ai', '🤖 vs Phone'], ['two', '👥 2 Players']], mode)}
-      <div id="side">${seg('side', [['X', 'I play X (first)'], ['O', 'I play O (second)']], me)}</div>
+      <div id="ai">${seg('lvl', [['easy', 'Easy phone'], ['hard', 'Unbeatable']], lvl)}${seg('side', [['X', 'I play X (first)'], ['O', 'I play O (second)']], me)}</div>
       <div class="msg" id="msg"></div>
       <div id="grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:330px;margin:0 auto"></div>
       <div class="gap"></div>
@@ -726,17 +754,21 @@ reg('tictactoe', 'Tic-Tac-Toe', '⭕', 'Play against an unbeatable phone or a fr
     }
     function msg(t) { const m = $('#msg', root); m.textContent = t; bump(m); }
     function draw(line) {
-      $('#grid', root).innerHTML = b.map((v, i) => '<button data-i="' + i + '" aria-label="Cell ' + (i + 1) + '" class="tile3" style="aspect-ratio:1;display:grid;place-items:center;border-radius:20px;padding:0;' +
+      $('#grid', root).innerHTML = b.map((v, i) => '<button data-i="' + i + '" aria-label="Cell ' + (i + 1) + (v ? ', ' + v : ', empty') + '" class="tile3" style="aspect-ratio:1;display:grid;place-items:center;border-radius:20px;padding:0;' +
         (line && line.includes(i) ? 'background:var(--surface2);box-shadow:0 0 0 3px var(--ok);' : '') + '">' + (v === 'X' ? X : v === 'O' ? O : '') + '</button>').join('');
     }
     function newGame() {
       b = Array(9).fill(null); turn = 'X'; over = false; draw();
-      $('#side', root).style.display = mode === 'ai' ? '' : 'none';
+      $('#ai', root).style.display = mode === 'ai' ? '' : 'none';
       scoreHTML();
       if (mode === 'ai') { msg(me === 'X' ? 'Your move' : 'Phone is thinking…'); if (me === 'O') aiMove(); } else msg('X to move');
     }
     function aiMove() {
-      T.to(() => { if (over) return; place(L.tttBest(b, turn)); }, 450);
+      T.to(() => {
+        if (over) return;
+        const free = b.map((v, i) => v ? -1 : i).filter(i => i >= 0);
+        place(lvl === 'easy' && rnd(100) < 55 ? pick(free) : L.tttBest(b, turn));   // the easy phone plays a random square about half the time
+      }, 450);
     }
     function place(i) {
       b[i] = turn;
@@ -749,8 +781,8 @@ reg('tictactoe', 'Tic-Tac-Toe', '⭕', 'Play against an unbeatable phone or a fr
     function finish(r) {
       const s = score;
       if (mode === 'ai') {
-        if (r.w === 'draw') { s.d++; msg('🤝 A draw'); } else if (r.w === me) { s.w++; msg('🎉 You win!'); } else { s.l++; msg('🤖 The phone wins'); }
-      } else if (r.w === 'draw') { s.dd++; msg('🤝 A draw'); } else { s[r.w === 'X' ? 'x' : 'o']++; msg('🎉 ' + r.w + ' wins!'); }
+        if (r.w === 'draw') { s.d++; msg('🤝 A draw'); } else if (r.w === me) { s.w++; msg('🎉 You win!'); celebrate(root, T); } else { s.l++; msg('🤖 The phone wins'); }
+      } else if (r.w === 'draw') { s.dd++; msg('🤝 A draw'); } else { s[r.w === 'X' ? 'x' : 'o']++; msg('🎉 ' + r.w + ' wins!'); celebrate(root, T); }
       Store.set('fun.ttt.score', s); scoreHTML();
     }
     $('#grid', root).onclick = (e) => {
@@ -759,9 +791,12 @@ reg('tictactoe', 'Tic-Tac-Toe', '⭕', 'Play against an unbeatable phone or a fr
       if (b[i] || (mode === 'ai' && turn !== me)) return;
       place(i);
     };
-    onSeg(root, 'mode', v => { mode = v; Store.set('fun.ttt.mode', mode); T.stop(); newGame(); });
-    onSeg(root, 'side', v => { me = v; T.stop(); newGame(); });
-    $('#again', root).onclick = () => { T.stop(); newGame(); };
+    const playing = () => !over && b.filter(Boolean).length > (mode === 'ai' && me === 'O' ? 1 : 0);
+    const ask = () => sure(playing(), 'Start a new game? The current one will be lost.');
+    onSeg(root, 'mode', v => { mode = v; Store.set('fun.ttt.mode', mode); T.reset(); newGame(); }, ask);
+    onSeg(root, 'side', v => { me = v; T.reset(); newGame(); }, ask);
+    onSeg(root, 'lvl', v => { lvl = v; Store.set('fun.ttt.lvl', lvl); });
+    $('#again', root).onclick = () => { if (!ask()) return; T.reset(); newGame(); };
     $('#rst', root).onclick = () => { score = { w: 0, l: 0, d: 0, x: 0, o: 0, dd: 0 }; Store.set('fun.ttt.score', score); scoreHTML(); };
     newGame();
     return () => T.stop();
@@ -794,11 +829,11 @@ reg('memory', 'Memory Match', '🃏', 'Flip cards to find all the matching pairs
       <button class="btn big-btn" id="new">New game</button>`);
     function best() { const b = hsGet('memory.best', {})[size]; return b ? b.moves + ' / ' + fmtT(b.secs) : '–'; }
     function setup() {
-      T.stop(); const [c, r] = SIZES[size], n = c * r / 2;
+      T.reset(); const [c, r] = SIZES[size], n = c * r / 2;
       cards = shuffle(EMO.slice(0, n).concat(EMO.slice(0, n))); open = []; locked = false; matched = 0; moves = 0; t0 = 0; secs = 0;
       const g = $('#grid', root); g.style.gridTemplateColumns = 'repeat(' + c + ',1fr)';
       g.innerHTML = cards.map((e, i) => '<button class="mc" data-i="' + i + '" aria-label="Card ' + (i + 1) + ', face down"><div class="in"><div class="f back">?</div><div class="f front">' + e + '</div></div></button>').join('');
-      $('#mv', root).textContent = 0; $('#tm', root).textContent = '0:00'; $('#bs', root).textContent = best(); $('#msg', root).textContent = '';
+      $('#mv', root).textContent = 0; $('#tm', root).textContent = '0:00'; $('#bs', root).textContent = best(); $('#msg', root).textContent = 'Tap two cards to find a matching pair';
     }
     const cardLab = (btn, i, state) => btn.setAttribute('aria-label', 'Card ' + (i + 1) + ', ' + (state === 'down' ? 'face down' : cards[i] + (state === 'ok' ? ', matched' : '')));
     function flipDone() {
@@ -811,12 +846,12 @@ reg('memory', 'Memory Match', '🃏', 'Flip cards to find all the matching pairs
       }
     }
     function win() {
-      T.stop();
+      T.reset();
       const all = hsGet('memory.best', {}), old = all[size];
       const isBest = !old || moves < old.moves || (moves === old.moves && secs < old.secs);
       if (isBest) { all[size] = { moves, secs }; hsSet('memory.best', all); }
       $('#bs', root).textContent = best();
-      const m = $('#msg', root); m.textContent = '🎉 Done in ' + moves + ' moves, ' + fmtT(secs) + (isBest ? ' (new best!)' : ''); bump(m); buzz(80);
+      const m = $('#msg', root); m.textContent = '🎉 Done in ' + moves + ' moves, ' + fmtT(secs) + (isBest ? ' (new best!)' : ''); bump(m); buzz(80); celebrate(root, T);
     }
     $('#grid', root).onclick = (e) => {
       const bt = e.target.closest('.mc'); if (!bt || locked) return;
@@ -826,8 +861,10 @@ reg('memory', 'Memory Match', '🃏', 'Flip cards to find all the matching pairs
       bt.classList.add('up'); cardLab(bt, i, 'up'); open.push(i);
       if (open.length === 2) { moves++; $('#mv', root).textContent = moves; locked = true; T.to(flipDone, 450); }
     };
-    onSeg(root, 'sz', v => { size = v; Store.set('fun.memory.size', size); setup(); });
-    $('#new', root).onclick = setup;
+    const askMem = () => sure(moves > 0 && matched < cards.length / 2, 'Start a new game? Your current game will be lost.');
+    onSeg(root, 'sz', v => { size = v; Store.set('fun.memory.size', size); setup(); }, askMem);
+    $('#new', root).onclick = () => { if (askMem()) setup(); };
+    keepTime(T, d => { if (t0) t0 += d; });
     setup();
     return () => T.stop();
   });
@@ -1052,7 +1089,7 @@ reg('g2048', '2048', '🟧', 'Swipe to slide and merge tiles up to 2048. Smooth 
       T.to(() => {
         merges.forEach(([a, b, to]) => { a.el.remove(); b.el.remove(); tiles[to] = mk(board[to], to, 'bump'); });
         const i = L.add2048(board); if (i >= 0) tiles[i] = mk(board[i], i, 'pop');
-        if (!won && board.some(v => v >= 2048)) { won = true; $('#msg', root).textContent = '🎉 You made 2048! Keep going'; buzz(80); }
+        if (!won && board.some(v => v >= 2048)) { won = true; $('#msg', root).textContent = '🎉 You made 2048! Keep going'; buzz(80); celebrate(root, T); }
         if (!L.canMove2048(board)) { over = true; $('#msg', root).textContent = '💥 Game over. Score ' + score; buzz(100); }
         busy = false;
       }, 130);
@@ -1069,7 +1106,7 @@ reg('g2048', '2048', '🟧', 'Swipe to slide and merge tiles up to 2048. Smooth 
       const d = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 }[e.key];
       if (d != null) { e.preventDefault(); go(d); }
     });
-    $('#new', root).onclick = newGame;
+    $('#new', root).onclick = () => { if (sure(score > 0 && !over, 'Start a new game? Your score will be lost.')) newGame(); };
     newGame();
     return () => T.stop();
   });
@@ -1097,10 +1134,10 @@ reg('minesweeper', 'Minesweeper', '💣', 'Classic mine hunting with three sizes
       return base + (s === 2 ? 'flag' : s === 1 ? (g && g.mine[i] ? 'mine' : (g && g.adj[i]) || 'empty') : 'hidden');
     };
     function setup() {
-      T.stop(); [w, h, m] = LV[lv]; g = null; st = new Array(w * h).fill(0); over = false; t0 = 0; secs = 0; left = m; opened = 0;
+      T.reset(); [w, h, m] = LV[lv]; g = null; st = new Array(w * h).fill(0); over = false; t0 = 0; secs = 0; left = m; opened = 0;
       gridEl.style.gridTemplateColumns = 'repeat(' + w + ',1fr)';
       gridEl.innerHTML = st.map((_, i) => '<button data-i="' + i + '" aria-label="' + cellLabel(i) + '" style="aspect-ratio:1;padding:0;border:0;border-radius:8px;font-weight:800;font-size:17px;background:linear-gradient(145deg,var(--accent),#a78bfa);color:#fff;box-shadow:var(--shadow);transition:background .2s,transform .15s"></button>').join('');
-      $('#ml', root).textContent = left; $('#tm', root).textContent = '0:00'; $('#bs', root).textContent = bestStr(); $('#msg', root).textContent = 'Tap a cell to start';
+      $('#ml', root).textContent = left; $('#tm', root).textContent = '0:00'; $('#bs', root).textContent = bestStr(); $('#msg', root).textContent = 'Tap a cell to dig. Long-press (or Flag mode) marks a mine';
     }
     function paint(i) {
       const b = gridEl.children[i], s = st[i];
@@ -1111,13 +1148,13 @@ reg('minesweeper', 'Minesweeper', '💣', 'Classic mine hunting with three sizes
       } else if (s === 2) { b.textContent = '🚩'; } else b.textContent = '';
     }
     function end(winGame) {
-      over = true; T.stop();
+      over = true; T.reset();
       st.forEach((s, i) => { if (g.mine[i] && s !== 2 && !winGame) { st[i] = 1; paint(i); } });
       const msg = $('#msg', root);
       if (winGame) {
         const all = hsGet('mines.best', {}); const isB = !all[lv] || secs < all[lv];
         if (isB) { all[lv] = secs; hsSet('mines.best', all); $('#bs', root).textContent = bestStr(); }
-        msg.textContent = '🎉 Cleared in ' + fmtT(secs) + (isB ? ' (new best!)' : ''); buzz(80);
+        msg.textContent = '🎉 Cleared in ' + fmtT(secs) + (isB ? ' (new best!)' : ''); buzz(80); celebrate(root, T);
       } else { msg.textContent = '💥 Boom! Try again'; buzz(150); restart(gridEl, 'shake'); }
       bump(msg);
     }
@@ -1151,9 +1188,11 @@ reg('minesweeper', 'Minesweeper', '💣', 'Classic mine hunting with three sizes
       const i = +b.dataset.i;
       if (flagMode) flag(i); else dig(i);
     });
-    onSeg(root, 'lv', v => { lv = v; Store.set('fun.mines.lv', lv); setup(); });
+    const askMs = () => sure(g && !over && opened > 0, 'Start a new game? The board you are clearing will be lost.');
+    onSeg(root, 'lv', v => { lv = v; Store.set('fun.mines.lv', lv); setup(); }, askMs);
+    keepTime(T, d => { if (t0) t0 += d; });
     $('#mode', root).onclick = (e) => { flagMode = !flagMode; e.target.textContent = flagMode ? '🚩 Flag mode' : '⛏️ Dig mode'; };
-    $('#new', root).onclick = setup;
+    $('#new', root).onclick = () => { if (askMs()) setup(); };
     setup();
     return () => T.stop();
   });
@@ -1164,16 +1203,22 @@ reg('minesweeper', 'Minesweeper', '💣', 'Classic mine hunting with three sizes
 reg('snake', 'Snake', '🐲', 'Guide a growing snake to the apples with swipes or the arrow pad. Do not hit the walls or yourself.',
   ['snake', 'arcade', 'retro', 'apple'], function (el) {
     const T = tracker();
-    const N = 15, S = 40;
-    let snake, dir, queue, apple, score, best = hsGet('snake.best', 0), state = 'idle', loop = 0;
+    const N = 15, S = 40, SP = { slow: [190, 100], normal: [150, 70], fast: [110, 55] };   // [start delay, fastest delay] in ms
+    /* the best score used to be one number (the normal speed); it is now kept per speed */
+    const rawBest = hsGet('snake.best', 0), bests = typeof rawBest === 'number' ? { normal: rawBest } : (rawBest && typeof rawBest === 'object' ? rawBest : {});
+    let sp = Store.get('fun.snake.sp', 'normal'); if (!SP[sp]) sp = 'normal';
+    let snake, dir, queue, apple, score, best = bests[sp] || 0, state = 'idle', loop = 0;
+    const delay = () => Math.max(SP[sp][1], SP[sp][0] - score * 3);
     const root = mount(el, `
+      ${seg('sp', [['slow', 'Slow'], ['normal', 'Normal'], ['fast', 'Fast']], sp)}
       <div class="card"><div class="stats">${stat('sc', 'Score', 0)}${stat('bs', 'Best', best)}</div></div>
       <canvas id="cv" class="cv" width="${N * S}" height="${N * S}" style="max-width:380px"></canvas>
-      <div class="msg" id="msg">Tap the board to start</div>
+      <div class="msg" id="msg">Tap the board to start, then swipe or use the arrows</div>
       <div style="display:grid;grid-template-columns:repeat(3,64px);grid-template-rows:repeat(2,52px);gap:8px;justify-content:center">
         <span></span><button class="btn alt" data-d="0" aria-label="Up">▲</button><span></span>
         <button class="btn alt" data-d="3" aria-label="Left">◀</button><button class="btn alt" data-d="2" aria-label="Down">▼</button><button class="btn alt" data-d="1" aria-label="Right">▶</button>
-      </div>`);
+      </div>
+      <div class="gap"></div><button class="btn alt" id="pz" style="width:100%" aria-label="Pause">⏸ Pause</button>`);
     const cv = $('#cv', root), ctx = cv.getContext('2d'), V = [[0, -1], [1, 0], [0, 1], [-1, 0]];
     function reset() {
       snake = [{ x: 7, y: 7 }, { x: 6, y: 7 }, { x: 5, y: 7 }]; dir = 1; queue = []; score = 0; placeApple();
@@ -1207,32 +1252,41 @@ reg('snake', 'Snake', '🐲', 'Guide a growing snake to the apples with swipes o
       if (eat) { score++; $('#sc', root).textContent = score; bump($('#sc', root)); buzz(15); placeApple(); } else snake.pop();
       draw();
       if (!apple) return die(true);
-      loop = T.to(step, Math.max(70, 150 - score * 3));
+      loop = T.to(step, delay());
     }
     function die(win) {
-      state = 'dead'; buzz(120);
-      if (score > best) { best = score; hsSet('snake.best', best); $('#bs', root).textContent = best; }
+      state = 'dead'; buzz(120); $('#pz', root).textContent = '⏸ Pause';
+      if (score > best) { best = score; bests[sp] = best; hsSet('snake.best', bests); $('#bs', root).textContent = best; }
       $('#msg', root).textContent = (win ? '🏆 You filled the board! ' : '💥 Game over. ') + 'Score ' + score + '. Tap to play again'; restart(cv, 'shake');
     }
     function turn(d) {
-      if (state === 'idle' || state === 'dead') { start(); }
+      if (state === 'idle' || state === 'dead') { start(); } else if (state === 'paused') resume();
       if (queue.length < 3) queue.push(d);
     }
     function start() {
       if (state === 'run') return;
-      reset(); state = 'run'; $('#msg', root).textContent = 'Go!'; loop = T.to(step, 150);
+      reset(); state = 'run'; $('#msg', root).textContent = 'Go!'; loop = T.to(step, SP[sp][0]);
     }
+    /* Pause keeps the snake exactly where it is; leaving the app pauses by itself. */
+    function pause() { if (state !== 'run') return; state = 'paused'; T.clear(loop); $('#pz', root).textContent = '▶ Resume'; $('#msg', root).textContent = 'Paused. Tap the board or Resume to go on'; }
+    function resume() { if (state !== 'paused') return; state = 'run'; $('#pz', root).textContent = '⏸ Pause'; $('#msg', root).textContent = 'Go!'; loop = T.to(step, delay()); }
+    $('#pz', root).onclick = () => { if (state === 'run') pause(); else if (state === 'paused') resume(); };
+    T.on(document, 'visibilitychange', () => { if (document.hidden) pause(); });
+    onSeg(root, 'sp', v => {
+      sp = v; Store.set('fun.snake.sp', sp); T.reset(); state = 'idle'; best = bests[sp] || 0; $('#bs', root).textContent = best; $('#pz', root).textContent = '⏸ Pause';
+      reset(); $('#msg', root).textContent = 'Tap the board to start, then swipe or use the arrows';
+    }, () => sure(state === 'run' || state === 'paused', 'Change the speed? The game in progress will end.'));
     $$('button[data-d]', root).forEach(b => { b.onpointerdown = (e) => { e.preventDefault(); turn(+b.dataset.d); }; });
     let sx = 0, sy = 0;
     cv.addEventListener('pointerdown', (e) => { sx = e.clientX; sy = e.clientY; });
     cv.addEventListener('pointerup', (e) => {
       const dx = e.clientX - sx, dy = e.clientY - sy;
-      if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) { if (state !== 'run') start(); return; }
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) { if (state === 'paused') resume(); else if (state !== 'run') start(); return; }
       turn(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0));
     });
     T.on(window, 'keydown', (e) => {
       const d = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3 }[e.key];
-      if (d != null) { e.preventDefault(); turn(d); }
+      if (d != null) { e.preventDefault(); turn(d); } else if (e.key === 'p' || e.key === 'P') { if (state === 'run') pause(); else if (state === 'paused') resume(); }
     });
     reset();
     return () => T.stop();
@@ -1262,19 +1316,20 @@ reg('sudoku', 'Sudoku', '9️⃣', 'Fresh Sudoku puzzles with a single solution 
       grid.innerHTML = g.map((v, i) => {
         const r = (i / 9) | 0, c = i % 9, given = puz[i] !== 0, isSel = i === sel;
         const peer = sel >= 0 && !isSel && (((sel / 9) | 0) === r || sel % 9 === c || (((sel / 9 / 3) | 0) === ((r / 3) | 0) && ((sel % 9 / 3) | 0) === ((c / 3) | 0)));
-        const bg = isSel ? 'var(--accent)' : bad.has(i) || wrong.has(i) ? 'color-mix(in srgb,var(--danger) 30%,var(--surface))' : sv && v === sv ? 'color-mix(in srgb,var(--accent) 30%,var(--surface))' : peer ? 'var(--surface2)' : 'var(--surface)';
-        const colr = isSel ? 'var(--accent-t)' : bad.has(i) || wrong.has(i) ? 'var(--danger)' : given ? 'var(--text)' : 'var(--accent)';
-        return '<button data-i="' + i + '" aria-label="Row ' + (r + 1) + ' column ' + (c + 1) + '" style="aspect-ratio:1;padding:0;border:0;border-right:' + (c === 8 ? 0 : c % 3 === 2 ? '3px solid var(--text)' : '1px solid var(--line)') + ';border-bottom:' + (r === 8 ? 0 : r % 3 === 2 ? '3px solid var(--text)' : '1px solid var(--line)') +
+        const clash = bad.has(i) || wrong.has(i);
+        const bg = isSel ? (clash ? 'var(--danger)' : 'var(--accent)') : bad.has(i) || wrong.has(i) ? 'color-mix(in srgb,var(--danger) 30%,var(--surface))' : sv && v === sv ? 'color-mix(in srgb,var(--accent) 30%,var(--surface))' : peer ? 'var(--surface2)' : 'var(--surface)';
+        const colr = isSel ? (clash ? '#fff' : 'var(--accent-t)') : bad.has(i) || wrong.has(i) ? 'var(--danger)' : given ? 'var(--text)' : 'var(--accent)';
+        return '<button data-i="' + i + '" aria-label="Row ' + (r + 1) + ' column ' + (c + 1) + (v ? ', ' + v + (given ? ', given' : '') : ', empty') + '" style="aspect-ratio:1;padding:0;border:0;border-right:' + (c === 8 ? 0 : c % 3 === 2 ? '3px solid var(--text)' : '1px solid var(--line)') + ';border-bottom:' + (r === 8 ? 0 : r % 3 === 2 ? '3px solid var(--text)' : '1px solid var(--line)') +
           ';border-radius:0;background:' + bg + ';color:' + colr + ';font-size:21px;font-weight:' + (given ? 800 : 600) + ';transition:background .15s">' + (v || '') + '</button>';
       }).join('');
     }
     function newGame() {
-      if (busy) return; busy = true; T.stop(); done = false; sel = -1; wrong = new Set();
+      if (busy) return; busy = true; T.reset(); done = false; sel = -1; wrong = new Set();
       $('#msg', root).textContent = 'Making a puzzle…'; $('#tm', root).textContent = '0:00'; $('#bs', root).textContent = bestStr();
       grid.style.opacity = .3;
       T.to(() => {
         const r = L.sdkGen(CLUES[lvl]); puz = r.puzzle; sol = r.solution; g = puz.slice();
-        grid.style.opacity = 1; $('#msg', root).textContent = ''; busy = false; paint();
+        grid.style.opacity = 1; $('#msg', root).textContent = 'Tap a cell, then a number'; busy = false; paint();
         t0 = Date.now(); tick = T.iv(() => { secs = Math.floor((Date.now() - t0) / 1000); $('#tm', root).textContent = fmtT(secs); }, 500);
       }, 40);
     }
@@ -1284,10 +1339,10 @@ reg('sudoku', 'Sudoku', '9️⃣', 'Fresh Sudoku puzzles with a single solution 
     }
     function checkWin() {
       if (g.every(Boolean) && L.sdkValid(g)) {
-        done = true; T.stop();
+        done = true; T.reset();
         const all = hsGet('sudoku.best', {}), isB = !all[lvl] || secs < all[lvl];
         if (isB) { all[lvl] = secs; hsSet('sudoku.best', all); }
-        $('#bs', root).textContent = bestStr(); $('#msg', root).textContent = '🎉 Solved in ' + fmtT(secs) + (isB ? ' (new best!)' : ''); bump($('#msg', root)); buzz(100);
+        $('#bs', root).textContent = bestStr(); $('#msg', root).textContent = '🎉 Solved in ' + fmtT(secs) + (isB ? ' (new best!)' : ''); bump($('#msg', root)); buzz(100); celebrate(root, T);
       }
     }
     grid.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; sel = +b.dataset.i; paint(); };
@@ -1303,9 +1358,11 @@ reg('sudoku', 'Sudoku', '9️⃣', 'Fresh Sudoku puzzles with a single solution 
       $('#msg', root).textContent = wrong.size ? wrong.size + ' wrong cell' + (wrong.size > 1 ? 's' : '') + ' marked red' : '👍 All filled cells are correct';
       paint(); T.to(() => { wrong = new Set(); if (g) paint(); }, 2500);
     };
-    onSeg(root, 'lv', v => { lvl = v; Store.set('fun.sudoku.lvl', lvl); busy = false; newGame(); });
+    const askSdk = () => sure(!done && !busy && g && g.some((v, i) => v && !puz[i]), 'Start a new puzzle? The numbers you entered will be lost.');
+    onSeg(root, 'lv', v => { lvl = v; Store.set('fun.sudoku.lvl', lvl); busy = false; newGame(); }, askSdk);
+    keepTime(T, d => { if (t0) t0 += d; });
     T.on(window, 'keydown', (e) => { if (/^[0-9]$/.test(e.key)) setCell(+e.key); else if (e.key === 'Backspace' || e.key === 'Delete') setCell(0); });
-    $('#new', root).onclick = newGame;
+    $('#new', root).onclick = () => { if (askSdk()) newGame(); };
     newGame();
     return () => T.stop();
   });
@@ -1323,7 +1380,7 @@ reg('simon', 'Simon Says', '🔴', 'Watch the colour pattern and repeat it from 
       <div id="pads" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;max-width:340px;margin:14px auto">
         ${COLS.map((c, i) => '<button data-i="' + i + '" aria-label="Pad ' + (i + 1) + '" style="aspect-ratio:1;border:0;border-radius:' + ['100% 14px 14px 14px', '14px 100% 14px 14px', '14px 14px 14px 100%', '14px 14px 100% 14px'][i] + ';background:' + c[0] + ';opacity:.55;transition:opacity .12s,transform .12s,box-shadow .12s"></button>').join('')}
       </div>
-      <div class="msg" id="msg">Press Start</div>
+      <div class="msg" id="msg">Press Start, watch the colours, then repeat them</div>
       <button class="btn big-btn" id="go">Start</button>`);
     const pads = $$('#pads button', root);
     function tone(i) {
@@ -1358,7 +1415,7 @@ reg('simon', 'Simon Says', '🔴', 'Watch the colour pattern and repeat it from 
       idx++;
       if (idx === seq.length) { mode = 'wait'; $('#msg', root).textContent = '✅ Nice!'; T.to(next, 900); }
     };
-    $('#go', root).onclick = () => { T.stop(); seq = []; mode = 'wait'; next(); };
+    $('#go', root).onclick = () => { T.reset(); seq = []; mode = 'wait'; next(); };
     return () => { T.stop(); try { if (ac) ac.close(); } catch (e) { /* ignore */ } };
   });
 
@@ -1386,7 +1443,7 @@ reg('hangman', 'Hangman', '🪢', 'Guess the hidden word letter by letter before
       <div class="center"><span class="chip" id="cat"></span> <span class="chip" id="lives"></span></div>
       <div id="word" class="mid" style="letter-spacing:6px;margin:14px 0;min-height:44px;word-break:break-all"></div>
       <div class="msg" id="msg"></div>
-      <div id="kb" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(c => '<button class="btn alt" data-k="' + c + '" style="padding:10px 0;font-size:17px;min-width:0">' + c + '</button>').join('')}</div>
+      <div id="kb" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(c => '<button class="btn alt" data-k="' + c + '" style="padding:10px 0;font-size:17px;min-width:0;min-height:44px">' + c + '</button>').join('')}</div>
       <div class="gap"></div>
       <div class="card"><div class="stats">${stat('w', 'Won', st.w)}${stat('l', 'Lost', st.l)}${stat('sk', 'Streak', st.streak)}${stat('bs', 'Best streak', st.best)}</div></div>
       <div class="gap"></div><button class="btn big-btn" id="new">New word</button>`);
@@ -1407,7 +1464,7 @@ reg('hangman', 'Hangman', '🪢', 'Guess the hidden word letter by letter before
       b.disabled = true; b.style.background = hit ? 'var(--ok)' : 'var(--danger)'; b.style.color = '#fff';
       if (!hit) { wrongN++; buzz(25); }
       const m = $('#msg', root);
-      if (word.split('').every(x => used.has(x))) { over = true; st.w++; st.streak++; st.best = Math.max(st.best, st.streak); m.textContent = '🎉 You got it!'; bump(m); upd(); buzz(60); }
+      if (word.split('').every(x => used.has(x))) { over = true; st.w++; st.streak++; st.best = Math.max(st.best, st.streak); m.textContent = '🎉 You got it!'; bump(m); upd(); buzz(60); celebrate(root, T); }
       else if (wrongN >= 6) { over = true; st.l++; st.streak = 0; m.textContent = '💀 It was ' + word; bump(m); upd(); restart($('svg', root), 'shake'); }
       paint();
     }
@@ -1444,7 +1501,7 @@ reg('connect4', 'Connect Four', '🟡', 'Drop discs and line up four in a row. P
         (v ? '<span style="position:absolute;inset:3px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff8,' + COL[v] + ' 55%);' + (win && win.includes(i) ? 'box-shadow:0 0 0 4px #fff,0 0 18px #fff;' : '') + (i === last ? 'animation:fnfall .4s cubic-bezier(.5,0,.8,.6)' : '') + '"></span>' : '') + '</button>').join('');
     }
     function newGame() {
-      T.stop(); b = Array(42).fill(0); turn = 1; over = false; busy = false; paint(); scoreHTML();
+      T.reset(); b = Array(42).fill(0); turn = 1; over = false; busy = false; paint(); scoreHTML();
       $('#lvw', root).style.display = mode === 'ai' ? '' : 'none';
       msg(mode === 'ai' ? 'Your move (red)' : 'Red to move');
     }
@@ -1452,16 +1509,17 @@ reg('connect4', 'Connect Four', '🟡', 'Drop discs and line up four in a row. P
       const r = L.c4Drop(b, c, turn); if (r < 0) { restart(bd, 'shake'); return; }
       const last = r * 7 + c, w = L.c4Win(b, turn);
       paint(last, w); buzz(15);
-      if (w) { over = true; if (turn === 1) sc.a++; else sc.b++; Store.set('fun.c4.score', sc); scoreHTML(); msg(mode === 'ai' ? (turn === 1 ? '🎉 You win!' : '🤖 The phone wins') : (turn === 1 ? '🔴 Red wins!' : '🟡 Yellow wins!')); return; }
+      if (w) { over = true; if (turn === 1) sc.a++; else sc.b++; Store.set('fun.c4.score', sc); scoreHTML(); if (turn === 1 || mode === 'two') celebrate(root, T); msg(mode === 'ai' ? (turn === 1 ? '🎉 You win!' : '🤖 The phone wins') : (turn === 1 ? '🔴 Red wins!' : '🟡 Yellow wins!')); return; }
       if (b.every(Boolean)) { over = true; sc.d++; Store.set('fun.c4.score', sc); scoreHTML(); msg('🤝 Draw'); return; }
       turn = 3 - turn;
       if (mode === 'ai' && turn === 2) { busy = true; msg('Phone is thinking…'); T.to(() => { const mv = L.c4Best(b, 2, DEPTH[lvl]); busy = false; drop(mv); }, 450); }
       else msg(mode === 'ai' ? 'Your move (red)' : (turn === 1 ? 'Red to move' : 'Yellow to move'));
     }
     bd.onclick = (e) => { const t = e.target.closest('button'); if (!t || over || busy) return; drop(+t.dataset.c); };
-    onSeg(root, 'mode', v => { mode = v; Store.set('fun.c4.mode', mode); newGame(); });
-    onSeg(root, 'lvl', v => { lvl = v; Store.set('fun.c4.lvl', lvl); newGame(); });
-    $('#new', root).onclick = newGame;
+    const askC4 = () => sure(!over && b.some(Boolean), 'Start a new game? The current one will be lost.');
+    onSeg(root, 'mode', v => { mode = v; Store.set('fun.c4.mode', mode); newGame(); }, askC4);
+    onSeg(root, 'lvl', v => { lvl = v; Store.set('fun.c4.lvl', lvl); newGame(); }, askC4);
+    $('#new', root).onclick = () => { if (askC4()) newGame(); };
     $('#rst', root).onclick = () => { sc = { a: 0, b: 0, d: 0 }; Store.set('fun.c4.score', sc); scoreHTML(); };
     newGame();
     return () => T.stop();
@@ -1472,6 +1530,7 @@ reg('connect4', 'Connect Four', '🟡', 'Drop discs and line up four in a row. P
    ===================================================================== */
 reg('hanoi', 'Tower of Hanoi', '🗼', 'Move the whole stack of discs to the last peg, one at a time, never a big disc on a small one.',
   ['hanoi', 'tower', 'discs', 'puzzle', 'pegs'], function (el) {
+    const T = tracker();
     let n = Store.get('fun.hanoi.n', 4), pegs, sel = -1, moves = 0, done = false;
     const root = mount(el, `
       ${seg('n', [3, 4, 5, 6, 7].map(x => ['' + x, x + ' discs']), '' + n)}
@@ -1507,14 +1566,16 @@ reg('hanoi', 'Tower of Hanoi', '🗼', 'Move the whole stack of discs to the las
           done = true; const all = hsGet('hanoi.best', {}), isB = !all[n] || moves < all[n];
           if (isB) { all[n] = moves; hsSet('hanoi.best', all); }
           $('#bs', root).textContent = best();
-          const m = $('#msg', root); m.textContent = '🎉 Solved in ' + moves + ' moves' + (moves === L.hanoiMin(n) ? ' (perfect!)' : ''); bump(m);
+          const m = $('#msg', root); m.textContent = '🎉 Solved in ' + moves + ' moves' + (moves === L.hanoiMin(n) ? ' (perfect!)' : ''); bump(m); celebrate(root, T);
         } else $('#msg', root).textContent = '';
       } else { $('#msg', root).textContent = '🚫 A big disc cannot go on a smaller one'; sel = -1; restart(bt, 'shake'); }
       paint();
     };
-    onSeg(root, 'n', v => { n = +v; Store.set('fun.hanoi.n', n); setup(); });
-    $('#new', root).onclick = setup;
+    const askH = () => sure(moves > 0 && !done, 'Start over? Your moves so far will be lost.');
+    onSeg(root, 'n', v => { n = +v; Store.set('fun.hanoi.n', n); setup(); }, askH);
+    $('#new', root).onclick = () => { if (askH()) setup(); };
     setup();
+    return () => T.stop();
   });
 
 /* =====================================================================
@@ -1522,6 +1583,7 @@ reg('hanoi', 'Tower of Hanoi', '🗼', 'Move the whole stack of discs to the las
    ===================================================================== */
 reg('numguess', 'Number Guess', '🔮', 'The phone picks a secret number. Guess it using higher and lower hints in as few tries as you can.',
   ['guess', 'number', 'higher', 'lower', 'secret'], function (el) {
+    const T = tracker();
     let max = Store.get('fun.guess.max', 100), secret, lo, hi, tries, done, hist;
     const root = mount(el, `
       ${seg('mx', [50, 100, 1000].map(x => ['' + x, '1 to ' + x]), '' + max)}
@@ -1551,7 +1613,7 @@ reg('numguess', 'Number Guess', '🔮', 'The phone picks a secret number. Guess 
       tries++; inp.value = '';
       const d = v - secret; hist.unshift({ v, d });
       if (d === 0) {
-        done = true; m.textContent = '🎉 Yes! ' + secret + ' in ' + tries + (tries === 1 ? ' try' : ' tries'); buzz(80);
+        done = true; m.textContent = '🎉 Yes! ' + secret + ' in ' + tries + (tries === 1 ? ' try' : ' tries'); buzz(80); celebrate(root, T);
         const all = hsGet('guess.best', {}); if (!all[max] || tries < all[max]) { all[max] = tries; hsSet('guess.best', all); }
         $('#bs', root).textContent = best();
       } else if (d > 0) { hi = Math.min(hi, v - 1); m.textContent = v + ' is too high ⬇️'; }
@@ -1560,9 +1622,10 @@ reg('numguess', 'Number Guess', '🔮', 'The phone picks a secret number. Guess 
     }
     $('#go', root).onclick = guess;
     $('#in', root).onkeydown = (e) => { if (e.key === 'Enter') guess(); };
-    onSeg(root, 'mx', v => { max = +v; Store.set('fun.guess.max', max); setup(); });
+    onSeg(root, 'mx', v => { max = +v; Store.set('fun.guess.max', max); setup(); }, () => sure(tries > 0 && !done, 'Pick a new number? The current one will be lost.'));
     $('#new', root).onclick = setup;
     setup();
+    return () => T.stop();
   });
 
 /* =====================================================================
@@ -1585,15 +1648,15 @@ reg('mathsprint', 'Math Sprint', '➕', 'Answer as many arithmetic questions as 
     const best = () => hsGet('math.best', {})[lvl] || '–';
     function next() { q = L.mathQ(+lvl); typed = ''; $('#q', root).textContent = q.text + ' = ?'; $('#ans', root).textContent = ''; }
     function end() {
-      run = false; T.stop(); $('#bar', root).style.width = '0%';
+      run = false; T.reset(); $('#bar', root).style.width = '0%';
       const all = hsGet('math.best', {}), isB = score > (all[lvl] || 0);
       if (isB) { all[lvl] = score; hsSet('math.best', all); }
       $('#bs', root).textContent = best(); $('#q', root).textContent = 'Time!';
-      const m = $('#msg', root); m.textContent = '🎉 ' + score + ' correct' + (isB && score ? ' (new best!)' : ''); bump(m); $('#go', root).textContent = 'Play again'; buzz(100);
+      const m = $('#msg', root); m.textContent = '🎉 ' + score + ' correct' + (isB && score ? ' (new best!)' : ''); bump(m); $('#go', root).textContent = 'Play again'; buzz(100); if (isB && score) celebrate(root, T);
     }
     /* Throws the running round away without saving anything (used when the level is switched mid-round). */
     function abort() {
-      run = false; T.stop(); score = 0; wrongN = 0;
+      run = false; T.reset(); score = 0; wrongN = 0;
       $('#bar', root).style.width = '100%'; $('#q', root).textContent = 'Ready?'; $('#ans', root).textContent = ''; $('#msg', root).textContent = '';
       $('#sc', root).textContent = 0; $('#wr', root).textContent = 0; $('#go', root).textContent = 'Start (30 s)';
     }
@@ -1607,7 +1670,7 @@ reg('mathsprint', 'Math Sprint', '➕', 'Answer as many arithmetic questions as 
       }
     }
     function start() {
-      T.stop(); score = 0; wrongN = 0; run = true; t0 = Date.now(); $('#sc', root).textContent = 0; $('#wr', root).textContent = 0; $('#msg', root).textContent = ''; next();
+      T.reset(); score = 0; wrongN = 0; run = true; t0 = Date.now(); $('#sc', root).textContent = 0; $('#wr', root).textContent = 0; $('#msg', root).textContent = ''; next();
       loop = T.iv(() => {
         const left = DUR - (Date.now() - t0); $('#bar', root).style.width = Math.max(0, left / DUR * 100) + '%';
         if (left <= 0) end();
@@ -1615,6 +1678,7 @@ reg('mathsprint', 'Math Sprint', '➕', 'Answer as many arithmetic questions as 
     }
     $('#keys', root).onpointerdown = (e) => { const b = e.target.closest('button'); if (b) { e.preventDefault(); key(b.dataset.k); } };
     T.on(window, 'keydown', (e) => { if (/^[0-9]$/.test(e.key)) key(e.key); else if (e.key === 'Backspace') key('⌫'); });
+    keepTime(T, d => { if (run) t0 += d; });
     onSeg(root, 'lv', v => { if (run) abort(); lvl = v; Store.set('fun.math.lvl', lvl); $('#bs', root).textContent = best(); });
     $('#go', root).onclick = start;
     $('#bs', root).textContent = best();
@@ -1813,7 +1877,7 @@ reg('whackamole', 'Whack-a-Mole', '🔨', 'Tap the moles as they pop up before t
       T.to(spawn, Math.max(380, 850 - score * 10) * (0.7 + Math.random() * 0.6));
     }
     function end() {
-      run = false; T.stop(); holes.forEach((_, i) => hide(i)); active.clear();
+      run = false; T.reset(); holes.forEach((_, i) => hide(i)); active.clear();
       if (score > best) { best = score; hsSet('whack.best', best); $('#bs', root).textContent = best; }
       $('#tm', root).textContent = 0; const m = $('#msg', root); m.textContent = '🎉 Time! You whacked ' + score; bump(m); $('#go', root).textContent = 'Play again'; buzz(100);
     }
@@ -1825,8 +1889,9 @@ reg('whackamole', 'Whack-a-Mole', '🔨', 'Tap the moles as they pop up before t
       score++; $('#sc', root).textContent = score; bump($('#sc', root)); buzz(20);
       const m = $('.mole', b); m.textContent = '💥'; T.to(() => { if (tok[i] === my) hide(i); }, 120);
     };
+    keepTime(T, d => { if (run) t0 += d; });
     $('#go', root).onclick = () => {
-      T.stop(); active.clear(); holes.forEach((_, i) => { tok[i]++; hide(i); }); score = 0; run = true; t0 = Date.now();
+      T.reset(); active.clear(); holes.forEach((_, i) => { tok[i]++; hide(i); }); score = 0; run = true; t0 = Date.now();
       $('#sc', root).textContent = 0; $('#msg', root).textContent = 'Go go go!';
       T.iv(() => { const left = DUR - (Date.now() - t0); $('#tm', root).textContent = Math.max(0, Math.ceil(left / 1000)); if (left <= 0) end(); }, 100);
       T.to(spawn, 400);
@@ -1931,7 +1996,7 @@ reg('slide15', 'Slide Puzzle', '🧱', 'The classic sliding tile puzzle in 3x3 a
       });
     }
     function setup() {
-      T.stop(); t = L.slShuffle(n); moves = 0; secs = 0; t0 = 0; done = false; els = {};
+      T.reset(); t = L.slShuffle(n); moves = 0; secs = 0; t0 = 0; done = false; els = {};
       bd.innerHTML = '';
       t.forEach((v) => {
         if (!v) return;
@@ -1950,13 +2015,15 @@ reg('slide15', 'Slide Puzzle', '🧱', 'The classic sliding tile puzzle in 3x3 a
       if (!t0) { t0 = Date.now(); tick = T.iv(() => { secs = Math.floor((Date.now() - t0) / 1000); $('#tm', root).textContent = fmtT(secs); }, 500); }
       moves++; $('#mv', root).textContent = moves; place(); buzz(8);
       if (L.slSolved(t)) {
-        done = true; T.stop(); const all = hsGet('slide.best', {}), isB = !all[n] || moves < all[n];
+        done = true; T.reset(); const all = hsGet('slide.best', {}), isB = !all[n] || moves < all[n];
         if (isB) { all[n] = moves; hsSet('slide.best', all); }
-        $('#bs', root).textContent = best(); const m = $('#msg', root); m.textContent = '🎉 Solved in ' + moves + ' moves, ' + fmtT(secs) + (isB ? ' (new best!)' : ''); bump(m); buzz(80);
+        $('#bs', root).textContent = best(); const m = $('#msg', root); m.textContent = '🎉 Solved in ' + moves + ' moves, ' + fmtT(secs) + (isB ? ' (new best!)' : ''); bump(m); buzz(80); celebrate(root, T);
       }
     };
-    onSeg(root, 'n', v => { n = +v; Store.set('fun.slide.n', n); setup(); });
-    $('#new', root).onclick = setup;
+    const askSl = () => sure(moves > 0 && !done, 'Shuffle again? Your progress on this puzzle will be lost.');
+    onSeg(root, 'n', v => { n = +v; Store.set('fun.slide.n', n); setup(); }, askSl);
+    $('#new', root).onclick = () => { if (askSl()) setup(); };
+    keepTime(T, d => { if (t0) t0 += d; });
     setup();
     return () => T.stop();
   });
@@ -1966,7 +2033,7 @@ reg('slide15', 'Slide Puzzle', '🧱', 'The classic sliding tile puzzle in 3x3 a
    ===================================================================== */
 reg('lightsout', 'Lights Out', '🕹️', 'Tap a light to toggle it and its neighbours. Switch every light off to win.',
   ['lights', 'out', 'puzzle', 'toggle', 'grid'], function (el) {
-    const N = 5, PRESS = { easy: 3, med: 6, hard: 10 };
+    const T = tracker(), N = 5, PRESS = { easy: 3, med: 6, hard: 10 };
     let lv = Store.get('fun.lights.lv', 'easy'), g, start, moves, done, par;
     const root = mount(el, `
       ${seg('lv', [['easy', 'Easy'], ['med', 'Medium'], ['hard', 'Hard']], lv)}
@@ -1988,13 +2055,15 @@ reg('lightsout', 'Lights Out', '🕹️', 'Tap a light to toggle it and its neig
       L.loPress(g, N, +b.dataset.i); moves++; paint(); buzz(8);
       if (!g.some(Boolean)) {
         done = true; const all = hsGet('lights.best', {}); if (!all[lv] || moves < all[lv]) { all[lv] = moves; hsSet('lights.best', all); }
-        $('#bs', root).textContent = best(); const m = $('#msg', root); m.textContent = '🎉 Lights out in ' + moves + ' moves!'; bump(m); buzz(80);
+        $('#bs', root).textContent = best(); const m = $('#msg', root); m.textContent = '🎉 Lights out in ' + moves + ' moves!'; bump(m); buzz(80); celebrate(root, T);
       }
     };
-    onSeg(root, 'lv', v => { lv = v; Store.set('fun.lights.lv', lv); newLevel(); });
+    const askLo = () => sure(moves > 0 && !done, 'Start a new level? Your moves on this one will be lost.');
+    onSeg(root, 'lv', v => { lv = v; Store.set('fun.lights.lv', lv); newLevel(); }, askLo);
     $('#redo', root).onclick = () => load(start);
-    $('#new', root).onclick = newLevel;
+    $('#new', root).onclick = () => { if (askLo()) newLevel(); };
     newLevel();
+    return () => T.stop();
   });
 
 /* =====================================================================
@@ -2058,6 +2127,7 @@ reg('quiz', 'Trivia Quiz', '❓', 'Ten random general-knowledge questions per ro
       $('#bar', root).style.width = '100%'; $('#opts', root).innerHTML = '';
       $('#q', root).textContent = '🏁 You scored ' + score + ' / ' + ROUND + (score === ROUND ? ' - perfect!' : score >= 7 ? ' - great job!' : ' - keep going!');
       $('#next', root).hidden = false; $('#next', root).textContent = 'Play again';
+      if (score === ROUND) celebrate(root, T);
     }
     $('#next', root).onclick = () => {
       if (finished) { finished = false; start(); return; }
@@ -2207,13 +2277,13 @@ reg('scramble', 'Word Scramble', '🔡', 'Unscramble the jumbled letters by tapp
     function paint() {
       $('#slots', root).innerHTML = word.split('').map((_, i) => {
         const id = ans[i], on = id != null;
-        return '<button data-s="' + i + '" aria-label="Slot ' + (i + 1) + '" style="width:40px;height:50px;border-radius:12px;border:2px ' + (on ? 'solid var(--accent)' : 'dashed var(--line)') + ';background:' + (on ? 'var(--surface)' : 'transparent') + ';font-size:22px;font-weight:800;padding:0;color:var(--text)">' + (on ? letters[id] : '') + '</button>';
+        return '<button data-s="' + i + '" aria-label="Slot ' + (i + 1) + '" style="width:44px;height:50px;border-radius:12px;border:2px ' + (on ? 'solid var(--accent)' : 'dashed var(--line)') + ';background:' + (on ? 'var(--surface)' : 'transparent') + ';font-size:22px;font-weight:800;padding:0;color:var(--text)">' + (on ? letters[id] : '') + '</button>';
       }).join('');
       $('#tiles', root).innerHTML = letters.map((c, i) => '<button data-t="' + i + '" class="btn" style="width:44px;height:52px;padding:0;font-size:22px;' + (ans.includes(i) ? 'opacity:.2;pointer-events:none;' : '') + '">' + c + '</button>').join('');
     }
     function next() {
       cat = pick(Object.keys(WORDS)); word = pick(WORDS[cat]); letters = L.scrambleWord(word).split(''); ans = []; locked = false;
-      $('#cat', root).textContent = '?'; $('#msg', root).textContent = ''; paint();
+      $('#cat', root).textContent = '?'; $('#msg', root).textContent = 'Tap the letters in the right order'; paint();
     }
     function stats() { $('#sc', root).textContent = st.score; $('#sk', root).textContent = st.streak; $('#bs', root).textContent = st.best; Store.set('fun.scramble.st', st); }
     function check() {
