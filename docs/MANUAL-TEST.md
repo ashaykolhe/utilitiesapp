@@ -2274,6 +2274,8 @@ _Free. Needs: storage_
 - [ ] Tap "Skip": a new word shows and the streak resets.
 - [ ] When time is up the final score and best score show. Reload the tool: the best score is kept.
 - [ ] The scramble is never identical to the word.
+- [ ] Tap "Play with others", choose 3 seats (two Human, one Phone), name them and Start: "Next up: <first name>" shows. Tap the start button: "Racing now: <name>" shows with the usual 60 second race. When time is up the score is announced and the next seat is up.
+- [ ] The second human sees the same first scramble as the first human (same word sequence). After the last race the standings show every seat's points and a winner or "It is a tie". "Race again" starts a new match with the same seats; "Change players" opens the setup, which remembers your last choices.
 
 ### Backgammon
 _Free. Needs: storage_
@@ -2386,11 +2388,11 @@ _Free. Needs: storage_
 ### Dice Five
 _Free. Needs: storage_
 
-- [ ] Open the tool (Solo): tap Roll dice; five dice appear. Tap two dice: they get an accent border (held). Roll again: only the unheld dice change; the button shows the rolls left.
-- [ ] After a roll the scorecard shows outlined buttons with the points each open box would give. Tap one: the box fills, the dice reset and the next turn starts. Fill all 13 boxes: "Game over", total and a new best when higher.
-- [ ] Tap Hint after a roll: the dice worth keeping are highlighted. With no rolls left it names a box to try.
-- [ ] Switch to vs Phone: you play a turn, then the phone rolls, holds and scores on its own with short pauses and a message. At the end the winner is shown and the win record (e.g. 1-0) updates.
-- [ ] Edge case: roll a second Dice Five after scoring 50 in the Dice Five box: only the matching upper box (or lower boxes with full values) can be picked and +100 is added.
+- [ ] Open the tool: the setup shows Players 1 to 4 and one human seat. Tap Start game, Roll dice: five dice appear. Tap two dice: they get an accent border (held). Roll again: only the unheld dice change; the button shows the rolls left.
+- [ ] After a roll the scorecard shows outlined buttons with the points each open box would give. Tap one: the box fills and the dice reset. Fill all 13 boxes: Game over, the total and a new best when higher.
+- [ ] Tap New game, choose 2 players, make seat 2 a Human, type the names Ann and Ben and tap Start game: two scorecard columns, an arrow before Ann and the line Turn order: [Ann] → Ben. Ann rolls and fills a box: the message says it is Ben's turn and the dice are blank again. Play to the end: Final standings lists both seats with rank and total, and the winner (or Tie) is announced.
+- [ ] New game, 3 players, seats Human, Human, Phone: after the humans have played, the phone rolls, keeps dice and scores on its own with short pauses and a message naming Phone 1. Leave the tool while the phone is playing and reopen it: nothing keeps running and the setup is remembered.
+- [ ] Edge case: with every seat set to Phone the Start game button is disabled with a message. Roll a second Dice Five after scoring 50 in the Dice Five box: only the matching upper box (or lower boxes with full values) can be picked and +100 is added. Type <b>x</b> as a name: it shows as plain text.
 
 ### Dice Roller
 _Free_
@@ -2418,11 +2420,11 @@ _Free. Needs: motion, storage_
 ### Dots and Boxes
 _Free. Needs: storage_
 
-- [ ] Tap between two dots: a line appears in your colour and the phone replies after a moment.
-- [ ] Complete a box: it fills with your colour and a Y, and you go again. The phone's boxes use its colour and an M.
-- [ ] Finish the board: the message shows who won and the score; a win adds 1 to Games won.
-- [ ] Edge case: tap a line that is already drawn, or tap while the phone is thinking: nothing happens. Press New game while the phone is thinking: the phone's pending move is cancelled.
-- [ ] Change grid size: a new game of that size starts.
+- [ ] Default: two seats, Seat 1 Human and Seat 2 Phone. Tap between two dots: a line appears in your colour and the phone replies after a moment.
+- [ ] Complete a box: it fills with your colour and your symbol, and you go again. The phone's boxes show its own symbol.
+- [ ] Choose 4 players and set every seat to Human: lines and boxes are coloured per seat, the turn passes Player 1 to 4 in order, and the message shows whose turn it is. Close a box: that player goes again.
+- [ ] Mix humans and phones (for example Human, Human, Phone, Phone): the phones move by themselves after the humans. Finish the board: the message names the winner or the tied seats; with exactly one human, winning adds 1 to Games won.
+- [ ] Edge case: tap a line that is already drawn, or tap while a phone seat is thinking: nothing happens. Press New game or change a seat mid-game: it asks first.
 
 ### Farkle
 _Free. Needs: storage_
@@ -2537,11 +2539,11 @@ _Free. Needs: storage_
 ### Liar's Dice
 _Free. Needs: storage_
 
-- [ ] Open the tool, keep 1 opponent, 5 dice and wild ones on, tap Start game. Your five dice are shown, the phone's dice appear as question marks. If the phone opens, its bid shows as "Current bid".
-- [ ] Use the minus and plus buttons and the face dice to build a bid. A bid that is not higher than the current one shows "Bid must be higher" and the Bid button is disabled; a higher bid is accepted and the phone answers after a short pause.
-- [ ] Tap Hint: it shows the percentage chance that the current bid is true and whether to raise or call Liar. Tap Liar!: all dice are revealed, matching dice are highlighted and the message says who loses a die.
-- [ ] Tap Next round: new dice are rolled, the loser starts and dice counts update. Count with wild ones on: a one counts toward every face except a bid on ones.
-- [ ] Play to the end: "You win the game!" or the winner's name is shown with Play again, and the games won record updates. New game returns to the setup (try 3 opponents).
+- [ ] Open the tool: Players 2, seat 1 Human, seat 2 Phone, 5 dice. Tap Start game: your five dice are shown, the phone's dice are question marks. If the phone opens, its bid shows as Current bid. No cover appears with a single human.
+- [ ] Choose 3 players, make seat 2 a Human and type the names Alice and Bob, Start game: a full screen says Pass the phone to Alice. Tap when only you can see the screen, with no dice anywhere. Tap Show my dice, place a bid: the cover now names Bob and Alice's dice are gone; tap Show my dice to see Bob's own dice only.
+- [ ] Use the minus and plus buttons and the face dice to build a bid. A bid that is not higher shows Bid must be higher and is disabled. After Bob bids, the phone answers on its own after a short pause (then a cover for the next human). Tap Hint for the chance that the current bid is true, then Liar!: all dice are revealed with matching dice outlined and the message names who loses a die.
+- [ ] Tap Next round: new dice, the loser starts and the dice counts update; an eliminated seat shows out and is skipped. Count with wild ones on: a one counts toward every face except a bid on ones. Play to the end: the winner's name and Play again appear and the record updates.
+- [ ] Edge case: with every seat set to Phone, Start game is disabled. New game returns to the setup with the saved choices; if all humans are knocked out the phones play on until one seat is left.
 
 ### Lights Out
 _Free_
@@ -2594,6 +2596,7 @@ _Free. Needs: storage_
 ### Math Sprint
 _Free_
 
+- [ ] Tap Play with friends, 3 players (Human, Human, Phone), Start. Player 1 taps Start and answers some questions, then Player 2 starts: the same questions appear in the same order. Minimise the app for 20 seconds mid-sprint: the bar does not lose that time. After the last human the phone seat scores itself and the winner or "Tie between ..." is shown with Play again. Change players asks before leaving a sprint.
 - [ ] Tap Start and answer using the keypad: right answers advance instantly and increase Score.
 - [ ] A wrong answer shakes, counts as a miss and clears your input.
 - [ ] When the bar runs out Time! shows your score; Best updates per level.
@@ -2619,6 +2622,7 @@ _Free. Needs: storage_
 ### Memory Match
 _Free_
 
+- [ ] Tap Play with friends, choose 3 players (seats 1 and 2 Human, seat 3 Phone), name them Ann and Bob, level Hard, Start. Ann flips two different cards: they flip back and the turn passes to Bob; Bob flips a pair: he scores and plays again. The phone plays its own turns after a short pause. At the end the winner (or "Tie between ...") is shown with a Play again button. Setting every seat to Phone and tapping Start shows "Choose at least one Human seat." Leave and reopen the tool: the last set-up is still there. Change players asks before abandoning a game in progress.
 - [ ] Tap two cards: matching ones stay up with a green border, others flip back after ~0.7 s.
 - [ ] Timer starts at the first flip; Moves counts pairs tried.
 - [ ] Clear the board: message shows moves and time and Best updates. Changing size starts a new game.
@@ -2668,10 +2672,11 @@ _Free. Needs: storage_
 ### Pong
 _Free. Needs: storage_
 
-- [ ] Tap Start: after a short pause the ball is served. Drag left and right: your paddle follows.
-- [ ] Miss the ball: the phone scores; let it pass the AI: you score. First to 7 ends the game with a result message.
-- [ ] Choose Hard: the AI paddle is faster and more accurate than on Easy.
-- [ ] Edge case: switch level mid-game: the game stops and the start overlay returns. Win a game: Games won goes up by 1 and is remembered.
+- [ ] vs Phone: tap Start; after a short pause the ball is served. Drag left and right: your paddle follows. First to 7 ends the game with a result message.
+- [ ] Choose Hard: the AI paddle is faster and more accurate than on Easy. Switch level mid-game: the game stops and the start overlay returns. Win a game: Games won goes up by 1 and is remembered.
+- [ ] Choose 2 players: the level choice disappears. Put one finger on the bottom half and another on the top half: each moves only its own paddle, and nothing moves the top paddle on its own. A third finger on an occupied half does nothing. Lift a finger: its paddle stops following.
+- [ ] Play to 7: the message says which player won ("Player 1 wins 7 - 4"); Games won does not change in 2 player mode.
+- [ ] Edge case: switch mode mid-game: it asks before throwing the game away. Hide the app: the game pauses; touching the table resumes it.
 
 ### Reaction Timer
 _Free_
@@ -2683,10 +2688,11 @@ _Free_
 ### Reversi
 _Free. Needs: storage_
 
-- [ ] At the start, four dots show your legal moves. Tap one: your disc is placed, the flipped discs animate, and the phone replies.
+- [ ] vs Phone as black: four dots show your legal moves. Tap one: your disc is placed, the flipped discs animate, and the phone replies.
+- [ ] Choose Play white: the phone (black) moves first, then the dots show white's moves. Win a game: Games won increases and is remembered.
+- [ ] Choose 2 players: the side and level choices disappear. Moves alternate Black, White ("White's turn") with no phone moves; Games won is unchanged.
 - [ ] Edge case: tap a square that is not a dot: the board shakes and "Not a legal move" appears.
-- [ ] When one side has no move, the message says so and the other side plays again. When neither can move the game ends with the final count.
-- [ ] Win a game: Games won increases and is remembered. New game restarts, even during the phone's turn.
+- [ ] When one side has no move, the message says so and the other side plays again. When neither can move the game ends with the winner and the count.
 
 ### Road Hopper
 _Free. Needs: storage_
@@ -2709,6 +2715,7 @@ _Free. Needs: storage_
 ### RPS Showdown
 _Free_
 
+- [ ] Tap Play with friends, 3 players (Human, Human, Phone), series 3 rounds, Start. A cover asks you to pass the phone to Player 1: no hands are visible. Tap the ready button, pick a hand: the screen at once shows the cover for Player 2 and nothing about Player 1's choice. After Player 2 picks, all three hands are revealed with the points of the round (+0 / +1 / +2); totals add up and after round 3 the winner or tie is announced with Play again. Try First to 5 and a game with one Human and two Phones (no cover).
 - [ ] Tap a hand: both fists bounce 3 times, then reveal; the message says who won.
 - [ ] Win twice in a row: Streak shows 2; a loss resets it to 0 while Best streak keeps the record.
 - [ ] Reset stats clears everything.
@@ -2869,10 +2876,14 @@ _Free. Needs: storage_
 - [ ] Tap "Daily Five": five questions; leave and come back the same day: the same five questions show in the same order.
 - [ ] Open another pack (Science): the explanation line shows after answering where one exists.
 - [ ] Leave and reopen: best scores per pack are remembered.
+- [ ] Tap "Play with others": 2 seats (Player 1 Human, Phone 1 Phone) show. Choose 3 seats, make seats 1 and 2 Human, type names (try `<b>X</b>`: it shows as plain text; the field stops at 12 characters), pick a pack, 5 questions and Hard, then Start: "Turn: <name>" and four options show. After a human answers, a "Pass the phone to ..." screen hides the question until that player taps ready.
+- [ ] After the last seat answers: "The correct answer is ..." and a Right/Wrong line per seat (with a tick or cross) show, plus the scoreboard. Finish all questions: final standings show a winner, or "It is a tie" when top scores are equal. Set every seat to Phone: seat 1 is changed back to Human with a message.
+- [ ] Leave and reopen "Play with others": seats, names, level, pack and round length are remembered; solo packs and the Daily Five still work and their best scores are unchanged.
 
 ### Trivia Quiz
 _Free_
 
+- [ ] Tap Play with friends, 3 players (Human, Human, Phone), Start. The header says "Question 1 of 15: <name>, your turn" and passes to the next seat each question; the phone answers by itself after a second and tapping an answer during its turn does nothing. After question 15 the verdict (winner or tie) and a Play again button appear. Choose 6 players: 30 questions.
 - [ ] Tap an answer: right turns green with Correct, wrong turns red and shows the right answer.
 - [ ] Tap Next 10 times: final score. Play again gives a new random round.
 
