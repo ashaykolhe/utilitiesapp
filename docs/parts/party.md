@@ -56,13 +56,16 @@
 - category: fun
 - plan: free
 - needs: storage
-- what: Seven trivia packs in one tool: Flags (flag emoji to country), Capitals, Science, World Geography, General Knowledge, Human Body and Space. Four answer choices, a 10 question round, a Daily Five that is the same all day, streaks, your best score for every pack, and a review of the questions you got wrong with a short explanation where useful.
+- what: Seven trivia packs in one tool: Flags (flag emoji to country), Capitals, Science, World Geography, General Knowledge, Human Body and Space. Four answer choices, a 10 question round, a Daily Five that is the same all day, streaks, your best score for every pack, and a review of the questions you got wrong with a short explanation where useful. "Play with others" sets up 2 to 6 seats, each Human or Phone, with editable names (12 characters at most), a phone level (Easy 45%, Normal 70%, Hard 90% right), the pack and a round of 5, 10, 15 or 20 questions. Everyone gets the same questions in turn (pass the phone between humans); the correct answer and every seat's pick show after all seats have answered, with a running scoreboard and final standings (winner or tie). The last setup is remembered. The Daily Five, streak and best scores stay solo-only.
 - test:
   1. Open Trivia Packs and tap Flags: a flag emoji and four country names show. Tap an answer: right turns green, wrong turns red and the right one is highlighted.
   2. Finish the 10 questions: the score, the best score for the pack and your longest streak show. "Review mistakes" lists each wrong answer with the right one.
   3. Tap "Daily Five": five questions; leave and come back the same day: the same five questions show in the same order.
   4. Open another pack (Science): the explanation line shows after answering where one exists.
   5. Leave and reopen: best scores per pack are remembered.
+  6. Tap "Play with others": 2 seats (Player 1 Human, Phone 1 Phone) show. Choose 3 seats, make seats 1 and 2 Human, type names (try `<b>X</b>`: it shows as plain text; the field stops at 12 characters), pick a pack, 5 questions and Hard, then Start: "Turn: <name>" and four options show. After a human answers, a "Pass the phone to ..." screen hides the question until that player taps ready.
+  7. After the last seat answers: "The correct answer is ..." and a Right/Wrong line per seat (with a tick or cross) show, plus the scoreboard. Finish all questions: final standings show a winner, or "It is a tie" when top scores are equal. Set every seat to Phone: seat 1 is changed back to Human with a message.
+  8. Leave and reopen "Play with others": seats, names, level, pack and round length are remembered; solo packs and the Daily Five still work and their best scores are unchanged.
 
 ## Spelling Bee
 - id: spellingbee
@@ -82,10 +85,12 @@
 - category: fun
 - plan: free
 - needs: storage
-- what: A 60 second race to unscramble words. 400+ words on a difficulty ladder that gets harder as your streak grows. Skip a word, build the answer by tapping letters or typing it, and see your streak and your best score.
+- what: A 60 second race to unscramble words. 400+ words on a difficulty ladder that gets harder as your streak grows. Skip a word, build the answer by tapping letters or typing it, and see your streak and your best score. "Play with others" sets up 2 to 4 seats (Human or Phone, editable names of 12 characters at most, phone level Easy/Normal/Hard). Each seat plays one 60 second race in turn on the same word sequence, so it is fair; phone seats get a score modelled on the level. Per-seat scores and the winner or tie show at the end. The last setup is remembered and the solo best score is not affected.
 - test:
   1. Open Anagram Race and tap "Start": scrambled letters show and the 60 second timer runs.
   2. Tap letters (or type) to build the answer: a correct word scores, the streak grows and a new word appears. A wrong word shakes and keeps the streak.
   3. Tap "Skip": a new word shows and the streak resets.
   4. When time is up the final score and best score show. Reload the tool: the best score is kept.
   5. The scramble is never identical to the word.
+  6. Tap "Play with others", choose 3 seats (two Human, one Phone), name them and Start: "Next up: <first name>" shows. Tap the start button: "Racing now: <name>" shows with the usual 60 second race. When time is up the score is announced and the next seat is up.
+  7. The second human sees the same first scramble as the first human (same word sequence). After the last race the standings show every seat's points and a winner or "It is a tie". "Race again" starts a new match with the same seats; "Change players" opens the setup, which remembers your last choices.

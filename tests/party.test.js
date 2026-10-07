@@ -254,6 +254,120 @@ t('content: no banned word in any party word list', () => {
   for (const text of bag) for (const tok of text.toLowerCase().split(/[^a-z]+/)) assert(!ban.has(tok), 'banned word in content: ' + tok);
 });
 
+/* ---- Multi-seat setup, turn order, scoring, ties and phone models ---- */
+const seq = (vals) => { let i = 0; return (n) => vals[i++ % vals.length] % n; };   // scripted "random" source
+t('multi: setup is normalised (seat counts, human seat, names, level)', () => {
+  const d = P.tqSetup(null); assert.strictEqual(d.n, 2); assert.deepStrictEqual(d.ai.slice(0, 3), [false, true, true]); assert.strictEqual(d.pack, 'general'); assert.strictEqual(d.len, 10); assert.strictEqual(d.level, 'normal');
+  assert.strictEqual(P.tqSetup({ n: 99 }).n, 6); assert.strictEqual(P.tqSetup({ n: 1 }).n, 2); assert.strictEqual(P.tqSetup({ n: 'x' }).n, 2);
+  assert.strictEqual(P.mpSetup({ n: 9 }, 4).n, 4); assert.strictEqual(P.mpSetup({ n: 3 }, 4).ai.length, 4);
+  assert.strictEqual(P.mpSetup({ n: 2, ai: [true, true] }, 4).ai[0], false, 'all-phone setup gets a human seat');
+  assert.strictEqual(P.mpSetup({ n: 3, ai: [true, true, false] }, 4).ai[0], true, 'one human is enough');
+  assert.strictEqual(P.mpSetup({ level: 'insane' }, 4).level, 'normal'); assert.strictEqual(P.mpSetup({ level: 'hard' }, 4).level, 'hard');
+  assert.strictEqual(P.tqSetup({ pack: '__proto__', len: 7 }).pack, 'general'); assert.strictEqual(P.tqSetup({ pack: 'space', len: '15' }).pack, 'space'); assert.strictEqual(P.tqSetup({ len: 7 }).len, 10);
+  assert.doesNotThrow(() => { P.mpSetup('x', 4); P.mpSetup([], 4); P.mpSetup({ ai: 5, names: 'q' }, 4); });
+});
+t('multi: names are plain, at most 12 characters, defaulted and unique', () => {
+  assert.strictEqual(P.mpClean('  Alexandria the Great  '), 'Alexandria t'); assert.strictEqual(P.mpClean(null), ''); assert.strictEqual(P.mpClean('a\nb\tc'), 'a b c');
+  const c = P.mpSetup({ n: 4, ai: [false, true, false, true], names: ['', '', 'Zed', ''] }, 6);
+  assert.deepStrictEqual(P.mpNames(c), ['Player 1', 'Phone 1', 'Zed', 'Phone 2']);
+  const u = P.mpNames(P.mpSetup({ n: 3, ai: [false, false, false], names: ['Sam', 'sam', 'SAM'] }, 6));
+  assert.strictEqual(new Set(u.map(x => x.toLowerCase())).size, 3); assert(u.every(x => x.length <= 12));
+  const long = P.mpNames(P.mpSetup({ n: 2, ai: [false, false], names: ['abcdefghijkl', 'abcdefghijkl'] }, 6)); assert(long[1].length <= 12 && long[1] !== long[0]);
+  assert.deepStrictEqual(P.mpDefaults([false, true, true, false], 4), ['Player 1', 'Phone 1', 'Phone 2', 'Player 2']);
+});
+t('multi: standings, winners and ties', () => {
+  let s = P.mpStandings([3, 7, 5]); assert.deepStrictEqual(s.rows.map(r => r.seat), [1, 2, 0]); assert.deepStrictEqual(s.winners, [1]); assert(!s.tie); assert.deepStrictEqual(s.rows.map(r => r.rank), [1, 2, 3]);
+  s = P.mpStandings([4, 9, 9, 1]); assert.deepStrictEqual(s.winners, [1, 2]); assert(s.tie); assert.deepStrictEqual(s.rows.map(r => r.rank), [1, 1, 3, 4]);
+  s = P.mpStandings([0, 0]); assert(s.tie && s.winners.length === 2);
+  s = P.mpStandings([5]); assert(!s.tie && s.winners[0] === 0);
+});
+t('trivia match: turn order, same questions for every seat, reveal after the last seat', () => {
+  const cfg = P.tqSetup({ n: 3, ai: [false, false, false], pack: 'space', len: 5 }), qs = P.tqRound('space', 5), m = P.tqNew(cfg, qs);
+  const order = [];
+  while (P.tqPhase(m) !== 'done') {
+    if (P.tqPhase(m) === 'reveal') { assert.strictEqual(m.k % 3, 0); P.tqNext(m); continue; }
+    const c = P.tqCur(m); order.push(c.qi + ':' + c.seat); assert.strictEqual(P.tqPlay(m, qs[c.qi].ans).right, true);
+  }
+  assert.deepStrictEqual(order.slice(0, 7), ['0:0', '0:1', '0:2', '1:0', '1:1', '1:2', '2:0']); assert.strictEqual(order.length, 15);
+  assert.deepStrictEqual(m.scores, [5, 5, 5]); assert.strictEqual(P.tqPlay(m, 0), null);
+  assert(m.picks.every(row => row.every(x => x >= 0)));
+});
+t('trivia match: invalid picks are refused, no play during a reveal', () => {
+  const qs = P.tqRound('space', 5), m = P.tqNew(P.tqSetup({ n: 2, ai: [false, false], len: 5 }), qs);
+  assert.strictEqual(P.tqPlay(m, 4), null); assert.strictEqual(P.tqPlay(m, -1), null); assert.strictEqual(P.tqPlay(m, 1.5), null); assert.strictEqual(P.tqPlay(m, 'a'), null); assert.strictEqual(m.k, 0);
+  P.tqPlay(m, 0); P.tqPlay(m, 0); assert.strictEqual(P.tqPhase(m), 'reveal'); assert.strictEqual(P.tqPlay(m, 0), null);
+  P.tqNext(m); assert.strictEqual(P.tqPhase(m), 'turn'); P.tqNext(m); assert.strictEqual(m.shown, 1, 'next outside a reveal does nothing');
+});
+t('trivia match: phone accuracy follows the level and stays in range', () => {
+  const q = { opts: ['a', 'b', 'c', 'd'], ans: 2 };
+  for (const lv of ['easy', 'normal', 'hard']) {
+    let right = 0; const N = 6000;
+    for (let i = 0; i < N; i++) { const p = P.tqPhonePick(q, lv); assert(p >= 0 && p <= 3 && Number.isInteger(p)); if (p === q.ans) right++; }
+    const rate = right / N; assert(Math.abs(rate - P.TQ_ACC[lv]) < 0.04, lv + ' rate ' + rate);
+  }
+  assert(P.TQ_ACC.easy < P.TQ_ACC.normal && P.TQ_ACC.normal < P.TQ_ACC.hard && P.TQ_ACC.hard < 1 && P.TQ_ACC.easy > 0.25);
+  assert.strictEqual(P.tqPhonePick(q, 'hard', () => 0), 2, 'low roll is right'); assert.notStrictEqual(P.tqPhonePick(q, 'hard', seq([999, 0])), 2, 'high roll is wrong');
+  assert.strictEqual(P.tqPhonePick(q, 'bogus', () => 0), 2);
+  for (let i = 0; i < 200; i++) assert.notStrictEqual(P.tqPhonePick(q, 'easy', seq([900, i])), 2);
+});
+t('trivia match: scripted 2 humans + 1 phone game finishes with the right scores', () => {
+  const qs = P.tqRound('science', 5), cfg = P.tqSetup({ n: 3, ai: [false, false, true], level: 'hard', pack: 'science', len: 5 }), m = P.tqNew(cfg, qs);
+  const wrongOf = (q) => (q.ans + 1) % 4;
+  let humanTurns = 0, expect = [0, 0];
+  P.tqAuto(m, () => 0); assert.strictEqual(P.tqCur(m).seat, 0, 'a human is up first');
+  while (P.tqPhase(m) !== 'done') {
+    if (P.tqPhase(m) === 'reveal') { P.tqNext(m); P.tqAuto(m, () => 0); continue; }
+    const c = P.tqCur(m), q = qs[c.qi]; assert(!c.ai); humanTurns++;
+    const good = (c.qi + c.seat) % 2 === 0;   // seat 0 right on even questions, seat 1 right on odd ones
+    if (good) expect[c.seat]++;
+    P.tqPlay(m, good ? q.ans : wrongOf(q)); P.tqAuto(m, () => 0);
+  }
+  assert.strictEqual(humanTurns, 10); assert.deepStrictEqual(m.scores.slice(0, 2), expect); assert.strictEqual(m.scores[2], 5, 'phone with roll 0 is always right');
+  const s = P.mpStandings(m.scores); assert.deepStrictEqual(s.winners, [2]);
+});
+t('trivia match: a phone-first game, ties and every setup size finish', () => {
+  for (let n = 2; n <= 6; n++) for (const first of [false, true]) {
+    const ai = []; for (let i = 0; i < 6; i++) ai.push(i === 0 ? first : i % 2 === 1); if (ai.slice(0, n).every(Boolean)) ai[0] = false;
+    const cfg = P.tqSetup({ n, ai, len: 10, level: ['easy', 'normal', 'hard'][n % 3] }), qs = P.tqRound('flags', 10), m = P.tqNew(cfg, qs); let guard = 0;
+    P.tqAuto(m);
+    while (P.tqPhase(m) !== 'done' && guard++ < 1000) {
+      if (P.tqPhase(m) === 'reveal') { P.tqNext(m); P.tqAuto(m); continue; }
+      const c = P.tqCur(m); assert(!c.ai, 'phones never stall the turn'); P.tqPlay(m, rnd4()); P.tqAuto(m);
+    }
+    assert.strictEqual(P.tqPhase(m), 'done'); assert.strictEqual(m.k, 10 * n); assert(m.scores.every(x => x >= 0 && x <= 10));
+    const st = P.mpStandings(m.scores); assert.strictEqual(st.winners.length >= 1, true); assert.strictEqual(st.tie, st.winners.length > 1);
+  }
+  function rnd4() { return Math.floor(Math.random() * 4); }
+  const m = P.tqNew(P.tqSetup({ n: 2, ai: [false, false], len: 5 }), P.tqRound('space', 5));
+  for (let q = 0; q < 5; q++) { P.tqPlay(m, m.qs[q].ans); P.tqPlay(m, m.qs[q].ans); P.tqNext(m); }
+  assert(P.mpStandings(m.scores).tie, 'equal scores are a tie');
+});
+t('anagram match: shared word sequence is fair, harder by position and unique', () => {
+  const sq = P.arSequence(80); assert.strictEqual(sq.length, 80);
+  const dict = new Set(P.sbWords());
+  for (let j = 0; j < sq.length; j++) { const e = sq[j]; assert.strictEqual(e.lv, P.arLevel(j)); assert(P.arWords(e.lv).includes(e.w)); assert.notStrictEqual(e.s, e.w); assert.strictEqual(e.s.split('').sort().join(''), e.w.split('').sort().join('')); }
+  assert.strictEqual(new Set(sq.map(e => e.w)).size, 80, 'no repeats within 80 words');
+  assert(dict.size > 1000);
+  const m = P.arNew(P.mpSetup({ n: 3, ai: [false, true, false] }, 4)); assert.strictEqual(m.seq.length, 80);
+  const again = P.arSequence(10, () => 0); assert.strictEqual(again.length, 10);
+});
+t('anagram match: phone score model stays in range and rises with level', () => {
+  const mean = (lv) => { let s = 0; for (let i = 0; i < 4000; i++) { const v = P.arPhoneScore(lv); assert(Number.isInteger(v) && v >= 0 && v <= 140, 'score ' + v); s += v; } return s / 4000; };
+  const e = mean('easy'), nrm = mean('normal'), h = mean('hard');
+  assert(e < nrm && nrm < h, e + ' ' + nrm + ' ' + h); assert(Math.abs(nrm - P.AR_MEAN.normal) < 3); assert(Math.abs(h - P.AR_MEAN.hard) < 4);
+  assert(P.arPhoneScore('easy', () => 0) >= 0 && P.arPhoneScore('hard', () => 1000) <= 140); assert.strictEqual(typeof P.arPhoneScore('zzz'), 'number');
+});
+t('anagram match: scripted 2 humans + 1 phone race finishes with winner or tie', () => {
+  const m = P.arNew(P.mpSetup({ n: 3, ai: [false, true, false], level: 'normal' }, 4));
+  assert.strictEqual(P.arPhase(m), 'turn'); P.arAuto(m, () => 0); assert.strictEqual(m.cur, 0, 'human first, phone waits its turn');
+  P.arRecord(m, 40); assert.strictEqual(m.cur, 1); P.arAuto(m, () => 500); assert.strictEqual(m.cur, 2, 'phone raced'); assert(m.scores[1] > 0);
+  P.arRecord(m, m.scores[1]); assert.strictEqual(P.arPhase(m), 'done'); assert.strictEqual(P.arRecord(m, 5), false);
+  const fin = P.mpStandings(m.scores); assert.strictEqual(fin.tie, new Set(m.scores).size < 3 && fin.winners.length > 1); assert(fin.winners.length >= 1);
+  const t2 = P.arNew(P.mpSetup({ n: 2, ai: [false, false] }, 4)); P.arRecord(t2, 25); P.arRecord(t2, 25);
+  const st = P.mpStandings(t2.scores); assert(st.tie && st.winners.length === 2);
+  const t3 = P.arNew(P.mpSetup({ n: 4, ai: [true, false, true, false] }, 4)); P.arAuto(t3); assert.strictEqual(t3.cur, 1); P.arRecord(t3, -5); P.arAuto(t3); P.arRecord(t3, NaN); assert.deepStrictEqual([t3.scores[1], t3.scores[3], P.arPhase(t3)], [0, 0, 'done']); assert(t3.scores[0] !== null && t3.scores[2] !== null);
+});
+
 /*@@TESTS@@*/
 console.log(failed ? failed + ' FAILED' : 'party tests: ' + n + ' passed');
 process.exit(failed ? 1 : 0);

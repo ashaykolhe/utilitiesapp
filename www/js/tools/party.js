@@ -1169,21 +1169,164 @@ Which of these is a rocky planet? | Earth | Jupiter | Saturn | Neptune
 `);
 /* ---- END space ---- */
 
+/* =====================================================================
+   MULTI-PLAYER (Trivia Packs and Anagram Race): seats, names, phone players, standings. Pure logic first, then shared setup UI.
+   ===================================================================== */
+const MP_LEVELS = ['easy', 'normal', 'hard'];
+P.MP_LEVELS = MP_LEVELS;
+P.mpLevel = (v) => (MP_LEVELS.includes(v) ? v : 'normal');
+/* A seat name: plain text, control characters and extra spaces removed, at most 12 characters (escape it when you print it). */
+P.mpClean = (s) => String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 12).trim();
+/* Default names by seat type: Player 1.., Phone 1.. (counted separately). */
+P.mpDefaults = (ai, n) => { let h = 0, p = 0; return ai.slice(0, n).map(a => (a ? 'Phone ' + (++p) : 'Player ' + (++h))); };
+/* Normalise a saved or typed setup: { n, ai[max], names[max], level }. At least one of the seats in play is human. */
+P.mpSetup = function (raw, max) {
+  raw = raw && typeof raw === 'object' ? raw : {};
+  const n = clampInt(raw.n, 2, max, 2), ai = [], names = [];
+  for (let i = 0; i < max; i++) {
+    ai.push(Array.isArray(raw.ai) && raw.ai.length > i ? !!raw.ai[i] : i > 0);
+    names.push(Array.isArray(raw.names) ? P.mpClean(raw.names[i]) : '');
+  }
+  if (ai.slice(0, n).every(Boolean)) ai[0] = false;
+  return { n, ai, names, level: P.mpLevel(raw.level) };
+};
+/* The final names of the seats in play: typed name or default, made unique (a repeat gets " 2", " 3"...), 12 characters at most. */
+P.mpNames = function (cfg) {
+  const def = P.mpDefaults(cfg.ai, cfg.n), seen = new Set(), out = [];
+  for (let i = 0; i < cfg.n; i++) {
+    const base = P.mpClean(cfg.names && cfg.names[i]) || def[i];
+    let nm = base, k = 1;
+    while (seen.has(nm.toLowerCase())) { k++; nm = base.slice(0, 12 - String(k).length - 1).trim() + ' ' + k; }
+    seen.add(nm.toLowerCase()); out.push(nm);
+  }
+  return out;
+};
+/* Standings from the seat scores: rows sorted high to low (equal scores share a rank), the winners and whether it is a tie. */
+P.mpStandings = function (scores) {
+  const rows = scores.map((s, seat) => ({ seat, score: s | 0 })).sort((a, b) => b.score - a.score || a.seat - b.seat);
+  rows.forEach((r, i) => { r.rank = i > 0 && rows[i - 1].score === r.score ? rows[i - 1].rank : i + 1; });
+  const top = rows.length ? rows[0].score : 0, winners = rows.filter(r => r.score === top).map(r => r.seat);
+  return { rows, winners, tie: winners.length > 1 };
+};
+/* ---- Trivia match: same questions for every seat, seats answer in turn; the answer is revealed once everyone has answered ---- */
+P.TQ_ACC = { easy: 0.45, normal: 0.7, hard: 0.9 };
+P.TQ_LENS = [5, 10, 15, 20];
+P.tqSetup = function (raw) {
+  const c = P.mpSetup(raw, 6); raw = raw && typeof raw === 'object' ? raw : {};
+  c.pack = typeof raw.pack === 'string' && Object.prototype.hasOwnProperty.call(TQ_META, raw.pack) ? raw.pack : 'general';
+  c.len = P.TQ_LENS.includes(+raw.len) ? +raw.len : 10;
+  return c;
+};
+/* A phone seat's pick: the right option with the level's probability, otherwise one of the three wrong ones. */
+P.tqPhonePick = function (q, level, rf) {
+  rf = rf || rnd; const acc = P.TQ_ACC[P.mpLevel(level)];
+  if (rf(1000) / 1000 < acc) return q.ans;
+  const wrong = []; for (let i = 0; i < q.opts.length; i++) if (i !== q.ans) wrong.push(i);
+  return wrong[rf(wrong.length)];
+};
+P.tqNew = function (cfg, qs) {
+  const n = cfg.n;
+  return { n, ai: cfg.ai.slice(0, n).map(Boolean), level: P.mpLevel(cfg.level), qs, k: 0, shown: 0, scores: new Array(n).fill(0), picks: qs.map(() => new Array(n).fill(-1)) };
+};
+/* 'turn' = a seat has to answer, 'reveal' = everyone answered the question and the answer is on show, 'done' = all revealed. */
+P.tqPhase = (m) => (m.shown >= m.qs.length ? 'done' : (m.k > 0 && m.k % m.n === 0 && m.shown < m.k / m.n ? 'reveal' : 'turn'));
+P.tqCur = (m) => ({ qi: Math.floor(m.k / m.n), seat: m.k % m.n, ai: !!m.ai[m.k % m.n] });
+P.tqPlay = function (m, choice) {
+  if (P.tqPhase(m) !== 'turn') return null;
+  const c = P.tqCur(m), q = m.qs[c.qi], ch = Number.isInteger(choice) && choice >= 0 && choice < q.opts.length ? choice : -1;
+  if (ch < 0) return null;
+  const right = ch === q.ans; if (right) m.scores[c.seat]++;
+  m.picks[c.qi][c.seat] = ch; m.k++;
+  return { seat: c.seat, qi: c.qi, right };
+};
+/* Phone seats answer until a human is up or the question is complete. */
+P.tqAuto = function (m, rf) {
+  while (P.tqPhase(m) === 'turn') { const c = P.tqCur(m); if (!c.ai) break; P.tqPlay(m, P.tqPhonePick(m.qs[c.qi], m.level, rf)); }
+};
+P.tqNext = function (m) { if (P.tqPhase(m) === 'reveal') m.shown++; };
+/* ---- Anagram match: every seat races the same word sequence for ROUND seconds, one after the other ---- */
+const AR_MAX = 140;
+P.AR_MEAN = { easy: 24, normal: 44, hard: 68 };
+/* A modelled phone race score: a level based average with a bell-shaped spread, whole points, 0 to AR_MAX. */
+P.arPhoneScore = function (level, rf) {
+  rf = rf || rnd; const mean = P.AR_MEAN[P.mpLevel(level)];
+  const u = (rf(1001) + rf(1001) + rf(1001)) / 3000 - 0.5;   // about -0.5..0.5, bell shaped
+  return Math.max(0, Math.min(AR_MAX, Math.round(mean * (1 + u * 0.8))));
+};
+/* The shared word list: word j is of difficulty arLevel(j); no repeats until a level is used up. Each entry has the scramble. */
+P.arSequence = function (count, rf) {
+  rf = rf || rnd; const dict = new Set(P.sbWords()), isW = (x) => dict.has(x), pools = {}, out = [];
+  for (let j = 0; j < count; j++) {
+    const lv = P.arLevel(j);
+    if (!pools[lv] || !pools[lv].length) pools[lv] = shuffle(P.arWords(lv), rf);
+    const w = pools[lv].pop(); out.push({ w, s: P.arScramble(w, rf, isW), lv });
+  }
+  return out;
+};
+P.arNew = function (cfg, rf) {
+  const n = cfg.n;
+  return { n, ai: cfg.ai.slice(0, n).map(Boolean), level: P.mpLevel(cfg.level), seq: P.arSequence(80, rf), scores: new Array(n).fill(null), cur: 0 };
+};
+P.arPhase = (m) => (m.cur >= m.n ? 'done' : 'turn');
+P.arRecord = function (m, score) { if (m.cur >= m.n) return false; m.scores[m.cur] = Math.max(0, Math.min(9999, Math.round(+score) || 0)); m.cur++; return true; };
+P.arAuto = function (m, rf) { while (m.cur < m.n && m.ai[m.cur]) P.arRecord(m, P.arPhoneScore(m.level, rf)); };
+
+/* ---- shared setup screen (seats, names, level) ---- */
+const mpOpts = (list, sel) => list.map(([v, t]) => `<option value="${v}"${String(v) === String(sel) ? ' selected' : ''}>${esc(t)}</option>`).join('');
+function mpSetupHtml(cfg, max, title, intro, extra) {
+  const dn = P.mpDefaults(cfg.ai, max), nums = []; for (let i = 2; i <= max; i++) nums.push([i, i + ' seats']);
+  const rows = []; for (let i = 0; i < max; i++) rows.push(`<div class="row mpSeat" data-seat="${i}" style="align-items:flex-end;margin-top:6px${i >= cfg.n ? ';display:none' : ''}">
+      <label class="f" style="flex:3">Seat ${i + 1} name<input type="text" class="mpName" data-i="${i}" maxlength="12" autocomplete="off" placeholder="${esc(dn[i])}" value="${esc(cfg.names[i])}" style="min-height:44px"></label>
+      <label class="f" style="flex:2">Seat ${i + 1} type<select class="mpType" data-i="${i}" style="min-height:44px">${mpOpts([[0, 'Human'], [1, 'Phone']], cfg.ai[i] ? 1 : 0)}</select></label></div>`);
+  return `<div class="card"><div class="mid center">${esc(title)}</div><p class="muted center" style="margin:4px 0 10px">${esc(intro)}</p>
+    <label class="f">Seats<select id="mpN" style="min-height:44px">${mpOpts(nums, cfg.n)}</select></label>
+    <div id="mpSeats">${rows.join('')}</div>
+    <label class="f" style="margin-top:8px">Phone level<select id="mpLevel" style="min-height:44px">${mpOpts([['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']], cfg.level)}</select></label>
+    ${extra || ''}
+    <div class="muted center" id="mpWarn" role="status" style="min-height:20px;margin-top:6px"></div>
+    <button class="btn" style="width:100%;margin-top:6px;min-height:48px" data-a="mpstart">Start</button>
+    <button class="btn alt" style="width:100%;margin-top:8px;min-height:48px" data-a="menu">Back</button></div>`;
+}
+/* Show only the seats in play, keep the default-name hints right and make sure one seat is Human. */
+function mpSync(el) {
+  const sel = $('#mpN', el); if (!sel) return;
+  const n = +sel.value, types = $$('.mpType', el), ai = types.map(s => s.value === '1');
+  const msg = $('#mpWarn', el);
+  if (ai.slice(0, n).every(Boolean)) { types[0].value = '0'; ai[0] = false; if (msg) msg.textContent = 'At least one seat must be Human, so seat 1 was changed to Human.'; } else if (msg) msg.textContent = '';
+  const dn = P.mpDefaults(ai, ai.length);
+  $$('.mpSeat', el).forEach((r, i) => { r.style.display = i < n ? '' : 'none'; });
+  $$('.mpName', el).forEach((inp, i) => { inp.placeholder = dn[i]; });
+}
+function mpRead(el, max) {
+  return P.mpSetup({ n: +$('#mpN', el).value, ai: $$('.mpType', el).map(s => s.value === '1'), names: $$('.mpName', el).map(i => i.value), level: $('#mpLevel', el).value }, max);
+}
+function mpBoard(names, ai, scores, unit, active) {
+  return `<div class="list" aria-label="Scoreboard" style="margin-top:8px">${names.map((nm, i) => `<div class="item" style="min-height:44px"><span class="grow"><b>${esc(nm)}</b> <span class="muted">(${ai[i] ? 'phone' : 'human'})</span></span><span>${scores[i] == null ? 'waiting' : scores[i] + unit}${active === i ? ' (playing now)' : ''}</span></div>`).join('')}</div>`;
+}
+/* Standing lines and the verdict text */
+function mpResult(names, ai, scores, unit) {
+  const st = P.mpStandings(scores), nm = (s) => esc(names[s]);
+  const verdict = st.tie ? 'It is a tie between ' + st.winners.map(nm).join(' and ') + ' with ' + scores[st.winners[0]] + unit + ' each.' : 'Winner: ' + nm(st.winners[0]) + ' with ' + scores[st.winners[0]] + unit + '.';
+  const rows = `<div class="list" aria-label="Final standings" style="margin-top:8px">${st.rows.map(r => `<div class="item" style="min-height:44px"><span class="grow">${r.rank}. <b>${nm(r.seat)}</b> <span class="muted">(${ai[r.seat] ? 'phone' : 'human'})</span>${st.winners.includes(r.seat) ? ' (' + (st.tie ? 'tied for first' : 'winner') + ')' : ''}</span><span>${r.score}${unit}</span></div>`).join('')}</div>`;
+  return { verdict, rows, st };
+}
+
 reg({
   id: 'triviapacks', name: 'Trivia Packs', icon: '🥇', cat: 'fun',
-  desc: 'Seven trivia packs (flags, capitals, science, geography, general, body, space) with a daily five, streaks and best scores.',
+  desc: 'Seven trivia packs (flags, capitals, science, geography, general, body, space) with a daily five, streaks and best scores. Play solo, or take turns with friends and phone players.',
   keys: ['quiz', 'flags', 'capitals', 'science', 'space', 'geography', 'questions', 'daily'], needs: ['storage'], pro: false,
   render(el) {
     const B = bag();
-    let S = null;
+    let S = null, M = null, MC = null, passTo = false;
     const bests = () => sget('triviapacks.best', {});
 
     function menu() {
-      S = null;
+      S = null; M = null;
       const b = bests(), d = sget('triviapacks.daily', {}), today = todayKey();
       const doneToday = d && d.date === today;
       el.innerHTML = `<div class="card"><div class="mid">Trivia Packs</div><p class="muted center" style="margin:4px 0 10px">Pick a pack for a 10 question round.</p>
         <button class="item" data-a="daily" style="text-align:left;width:100%;outline:2px solid var(--accent)"><span style="font-size:26px">📅</span><span class="grow"><b>Daily five</b><br><span class="muted">Same five questions all day${doneToday ? ' (today: ' + (d.score | 0) + '/5)' : ''}</span></span></button>
+        <button class="item" data-a="mpsetup" style="text-align:left;width:100%;margin-top:8px;min-height:56px"><span style="font-size:26px">👥</span><span class="grow"><b>Play with others</b><br><span class="muted">2 to 6 seats: friends take turns, phone players fill in</span></span></button>
         <div class="list" style="margin-top:8px">${P.tqPackIds().map(k => `<button class="item" data-a="pack" data-p="${k}" style="text-align:left"><span style="font-size:26px">${TQ_META[k].icon}</span><span class="grow"><b>${esc(TQ_META[k].label)}</b><br><span class="muted">${esc(TQ_META[k].desc)}</span></span><span class="muted">${b[k] !== undefined ? 'best ' + (b[k] | 0) + '/10' : ''}</span></button>`).join('')}</div>
         <p class="muted center" style="margin-top:10px">Longest streak: <b>${(sget('triviapacks.streak', 0) | 0)}</b></p></div>`;
     }
@@ -1236,6 +1379,74 @@ reg({
           <div style="color:var(--danger)">You said: ${esc(w.picked)}</div><div style="color:var(--ok)">Answer: ${esc(w.q.opts[w.q.ans])}</div>${w.q.ex ? `<div class="muted">${esc(w.q.ex)}</div>` : ''}</div>`).join('')}</div>
         <button class="btn" style="width:100%;margin-top:12px" data-a="again">Play again</button><button class="btn alt" style="width:100%;margin-top:8px" data-a="menu">All packs</button></div>`;
     }
+    /* ---- several players: seats take turns on the same questions ---- */
+    function mpSetupScreen() {
+      S = null; M = null;
+      MC = P.tqSetup(sget('triviapacks.setup', null));
+      const extra = `<label class="f" style="margin-top:8px">Pack<select id="mpPack" style="min-height:44px">${mpOpts(P.tqPackIds().map(k => [k, TQ_META[k].label]), MC.pack)}</select></label>
+        <label class="f" style="margin-top:8px">Questions in the round<select id="mpLen" style="min-height:44px">${mpOpts(P.TQ_LENS.map(v => [v, v + ' questions']), MC.len)}</select></label>`;
+      el.innerHTML = mpSetupHtml(MC, 6, 'Trivia Packs: play with others', 'Pass the phone between humans; phone players answer by themselves. Everyone gets the same questions.', extra);
+      mpSync(el);
+    }
+    function mpStart() {
+      MC = Object.assign(mpRead(el, 6), { pack: $('#mpPack', el).value, len: +$('#mpLen', el).value });
+      MC = P.tqSetup(MC); sset('triviapacks.setup', MC);
+      MC.names = P.mpNames(MC);
+      M = P.tqNew(MC, P.tqRound(MC.pack, MC.len)); passTo = false;
+      P.tqAuto(M); mpShow();
+    }
+    function mpHead(qi) {
+      const total = M.qs.length;
+      return `<div class="row muted" style="font-size:13px"><span>${esc(TQ_META[MC.pack].label)}: question ${Math.min(qi + 1, total)} of ${total}</span><span style="text-align:right">${M.n} seats</span></div>
+        <div class="progress" style="margin:6px 0 10px"><i style="width:${(Math.min(M.shown, total) / total) * 100}%"></i></div>`;
+    }
+    function mpShow() {
+      const ph = P.tqPhase(M), quit = '<button class="btn alt" style="width:100%;margin-top:12px;min-height:48px" data-a="mpquit">Quit game</button>';
+      if (ph === 'done') return mpFinal();
+      if (ph === 'reveal') return mpReveal(quit);
+      const c = P.tqCur(M), q = M.qs[c.qi], who = esc(MC.names[c.seat]);
+      if (passTo) {
+        el.innerHTML = `<div class="card center">${mpHead(c.qi)}<div class="muted" role="status" aria-live="polite">Answer locked in.</div><div class="mid" style="margin:10px 0">Pass the phone to ${who}</div>
+          <button class="btn" style="width:100%;min-height:48px" data-a="mpgo">${who} is ready: show the question</button>${mpBoard(MC.names, M.ai, M.scores, '', -1)}${quit}</div>`;
+        return;
+      }
+      el.innerHTML = `<div class="card">${mpHead(c.qi)}<div class="center" role="status" aria-live="polite" style="margin-bottom:6px"><b>Turn: ${who}</b> <span class="muted">(human)</span></div>
+        ${q.big ? `<div class="center" style="font-size:84px;line-height:1.1;margin:6px 0">${q.big}</div>` : ''}
+        <div class="mid" style="font-size:20px;margin:6px 0 14px">${esc(q.q)}</div>
+        <div class="list" id="tqOpts">${q.opts.map((o, i) => `<button class="item" data-a="mpans" data-i="${i}" style="text-align:left;min-height:48px"><span class="grow">${esc(o)}</span></button>`).join('')}</div>
+        ${mpBoard(MC.names, M.ai, M.scores, '', c.seat)}${quit}</div>`;
+    }
+    function mpAnswer(i) {
+      if (!M || P.tqPhase(M) !== 'turn' || P.tqCur(M).ai) return;
+      const r = P.tqPlay(M, i); if (!r) return;
+      P.tqAuto(M);
+      passTo = P.tqPhase(M) === 'turn';   // another human is up on this same question
+      mpShow();
+    }
+    function mpReveal(quit) {
+      const qi = Math.floor(M.k / M.n) - 1, q = M.qs[qi], last = M.shown + 1 >= M.qs.length;
+      const lines = MC.names.map((nm, s) => { const pk = M.picks[qi][s], ok = pk === q.ans; return `<div class="item" style="display:block;min-height:44px"><b>${esc(nm)}</b> <span class="muted">(${M.ai[s] ? 'phone' : 'human'})</span>: ${ok ? '✓ Right' : '✗ Wrong'}, picked ${esc(q.opts[pk])}</div>`; }).join('');
+      el.innerHTML = `<div class="card">${mpHead(qi)}${q.big ? `<div class="center" style="font-size:60px;line-height:1.1">${q.big}</div>` : ''}<div class="mid" style="font-size:18px;margin:6px 0">${esc(q.q)}</div>
+        <div class="center" role="status" aria-live="polite" style="margin:8px 0"><b>The correct answer is ${esc(q.opts[q.ans])}.</b>${q.ex ? `<div class="muted" style="margin-top:4px">${esc(q.ex)}</div>` : ''}</div>
+        <div class="list">${lines}</div><div class="mid" style="font-size:16px;margin:10px 0 0">Scoreboard</div>${mpBoard(MC.names, M.ai, M.scores, '', -1)}
+        <button class="btn" style="width:100%;margin-top:10px;min-height:48px" data-a="mpnext">${last ? 'See final standings' : 'Next question'}</button>${quit}</div>`;
+    }
+    function mpNext() {
+      if (!M) return; P.tqNext(M); passTo = false;
+      if (P.tqPhase(M) !== 'done') P.tqAuto(M);
+      mpShow();
+    }
+    function mpFinal() {
+      const r = mpResult(MC.names, M.ai, M.scores, ' correct');
+      try { if (typeof beep === 'function') beep(); } catch (e) { /* ignore */ }
+      el.innerHTML = `<div class="card center"><div class="muted">${esc(TQ_META[MC.pack].label)} · ${M.qs.length} questions · ${M.n} seats</div><div class="mid" role="status" aria-live="polite" style="margin:8px 0">${r.verdict}</div>${r.rows}
+        <button class="btn" style="width:100%;margin-top:12px;min-height:48px" data-a="mpagain">Play again</button><button class="btn alt" style="width:100%;margin-top:8px;min-height:48px" data-a="mpsetup">Change players</button><button class="btn alt" style="width:100%;margin-top:8px;min-height:48px" data-a="menu">All packs</button></div>`;
+    }
+    function mpAgain() {
+      if (!MC) return mpSetupScreen();
+      M = P.tqNew(MC, P.tqRound(MC.pack, MC.len)); passTo = false; P.tqAuto(M); mpShow();
+    }
+    const mpAct = { mpsetup: mpSetupScreen, mpstart: mpStart, mpans(b) { mpAnswer(+b.dataset.i); }, mpgo() { passTo = false; mpShow(); }, mpnext: mpNext, mpagain: mpAgain, mpquit: menu };
     const act = {
       menu, daily() { begin('daily', true); },
       pack(b) { if (TQ_META[b.dataset.p]) begin(b.dataset.p, false); },
@@ -1243,9 +1454,15 @@ reg({
       next() { if (S.i + 1 >= S.qs.length) finish(); else { S.i++; ask(); } },
       review, again() { begin(S.pack, S.daily); }
     };
-    B.on(el, 'click', e => { const b = e.target.closest('[data-a]'); if (b && act[b.dataset.a]) { if (!S && !['pack', 'daily', 'menu'].includes(b.dataset.a)) return; act[b.dataset.a](b); } });
+    B.on(el, 'click', e => {
+      const b = e.target.closest('[data-a]'); if (!b) return;
+      const a = b.dataset.a;
+      if (Object.prototype.hasOwnProperty.call(mpAct, a)) { if (a !== 'mpsetup' && a !== 'mpstart' && !M && !MC) return; mpAct[a](b); return; }
+      if (Object.prototype.hasOwnProperty.call(act, a)) { if (!S && !['pack', 'daily', 'menu'].includes(a)) return; act[a](b); }
+    });
+    B.on(el, 'change', e => { const t = e.target; if (t && (t.id === 'mpN' || (t.classList && t.classList.contains('mpType')))) mpSync(el); });
     menu();
-    return () => { B.clear(); S = null; };
+    return () => { B.clear(); S = null; M = null; };
   }
 });
 
@@ -1453,17 +1670,22 @@ reg({
   render(el) {
     const B = bag();
     const ROUND = 60;
-    let G = null, tid = null;
+    let G = null, tid = null, M = null, MC = null;
     const best = () => sget('anagramrace.best', 0) | 0;
         let dictSet = null;
     const inDict = (w) => { if (!dictSet) dictSet = new Set(P.sbWords()); return dictSet.has(w); };
 
     function menu() {
-      B.stop(tid); G = null;
+      B.stop(tid); G = null; M = null;
       el.innerHTML = `<div class="card center"><div class="mid">Anagram Race</div><p class="muted">Unscramble as many words as you can in ${ROUND} seconds. Words get harder as you go. Skipping resets your streak; a streak gives bonus points.</p>
-        <p class="muted">Best score: <b>${best()}</b></p><button class="btn" style="width:100%" data-a="start">Start</button></div>`;
+        <p class="muted">Best score: <b>${best()}</b></p><button class="btn" style="width:100%" data-a="start">Start</button>
+        <button class="btn alt" style="width:100%;margin-top:8px;min-height:48px" data-a="mpsetup">👥 Play with others (2 to 4 seats)</button></div>`;
     }
     function next() {
+      if (G.mp) {   // same word sequence for every seat, harder by position
+        const e = G.seq[G.idx % G.seq.length]; G.idx++;
+        G.word = e.w; G.lv = e.lv; G.scr = e.s; paintWord(); return;
+      }
       const lv = P.arLevel(G.solved), list = P.arWords(lv);
       let w, tries = 0;
       do { w = list[rnd(list.length)]; tries++; } while (G.used.has(w) && tries < 30);
@@ -1476,9 +1698,9 @@ reg({
       $('#arLevel', el).textContent = AR[G.lv].name;
       const i = $('#arIn', el); i.value = ''; i.maxLength = G.word.length; i.focus();
     }
-    function start() {
-      G = { t0: Date.now(), solved: 0, streak: 0, bestStreak: 0, score: 0, used: new Set(), missed: [], over: false };
-      el.innerHTML = `<div class="card center"><div class="row muted" style="font-size:14px"><span>Score <b id="arScore">0</b></span><span>🔥 <b id="arStreak">0</b></span><span>Time <b id="arTime">${ROUND}</b></span></div>
+    function start(mp) {
+      G = { t0: Date.now(), solved: 0, streak: 0, bestStreak: 0, score: 0, used: new Set(), missed: [], over: false, mp: mp === true, seq: mp === true ? M.seq : null, idx: 0 };
+      el.innerHTML = `<div class="card center">${G.mp ? `<div class="muted" role="status" aria-live="polite" style="margin-bottom:6px"><b>Racing now: ${esc(MC.names[M.cur])}</b></div>` : ''}<div class="row muted" style="font-size:14px"><span>Score <b id="arScore">0</b></span><span>🔥 <b id="arStreak">0</b></span><span>Time <b id="arTime">${ROUND}</b></span></div>
         <div class="progress" style="margin:6px 0"><i id="arBar" style="width:100%"></i></div><div class="muted" id="arLevel" style="margin:8px 0 4px"></div>
         <div id="arLetters" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:6px 0"></div>
         <label class="f" style="text-align:left">Your answer<input type="text" id="arIn" maxlength="15" autocomplete="off" autocapitalize="none" spellcheck="false" style="text-transform:uppercase;text-align:center;font-size:22px;letter-spacing:2px"></label>
@@ -1508,6 +1730,7 @@ reg({
     function over() {
       B.stop(tid); G.over = true;
       try { if (typeof beep === 'function') beep(); } catch (e) { /* ignore */ }
+      if (G.mp) return mpRaceOver();
       const prev = best(), isBest = G.score > prev; if (isBest) sset('anagramrace.best', G.score);
       const g = G;
       el.innerHTML = `<div class="card center"><div class="muted">Time is up!</div><div class="big">${g.score}</div><div class="muted">points · ${g.solved} word${g.solved === 1 ? '' : 's'} · best streak ${g.bestStreak}</div>
@@ -1515,19 +1738,55 @@ reg({
         ${g.missed.length ? `<h3 style="margin:10px 0 4px">Skipped words</h3><div>${g.missed.map(w => `<span class="chip" style="min-height:30px;display:inline-flex;align-items:center;margin:2px">${esc(w)}</span>`).join('')}</div>` : ''}
         <button class="btn" style="width:100%;margin-top:12px" data-a="start">Race again</button></div>`;
     }
+    /* ---- several players: one 60 second race each, on the same words ---- */
+    function mpSetupScreen() {
+      B.stop(tid); G = null; M = null;
+      MC = P.mpSetup(sget('anagramrace.setup', null), 4);
+      el.innerHTML = mpSetupHtml(MC, 4, 'Anagram Race: play with others', 'Each seat races ' + ROUND + ' seconds in turn on the same words; the highest score wins. Phone seats get a score based on the level.', '');
+      mpSync(el);
+    }
+    function mpStart() {
+      MC = P.mpSetup(mpRead(el, 4), 4); sset('anagramrace.setup', MC);
+      MC.names = P.mpNames(MC);
+      M = P.arNew(MC); P.arAuto(M); mpShow('');
+    }
+    function mpShow(note) {
+      B.stop(tid); G = null;
+      if (P.arPhase(M) === 'done') return mpFinal();
+      const who = esc(MC.names[M.cur]);
+      el.innerHTML = `<div class="card center"><div class="muted" role="status" aria-live="polite">${note || ''}</div><div class="mid" style="margin:8px 0">Next up: ${who}</div>
+        <p class="muted">Race ${M.cur + 1} of ${M.n}. Everyone unscrambles the same words. ${ROUND} seconds starts when you tap Start.</p>${mpBoard(MC.names, M.ai, M.scores, ' points', M.cur)}
+        <button class="btn" style="width:100%;margin-top:10px;min-height:48px" data-a="mpgo">${who}: start the race</button>
+        <button class="btn alt" style="width:100%;margin-top:8px;min-height:48px" data-a="menu">Quit game</button></div>`;
+    }
+    function mpRaceOver() {
+      const seat = M.cur, sc = G.score, solved = G.solved;
+      P.arRecord(M, sc); P.arAuto(M);
+      mpShow('Time is up! ' + esc(MC.names[seat]) + ' scored ' + sc + ' point' + (sc === 1 ? '' : 's') + ' (' + solved + ' word' + (solved === 1 ? '' : 's') + ').');
+    }
+    function mpFinal() {
+      const r = mpResult(MC.names, M.ai, M.scores, ' points');
+      el.innerHTML = `<div class="card center"><div class="muted">Anagram Race · ${M.n} seats</div><div class="mid" role="status" aria-live="polite" style="margin:8px 0">${r.verdict}</div>${r.rows}
+        <button class="btn" style="width:100%;margin-top:12px;min-height:48px" data-a="mpagain">Race again</button><button class="btn alt" style="width:100%;margin-top:8px;min-height:48px" data-a="mpsetup">Change players</button><button class="btn alt" style="width:100%;margin-top:8px;min-height:48px" data-a="menu">Solo menu</button></div>`;
+    }
+    function mpAgain() { if (!MC) return mpSetupScreen(); M = P.arNew(MC); P.arAuto(M); mpShow(''); }
     const act = {
-      start,
+      start() { start(false); },
+      menu,
+      mpsetup: mpSetupScreen, mpstart: mpStart, mpagain: mpAgain,
+      mpgo() { if (M && P.arPhase(M) === 'turn') start(true); },
       tile(b) { if (!G || G.over) return; const i = $('#arIn', el); if (i && i.value.length < G.word.length) { i.value += b.dataset.l; if (i.value.length === G.word.length) submit(); } },
       clear() { const i = $('#arIn', el); if (i) { i.value = ''; i.focus(); } },
       reshuffle() { if (G && !G.over) { G.scr = P.arScramble(G.word, undefined, inDict); paintWord(); } },
       skip() { if (!G || G.over) return; G.missed.push(G.word); G.streak = 0; $('#arStreak', el).textContent = 0; say('Skipped: it was ' + G.word, false); next(); },
       enter: submit
     };
-    B.on(el, 'click', e => { const b = e.target.closest('[data-a]'); if (b && act[b.dataset.a]) act[b.dataset.a](b); });
+    B.on(el, 'click', e => { const b = e.target.closest('[data-a]'); if (b && Object.prototype.hasOwnProperty.call(act, b.dataset.a)) act[b.dataset.a](b); });
+    B.on(el, 'change', e => { const t = e.target; if (t && (t.id === 'mpN' || (t.classList && t.classList.contains('mpType')))) mpSync(el); });
     B.on(el, 'keydown', e => { if (e.key === 'Enter' && e.target && e.target.id === 'arIn') { e.preventDefault(); submit(); } });
     B.on(el, 'input', e => { const t = e.target; if (t && t.id === 'arIn') { t.value = t.value.replace(/[^a-zA-Z]/g, ''); if (G && !G.over && t.value.length === G.word.length) submit(); } });
     menu();
-    return () => { B.clear(); G = null; };
+    return () => { B.clear(); G = null; M = null; };
   }
 });
 
