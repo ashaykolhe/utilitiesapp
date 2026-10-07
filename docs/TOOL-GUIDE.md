@@ -100,3 +100,13 @@ so dark and light themes both work. For one-off layout use inline `style=""` ins
 * Every tool id, name and emoji must be unique across ALL files in www/js/tools/. Before choosing, grep the other files for your candidate icons and ids (`grep -h "icon:" www/js/tools/*.js`). Names should be 16 characters or fewer.
 * Checkboxes/radios and small buttons must still have a hit area of at least 44px (wrap in a label with padding). Every input needs a visible label or aria-label. Use theme variables only, so light and dark both stay readable.
 * Escape user text in innerHTML with esc().
+
+## Helpers added later (use them instead of writing your own)
+
+* `Valid.num(value)` (decimal comma ok), `Valid.clamp(v, min, max, fallback)`: see www/js/validate.js. Every field also needs HTML limits (min, max, step, maxlength) and a label; `node tests/validation-audit.js` must stay at 0.
+* `copyToClipboard(text)` (async, true/false, has a fallback), `shareText(title, text)`, `saveTextFile(name, text, mime)`, `shareImageBlob(name, blob, title)`, `toCSV(rows)`: in www/js/core.js.
+* `Hist.add(toolId, label, value)` to put a settled calculator result in the tool's history (clock button in the header). Never per keystroke.
+* `Sens` (www/js/tools/sensorbox.js) for hardware sensors; native plugins are reached as `Capacitor.Plugins.<Name>` (never `Capacitor.registerPlugin`).
+* Pro: set `pro: true, proKey: '...'` on the tool, then list the tool id in scripts/set-pro-tools.js (it also updates the docs).
+* Games: put big boards on a canvas or CSS grid that fits a 360 px phone; stop timers, animation frames and listeners in the cleanup; store high scores with Store under 'fun3.<id>'; no real-money or casino mechanics (Google Play restricts simulated gambling).
+* Every tool needs: a section in your docs/parts/<file>.md; unique id, name (16 characters or fewer) and emoji across ALL tool files (run `npm test`: it lists clashes); pure logic tested in Node (put the test in tests/ as tests/<name>.test.js and make it runnable with node, no network); `npm test`, `node tests/fuzz.js <ids>` and `node tests/validation-audit.js` all clean.

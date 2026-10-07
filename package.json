@@ -17,7 +17,8 @@
     "test:coupons": "node tests/coupon-flow.js",
     "audit:inputs": "node tests/validation-audit.js",
     "test:drive": "node tests/drive-flow.js",
-    "test:quotes": "node tests/quotes-real.test.js && node tests/quotes-goofy.test.js"
+    "test:quotes": "node tests/quotes-real.test.js && node tests/quotes-goofy.test.js",
+    "test:functional": "node tests/run-functional.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
