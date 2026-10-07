@@ -3,7 +3,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: Translates text to Morse code and Morse back to text (letters, digits and common punctuation). The Morse can be played as beeps and phone vibration at a speed of 5 to 30 words per minute.
+- what: Translates text to Morse code and Morse back to text (letters, digits and common punctuation). The Morse can be played as beeps and phone vibration at a speed of 5 to 30 words per minute. The speed you pick is remembered.
 - test:
   1. Choose "Text to Morse", type `SOS`. Output is `... --- ...`.
   2. Type `Hello World`. Output is `.... . .-.. .-.. --- / .-- --- .-. .-.. -..` (words separated by `/`).
@@ -16,7 +16,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: Makes QR codes from text, web links, Wi-Fi details, phone numbers, email and SMS templates, plus Code 128 and EAN-13 barcodes drawn on a canvas. The picture can be saved as a PNG or shared.
+- what: Makes QR codes from text, web links, Wi-Fi details, phone numbers, email and SMS templates, plus Code 128 and EAN-13 barcodes drawn on a canvas. The picture can be saved as a PNG or shared. Wi-Fi security is chosen from plain names (WPA / WPA2 / WPA3, WEP, None); Save PNG and Share go through the system share sheet.
 - test:
   1. Type: Text, enter `hello`. A QR code appears. Scan it with another phone: it reads `hello`.
   2. Type: Wi-Fi, enter a network name and password, security WPA. Scan with a phone camera: it offers to join that network. A name containing `;` or `:` still works.
@@ -29,7 +29,7 @@
 - category: text
 - plan: free with limit: 10 notes (unlimited with Pro)
 - needs: storage
-- what: Quick notes with a title and body. Search, pin notes to the top, copy or delete. Everything is saved on the device as you type. All notes can be exported as one Markdown file, or a single note on its own.
+- what: Quick notes with a title and body. Search, pin notes to the top, copy or delete. Everything is saved on the device as you type. All notes can be exported as one Markdown file, or a single note on its own. Each note in the list shows the date it was last edited.
 - test:
   1. Tap New, type a title and body, tap Done. The note appears in the list. Close and reopen the app: it is still there.
   2. Create a second note and pin it, then pin the first: pinned notes (with 📌) sort above others; newest edited first within each group.
@@ -56,7 +56,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: Live counts of words, characters, characters without spaces, sentences, lines and paragraphs, plus one-tap UPPER, lower, Title and Sentence case, reverse, space clean-up, dedupe lines, sort lines and remove blank lines, with Undo and Copy.
+- what: Live counts of words, characters, characters without spaces, sentences, lines and paragraphs, plus one-tap UPPER, lower, Title and Sentence case, reverse, space clean-up, dedupe lines, sort lines and remove blank lines, with Undo and Copy. Lower-casing turns the Turkish dotted capital I into a plain i, and Title / Sentence case turn the German sharp s into "Ss" at the start of a word.
 - test:
   1. Type `Hello big world. How are you?` The counts show 6 words, 2 sentences, 1 line.
   2. Tap UPPER, then lower, then Title Case: the text changes each time. Tap Undo three times to return to the original.
@@ -147,7 +147,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: Generates placeholder text as paragraphs, sentences or words (1 to 100), optionally starting with the classic "Lorem ipsum dolor sit amet".
+- what: Generates placeholder text as paragraphs, sentences or words (1 to 100), optionally starting with the classic "Lorem ipsum dolor sit amet". The count and the "classic start" box regenerate the text straight away.
 - test:
   1. Choose Paragraphs, 3, tap Generate: three paragraphs separated by blank lines, starting with "Lorem ipsum dolor sit amet".
   2. Untick the classic start and Generate: starts differently.
@@ -172,7 +172,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: A keyboard of emoji and special characters (arrows, maths, currency, Greek, punctuation, shapes, box drawing, super and subscripts) with search. Tap characters to build text and copy it.
+- what: A keyboard of emoji and special characters (arrows, maths, currency, Greek, punctuation, shapes, box drawing, super and subscripts) with search. Tap characters to build text and copy it. Search also knows common names such as euro, rupee, heart, arrow, degree and copyright.
 - test:
   1. Open the tool: Smileys shown. Tap three emoji: they appear in the text box at the top.
   2. Choose Currency from the group list: euro, pound, rupee and other symbols appear.
@@ -208,7 +208,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: Tests regular expressions against sample text with highlighted matches, match positions and capture groups, and does find and replace with $1 style groups.
+- what: Tests regular expressions against sample text with highlighted matches, match positions and capture groups, and does find and replace with $1 style groups. A short flags legend is shown under the replace field; without the g flag only the first match is replaced.
 - test:
   1. Pattern `(\d+)-(\w)` flags `g`, text `a 12-x b 7-y`: 2 matches highlighted; list shows group 1 and 2 values.
   2. Replace with `$2$1`: result `a x12 b y7`.
@@ -221,7 +221,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: Converts text into URL slug, camelCase, PascalCase, snake_case, kebab-case, CONSTANT_CASE or dot.case, line by line. Accents are removed for slugs.
+- what: Converts text into URL slug, camelCase, PascalCase, snake_case, kebab-case, CONSTANT_CASE or dot.case, line by line. Accents are removed for slugs. Turkish dotted I and German sharp s are handled (istanbul, Ssa).
 - test:
   1. "URL slug" with `Crème Brûlée & Co.!` gives `creme-brulee-co`.
   2. "camelCase" with `hello big world` gives `helloBigWorld`; "PascalCase" gives `HelloBigWorld`.
@@ -245,7 +245,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: Shows pasted CSV (comma, semicolon, tab or pipe, auto-detected) as a scrollable table or converts it to JSON. Handles quoted fields, embedded commas and line breaks.
+- what: Shows pasted CSV (comma, semicolon, tab or pipe, auto-detected) as a scrollable table or converts it to JSON. Handles quoted fields, embedded commas and line breaks. A byte order mark at the start of pasted CSV (from Excel) is ignored.
 - test:
   1. Paste `name,age` / `Ada,36` / `Lin,29`: a table with header and 2 rows; "3 rows, 2 columns".
   2. Switch the view to JSON: array of objects `{"name":"Ada","age":"36"}`. Untick header: array of arrays.
@@ -257,7 +257,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: Live preview of Markdown: headings, bold, italic, strike, inline and fenced code, lists, quotes, rules and links. All text is HTML-escaped and unsafe link types are not made clickable.
+- what: Live preview of Markdown: headings, bold, italic, strike, inline and fenced code, lists, quotes, rules and links. All text is HTML-escaped and unsafe link types are not made clickable. Asterisks or underscores with spaces next to them (2 * 3 * 4) are left alone, not turned into italics.
 - test:
   1. Type `# Title` then a blank line and `Some **bold** and *italic*`: heading and styled text appear in the preview.
   2. Add `- a` / `- b` lines and `1. x` / `2. y` lines: bullet and numbered lists render.
@@ -283,7 +283,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: Counts how often each word appears, ranks the top 40 with bars, and can skip common words like "the" and "and". Copy the list as tab-separated text.
+- what: Counts how often each word appears, ranks the top 40 with bars, and can skip common words like "the" and "and". Copy the list as tab-separated text. Curly and straight apostrophes count as the same word (don't).
 - test:
   1. Paste `the cat and the dog and the bird`: with "Skip common words" off, `the` is first with 3; on, it shows cat, bird, dog with 1 each.
   2. The summary shows total and different word counts.
@@ -295,7 +295,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: Estimates silent reading time (150, 200 or 300 words per minute) and speaking time (130 words per minute) for pasted text.
+- what: Estimates silent reading time (150, 200 or 300 words per minute) and speaking time (130 words per minute) for pasted text. A single short word shows "under 1 sec" instead of "0 sec".
 - test:
   1. Paste 400 words with Average speed: reading about 2 min 0 sec, speaking about 3 min 5 sec.
   2. Switch to Fast: reading time drops to about 1 min 20 sec.
@@ -366,7 +366,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: Converts text to old phone keypad key presses (multi-tap such as `44 33 555 555 666`, or single T9 digits) and decodes multi-tap digits back to text.
+- what: Converts text to old phone keypad key presses (multi-tap such as `44 33 555 555 666`, or single T9 digits) and decodes multi-tap digits back to text. Characters with no key are reported ("Skipped 1 character ...").
 - test:
   1. "Text to multi-tap" with `hello`: `44 33 555 555 666`. Swap: output `hello`.
   2. `hi you` gives `44 444 0 999 666 88` (0 is space).
@@ -391,7 +391,7 @@
 - category: text
 - plan: free
 - needs: none
-- what: Generates random version 4 UUIDs, 1 to 50 at a time, with upper-case and no-dash options.
+- what: Generates random version 4 UUIDs, 1 to 50 at a time, with upper-case and no-dash options. Changing the count, upper case or no-dash option regenerates the list at once.
 - test:
   1. Open the tool: 5 UUIDs in the form `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx` (y is 8, 9, a or b).
   2. Tick UPPERCASE and No dashes, Generate: 32 upper-case characters per line.

@@ -84,31 +84,34 @@ TX.wifiString = (ssid, pass, sec, hidden) => 'WIFI:T:' + sec + ';S:' + wesc(ssid
 TX.countWords = (s) => (s.match(/\S+/g) || []).length;
 TX.countSentences = (s) => (s.match(/[^.!?…]+[.!?…]+|[^.!?…]+$/g) || []).filter(x => /\S/.test(x)).length;
 TX.countParas = (s) => s.split(/\n\s*\n/).filter(x => x.trim()).length;
-TX.titleCase = (s) => s.toLowerCase().replace(/(^|[\s\-(\/])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
-TX.sentenceCase = (s) => s.toLowerCase().replace(/(^\s*|[.!?]\s+|\n\s*)(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
+// first letter in title case: German sharp s becomes "Ss" (not "SS")
+const initial = (b) => { const u = b.toUpperCase(); return u.length > 1 ? u[0] + u.slice(1).toLowerCase() : u; };
+TX.lower = (s) => s.toLowerCase().replace(/i\u0307/g, 'i'); // "İ".toLowerCase() is "i" + a combining dot, which would not match a plain i
+TX.titleCase = (s) => TX.lower(s).replace(/(^|[\s\-(\/])(\p{L})/gu, (m, a, b) => a + initial(b)).normalize('NFC');
+TX.sentenceCase = (s) => TX.lower(s).replace(/(^\s*|[.!?]\s+|\n\s*)(\p{L})/gu, (m, a, b) => a + initial(b)).normalize('NFC');
 TX.squeeze = (s) => s.replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 TX.dedupeLines = (s) => { const seen = new Set(); return s.split('\n').filter(l => !seen.has(l) && seen.add(l)).join('\n'); };
 TX.sortLines = (s, desc) => { const a = s.split('\n').sort((x, y) => x.localeCompare(y, undefined, { numeric: true, sensitivity: 'base' })); return (desc ? a.reverse() : a).join('\n'); };
 TX.dropEmpty = (s) => s.split('\n').filter(l => l.trim()).join('\n');
 TX.reverseText = (s) => [...s].reverse().join('');
 TX.words = (s) => s.normalize('NFC').replace(/['’]/g, '').replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, '$1 $2').replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, '$1 $2').match(/[\p{L}\p{N}\p{M}]+/gu) || [];
-const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+const cap = (w) => { const l = TX.lower(w), f = [...l][0] || ''; return initial(f) + l.slice(f.length); };
 const perLine = (f) => (s) => s.split('\n').map(l => f(TX.words(l), l)).join('\n');
 // Only Latin-style combining accents are stripped (U+0300-036F); Indic and other scripts keep their vowel signs.
 TX.slug = perLine((w, l) => TX.words(l.normalize('NFD').replace(/[\u0300-\u036f]/g, '')).map(x => x.toLowerCase()).join('-'));
-TX.camel = perLine(w => w.map((x, i) => i ? cap(x) : x.toLowerCase()).join(''));
+TX.camel = perLine(w => w.map((x, i) => i ? cap(x) : TX.lower(x)).join(''));
 TX.pascal = perLine(w => w.map(cap).join(''));
-TX.snake = perLine(w => w.map(x => x.toLowerCase()).join('_'));
-TX.kebab = perLine(w => w.map(x => x.toLowerCase()).join('-'));
+TX.snake = perLine(w => w.map(TX.lower).join('_'));
+TX.kebab = perLine(w => w.map(TX.lower).join('-'));
 TX.constant = perLine(w => w.map(x => x.toUpperCase()).join('_'));
-TX.dotcase = perLine(w => w.map(x => x.toLowerCase()).join('.'));
+TX.dotcase = perLine(w => w.map(TX.lower).join('.'));
 TX.wordFreq = (s, opt = {}) => {
   const stop = new Set(opt.stop ? 'a an and are as at be but by for from has have he her his i in is it its of on or she that the their they this to was we were will with you your not so if do my me our us them then than there what when which who'.split(' ') : []);
   const m = new Map();
-  (s.toLowerCase().normalize('NFC').match(/[\p{L}\p{N}\p{M}']+/gu) || []).forEach(w => { w = w.replace(/^'+|'+$/g, ''); if (w.length >= (opt.min || 1) && !stop.has(w)) m.set(w, (m.get(w) || 0) + 1); });
+  (s.toLowerCase().normalize('NFC').replace(/’/g, "'").match(/[\p{L}\p{N}\p{M}']+/gu) || []).forEach(w => { w = w.replace(/^'+|'+$/g, ''); if (w.length >= (opt.min || 1) && !stop.has(w)) m.set(w, (m.get(w) || 0) + 1); });
   return [...m].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 };
-TX.readTime = (words, wpm) => { const sec = Math.round(words / wpm * 60); return { sec, text: sec < 60 ? sec + ' sec' : Math.floor(sec / 60) + ' min ' + (sec % 60) + ' sec' }; };
+TX.readTime = (words, wpm) => { const sec = Math.round(words / wpm * 60); return { sec, text: sec < 1 && words > 0 ? 'under 1 sec' : sec < 60 ? sec + ' sec' : Math.floor(sec / 60) + ' min ' + (sec % 60) + ' sec' }; };
 
 /* ---------- Base64 / URL ---------- */
 TX.b64enc = (s, urlSafe) => {
@@ -327,6 +330,7 @@ TX.regexReplace = (pat, flags, text, repl) => {
 
 /* ---------- CSV ---------- */
 TX.parseCSV = (s, d) => {
+  s = s.replace(/^\uFEFF/, ''); // a byte order mark (Excel exports) must not become part of the first header
   const rows = []; let row = [], f = '', q = false;
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
@@ -362,8 +366,8 @@ TX.mdInline = (t) => {
     lit.push(good ? '<a href="' + u + '">' : ' (' + u + ')');
     return good ? '\u0001' + (lit.length - 1) + '\u0001' + a + '\u0002' : a + '\u0001' + (lit.length - 1) + '\u0001';
   })
-    .replace(/\*\*(.+?)\*\*|__(.+?)__/g, (m, a, b) => '<b>' + (a || b) + '</b>')
-    .replace(/\*(.+?)\*|\b_(.+?)_\b/g, (m, a, b) => '<i>' + (a || b) + '</i>')
+    .replace(/\*\*(?!\s)(.+?)(?<!\s)\*\*|__(?!\s)(.+?)(?<!\s)__/g, (m, a, b) => '<b>' + (a || b) + '</b>')
+    .replace(/\*(?!\s)(.+?)(?<!\s)\*|\b_(?!\s)(.+?)(?<!\s)_\b/g, (m, a, b) => '<i>' + (a || b) + '</i>')
     .replace(/~~(.+?)~~/g, '<s>$1</s>');
   t = t.replace(/\u0001(\d+)\u0001/g, (m, i) => lit[+i]).replace(/\u0002/g, '</a>');
   return t.replace(/\u0000(\d+)\u0000/g, (m, i) => '<code>' + codes[+i] + '</code>');
@@ -577,33 +581,8 @@ async function sendFile(name, text, mime, what) {
   if (ok) toast((what || 'Exported') + ': ' + name);
   return ok;
 }
-function copy(s, msg) {
-  const done = () => toast(msg || 'Copied');
-  const fb = () => {
-    try { const t = document.createElement('textarea'); t.value = s; t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); done(); }
-    catch (e) { toast('Could not copy'); }
-  };
-  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(s).then(done, fb); else fb();
-}
-function blobB64(blob) {
-  return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
-}
-/* Android: write to cache and open the share sheet (which also offers Save). Browser: Web Share with a file, else a normal download. */
-async function sendBlob(blob, name) {
-  const P = (window.Capacitor && Capacitor.Plugins) || {};
-  try {
-    if (P.Filesystem && P.Share) {
-      const r = await P.Filesystem.writeFile({ path: name, data: await blobB64(blob), directory: 'CACHE' });
-      await P.Share.share({ title: name, url: r.uri }); return;
-    }
-  } catch (e) { /* fall through to the web fallbacks */ }
-  try {
-    const f = new File([blob], name, { type: blob.type });
-    if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: name }); return; }
-  } catch (e) { if (e && e.name === 'AbortError') return; }
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000); toast('Saved ' + name);
-}
+/* One-tap copy through the shared helper (clipboard API with a fallback), with a toast either way. */
+async function copy(s, msg) { toast(await copyToClipboard(s) ? (msg || 'Copied') : 'Could not copy'); }
 const lbl = (text, inner) => `<label class="f">${text}${inner}</label>`;
 
 /* A tool that turns one text box into another. modes: [{ n, f(text, opt), inv }]; inv = mode index to switch to on Swap. */
@@ -674,7 +653,8 @@ reg({ id: 'morse', name: 'Morse Code', icon: '📟', desc: 'Translate text to Mo
     }
     tm = setTimeout(stop, ev.reduce((a, d) => a + Math.abs(d), 0) + 150);
   };
-  $('#w', el).oninput = () => { $('#wv', el).textContent = $('#w', el).value; };
+  const wpm0 = clamp(Math.round(+Store.get('morse.wpm', 15)) || 15, 5, 30); $('#w', el).value = wpm0; $('#wv', el).textContent = wpm0;
+  $('#w', el).oninput = () => { $('#wv', el).textContent = $('#w', el).value; Store.set('morse.wpm', +$('#w', el).value); };
   $('#i', el).oninput = () => { conv(); };
   $('#m', el).onchange = () => { stop(); $('#i', el).value = $('#o', el).value; conv(); };
   $('#cp', el).onclick = () => { if ($('#o', el).value) copy($('#o', el).value); };
@@ -685,7 +665,7 @@ reg({ id: 'morse', name: 'Morse Code', icon: '📟', desc: 'Translate text to Mo
 const QF = {
   text: { n: 'Text', f: [{ l: 'Text', t: 'area' }] },
   url: { n: 'Web link', f: [{ l: 'Web address', ph: 'https://example.com' }] },
-  wifi: { n: 'Wi-Fi network', f: [{ l: 'Network name (SSID)' }, { l: 'Password' }, { l: 'Security', t: 'sel', o: ['WPA', 'WEP', 'nopass'] }, { l: 'Hidden network', t: 'chk' }] },
+  wifi: { n: 'Wi-Fi network', f: [{ l: 'Network name (SSID)' }, { l: 'Password' }, { l: 'Security', t: 'sel', o: [['WPA', 'WPA / WPA2 / WPA3'], ['WEP', 'WEP (old)'], ['nopass', 'None (open network)']] }, { l: 'Hidden network', t: 'chk' }] },
   phone: { n: 'Phone number', f: [{ l: 'Phone number', ty: 'tel' }] },
   email: { n: 'Email', f: [{ l: 'Email address', ty: 'email' }, { l: 'Subject' }, { l: 'Message', t: 'area' }] },
   sms: { n: 'SMS message', f: [{ l: 'Phone number', ty: 'tel' }, { l: 'Message', t: 'area' }] },
@@ -710,7 +690,7 @@ reg({ id: 'qr', name: 'QR & Barcode', icon: '🔳', desc: 'Make QR codes for tex
   const cv = $('#c', el), type = () => $('#t', el).value;
   const fields = () => {
     $('#fs', el).innerHTML = QF[type()].f.map((f, i) => f.t === 'area' ? lbl(f.l, `<textarea id="f${i}" rows="3" maxlength="1500"></textarea>`)
-      : f.t === 'sel' ? lbl(f.l, `<select id="f${i}">${f.o.map(o => `<option>${o}</option>`).join('')}</select>`)
+      : f.t === 'sel' ? lbl(f.l, `<select id="f${i}">${f.o.map(o => `<option value="${o[0]}">${o[1]}</option>`).join('')}</select>`)
         : f.t === 'chk' ? `<label style="display:flex;gap:8px;align-items:center;min-height:44px"><input type="checkbox" id="f${i}" style="flex:none"> ${f.l}</label>`
           : lbl(f.l, `<input id="f${i}" type="${f.ty || 'text'}" maxlength="500" placeholder="${esc(f.ph || '')}">`)).join('');
     $('#lv-w', el).style.display = /code128|ean13/.test(type()) ? 'none' : '';
@@ -746,8 +726,9 @@ reg({ id: 'qr', name: 'QR & Barcode', icon: '🔳', desc: 'Make QR codes for tex
   $('#t', el).onchange = fields;
   el.addEventListener('input', (ev) => { if (ev.target.id !== 't') draw(); });
   el.addEventListener('change', (ev) => { if (ev.target.id !== 't') draw(); });
-  $('#sv', el).onclick = () => out(b => sendBlob(b, (type() === 'code128' || type() === 'ean13' ? 'barcode' : 'qr') + '-' + Date.now() + '.png'));
-  $('#sh', el).onclick = () => out(b => sendBlob(b, 'code.png'));
+  const send = (name) => out(async (b) => { if (await shareImageBlob(name, b, 'PocketKit code')) toast('Picture ready'); });
+  $('#sv', el).onclick = () => send((type() === 'code128' || type() === 'ean13' ? 'barcode' : 'qr') + '-' + Date.now() + '.png');
+  $('#sh', el).onclick = () => send('code.png');
   fields();
 } });
 
@@ -765,7 +746,7 @@ reg({ id: 'notes', name: 'Notes', icon: '📝', desc: 'Quick notes with a title 
   const later = () => { clearTimeout(timer); timer = setTimeout(persist, 400); };
   const rows = () => {
     const f = items.filter(n => !q || (n.t + ' ' + n.b).toLowerCase().includes(q)).sort((a, b) => (b.pin ? 1 : 0) - (a.pin ? 1 : 0) || b.ts - a.ts);
-    $('#lst', el).innerHTML = f.map(n => `<div class="item" data-id="${n.id}" role="button" tabindex="0"><div class="grow"><b>${n.pin ? '📌 ' : ''}${esc(n.t || 'Untitled')}</b><div class="muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(n.b.slice(0, 90) || 'Empty note')}</div></div></div>`).join('') || `<div class="muted center">${items.length ? 'No matches' : 'No notes yet. Tap New to start.'}</div>`;
+    $('#lst', el).innerHTML = f.map(n => `<div class="item" data-id="${n.id}" role="button" tabindex="0"><div class="grow"><b>${n.pin ? '📌 ' : ''}${esc(n.t || 'Untitled')}</b><div class="muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(n.b.slice(0, 90) || 'Empty note')}</div></div><div class="muted" style="font-size:12px;flex:none">${new Date(n.ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</div></div>`).join('') || `<div class="muted center">${items.length ? 'No matches' : 'No notes yet. Tap New to start.'}</div>`;
   };
   const showList = () => {
     cur = null;
@@ -830,7 +811,7 @@ xform({ id: 'b64', name: 'Base64 & URL', icon: '🔣', desc: 'Encode and decode 
 
 /* ====================== 5. Text tools ====================== */
 reg({ id: 'texttools', name: 'Text Tools', icon: '✍️', desc: 'Live word, character and sentence counts, plus case changes, reverse, clean-up, sort and dedupe lines.', keys: ['word count', 'character count', 'uppercase', 'lowercase', 'title case', 'sort lines', 'reverse', 'remove duplicates'], needs: [], render(el) {
-  const acts = [['UPPER', s => s.toUpperCase()], ['lower', s => s.toLowerCase()], ['Title Case', TX.titleCase], ['Sentence case', TX.sentenceCase], ['Reverse', TX.reverseText],
+  const acts = [['UPPER', s => s.toUpperCase()], ['lower', TX.lower], ['Title Case', TX.titleCase], ['Sentence case', TX.sentenceCase], ['Reverse', TX.reverseText],
     ['Fix spaces', TX.squeeze], ['Dedupe lines', TX.dedupeLines], ['Sort A-Z', s => TX.sortLines(s)], ['Sort Z-A', s => TX.sortLines(s, true)], ['No blank lines', TX.dropEmpty]];
   el.innerHTML = `<div class="list">${lbl('Your text', '<textarea id="i" rows="8" maxlength="500000" placeholder="Type or paste text"></textarea>')}
     <div class="card" id="st" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center"></div>
@@ -1012,7 +993,7 @@ reg({ id: 'lorem', name: 'Lorem Ipsum', icon: '📜', desc: 'Generate placeholde
     ${chkRow('cl', 'Start with "Lorem ipsum dolor sit amet"', true)}
     ${taArea('o', 'Result', 10, '', 'readonly')}<div class="row"><button class="btn" id="g">Generate</button><button class="btn alt" id="cp">Copy</button></div></div>`;
   const gen = () => { $('#o', el).value = TX.lorem($('#u', el).value, +$('#n', el).value, undefined, $('#cl', el).checked); };
-  $('#g', el).onclick = gen; $('#cp', el).onclick = () => copy($('#o', el).value); $('#u', el).onchange = gen; gen();
+  $('#g', el).onclick = gen; $('#cp', el).onclick = () => { if ($('#o', el).value) copy($('#o', el).value); }; $('#u', el).onchange = gen; $('#n', el).oninput = gen; $('#cl', el).onchange = gen; gen();
 } });
 
 /* ---------- Text <-> binary / hex / decimal ---------- */
@@ -1042,10 +1023,12 @@ const SYM = {
   'Box': '─ │ ┌ ┐ └ ┘ ├ ┤ ┬ ┴ ┼ ═ ║ ╔ ╗ ╚ ╝ █ ▓ ▒ ░',
   'Super/sub': '⁰ ¹ ² ³ ⁴ ⁵ ⁶ ⁷ ⁸ ⁹ ⁺ ⁻ ₀ ₁ ₂ ₃ ₄ ₅ ₆ ₇ ₈ ₉'
 };
+/* Plain-English names so a search such as "euro" or "heart" finds the sign. */
+const SYMN = { '€': 'euro', '£': 'pound sterling', '¥': 'yen yuan', '¢': 'cent', '₹': 'rupee inr', '₽': 'ruble rouble', '₩': 'won', '₿': 'bitcoin', '₺': 'lira', '→': 'arrow right', '←': 'arrow left', '↑': 'arrow up', '↓': 'arrow down', '♥': 'heart love', '♦': 'diamond', '♣': 'club', '♠': 'spade', '★': 'star', '☆': 'star', '©': 'copyright', '®': 'registered', '™': 'trademark tm', '°': 'degree', '±': 'plus minus', '×': 'times multiply', '÷': 'divide division', '≠': 'not equal', '≤': 'less than or equal', '≥': 'greater than or equal', '≈': 'approximately', '∞': 'infinity', '√': 'square root', 'π': 'pi', 'µ': 'micro mu', '✓': 'check tick', '✔': 'check tick', '✗': 'cross', '✘': 'cross', '☀': 'sun', '☁': 'cloud', '☂': 'umbrella', '☎': 'telephone phone', '♪': 'music note', '♫': 'music notes', '☮': 'peace', '☯': 'yin yang', '•': 'bullet', '…': 'ellipsis', '–': 'en dash', '—': 'em dash', '½': 'half', '¼': 'quarter', '¾': 'three quarters', '²': 'squared', '³': 'cubed', '‰': 'per mille', '№': 'number', '¶': 'paragraph', '§': 'section' };
 reg({ id: 'symbols', name: 'Emoji & Symbols', icon: '😀', desc: 'Pick emoji and special characters (arrows, maths, currency, Greek, box drawing) and copy them.', keys: ['emoji', 'special characters', 'unicode', 'arrows', 'greek', 'symbols', 'keyboard'], needs: [], render(el) {
   const items = [];
   Object.keys(EMO).forEach(g => EMO[g].split('|').forEach(e => { const i = e.indexOf(' '); items.push({ g, c: e.slice(0, i), k: e.slice(i + 1) + ' ' + g.toLowerCase() }); }));
-  Object.keys(SYM).forEach(g => SYM[g].split(' ').forEach(c => items.push({ g, c, k: g.toLowerCase() })));
+  Object.keys(SYM).forEach(g => SYM[g].split(' ').forEach(c => items.push({ g, c, k: g.toLowerCase() + (SYMN[c] ? ' ' + SYMN[c] : '') })));
   const groups = Object.keys(EMO).concat(Object.keys(SYM));
   el.innerHTML = `<div class="list"><div class="row"><input id="buf" type="text" maxlength="500" aria-label="Your text" placeholder="Tap characters to add them here"><button class="btn" id="cp" style="flex:none">Copy</button><button class="btn alt" id="cl" style="flex:none">Clear</button></div>
     <input type="search" id="q" maxlength="50" placeholder="Search (e.g. heart, arrow, euro)" aria-label="Search">
@@ -1100,7 +1083,7 @@ reg({ id: 'regex', name: 'Regex & Replace', icon: '📌', desc: 'Test regular ex
   el.innerHTML = `<div class="list"><div class="row"><input id="p" type="text" maxlength="500" placeholder="Pattern, e.g. (\\d+)-(\\w+)" aria-label="Pattern" autocapitalize="none" autocomplete="off" spellcheck="false" style="flex:3"><input id="f" type="text" maxlength="8" value="g" aria-label="Flags" autocapitalize="none" style="flex:1"></div>
     ${taArea('t', 'Test text', 5, '', 'maxlength="20000"')}<div class="status" id="e" hidden></div>
     <div class="muted" id="cnt"></div><div class="card" id="hl" style="white-space:pre-wrap;word-break:break-word;min-height:40px"></div><div class="list" id="ml"></div>
-    ${lbl('Replace with (use $1, $2 for groups)', '<input id="r" type="text" maxlength="500" autocapitalize="none" autocomplete="off">')}
+    ${lbl('Replace with (use $1, $2 for groups)', '<input id="r" type="text" maxlength="500" autocapitalize="none" autocomplete="off">')}<div class="muted" style="font-size:12px">Flags: g all matches, i ignore case, m multiline, s dot matches newline, u unicode. Without g only the first match is replaced.</div>
     ${taArea('ro', 'Result', 4, '', 'readonly')}<button class="btn" id="cp">Copy result</button></div>`;
   /* The match and the replace run together, once, in a Worker built from a Blob (works offline). A pattern that backtracks forever
      is stopped after about a second instead of freezing the app. Without Worker support it falls back to running in the page. */
@@ -1288,7 +1271,7 @@ xform({ id: 'braille', name: 'Braille', icon: '👆', desc: 'Convert English tex
   { n: 'Text to Braille', f: TX.toBraille, inv: 1, note: s => { const k = TX.brailleLost(s); return k ? 'Unsupported characters ignored (' + k + ').' : ''; } }, { n: 'Braille to text', f: TX.fromBraille, inv: 0 }
 ], { ph: 'e.g. Hello World 2024' });
 xform({ id: 't9', name: 'Phone Keypad', icon: '☎️', desc: 'Convert text to old phone keypad taps (multi-tap or T9 digits) and decode keypad taps to text.', keys: ['t9', 'multitap', 'sms', 'nokia', 'keypad', 'texting'] }, [
-  { n: 'Text to multi-tap', f: TX.multitapEnc, inv: 1 }, { n: 'Multi-tap to text', f: TX.multitapDec, inv: 0 }, { n: 'Text to T9 digits', f: TX.t9Digits }
+  { n: 'Text to multi-tap', f: TX.multitapEnc, inv: 1, note: s => { const k = [...s.toLowerCase()].filter(c => c !== ' ' && !KEY_OF[c]).length; return k ? 'Skipped ' + k + ' character' + (k === 1 ? '' : 's') + ' with no key (only letters, space and . , ? ! - work).' : ''; } }, { n: 'Multi-tap to text', f: TX.multitapDec, inv: 0 }, { n: 'Text to T9 digits', f: TX.t9Digits }
 ], { ph: 'e.g. hello world', inLabel: 'Input (multi-tap: groups of digits separated by spaces, 0 = space)' });
 
 /* ---------- Epoch time ---------- */
@@ -1332,7 +1315,7 @@ reg({ id: 'uuid', name: 'UUID Maker', icon: '🪪', desc: 'Generate random versi
     let a = Array.from({ length: n }, TX.newUuid); if ($('#up', el).checked) a = a.map(x => x.toUpperCase()); if ($('#nd', el).checked) a = a.map(x => x.replace(/-/g, ''));
     $('#o', el).value = a.join('\n');
   };
-  $('#g', el).onclick = gen; $('#cp', el).onclick = () => copy($('#o', el).value); gen();
+  $('#g', el).onclick = gen; $('#cp', el).onclick = () => { if ($('#o', el).value) copy($('#o', el).value); }; el.addEventListener('change', gen); gen();
 } });
 
 /* ---------- Random picker / teams ---------- */
