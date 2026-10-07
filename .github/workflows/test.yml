@@ -17,4 +17,5 @@ jobs:
       - run: npm run test:quotes
       - run: npm run test:drive
       - run: npm run audit:inputs
+      - run: npm run test:functional
       - run: npm run fuzz

@@ -4,7 +4,7 @@ Fill the numbers from `docs/FEATURES.md` before publishing. Keep this file in st
 
 ## Store listing
 - **App name (max 30):** PocketKit: All-in-One Tools
-- **Short description (max 80):** 260+ offline tools: calculators, converters, scanner, sensors, notes, games and more.
+- **Short description (max 80):** 320+ offline tools: calculators, converters, scanner, sensors, notes, games and more.
 - **Category:** Tools
 - **Contact email:** ashay.the.lion.heart@gmail.com
 - **Privacy policy URL:** host `docs/privacy-policy.html` (for example with GitHub Pages from the `/docs` folder) and paste the URL.
@@ -38,10 +38,10 @@ PocketKit puts everything you reach for a phone to do into one app that works of
 - Optional Google Drive backup: the user's settings and tool data are sent from their phone to a hidden folder in the user's own Google Drive, only at their request. The developer does not receive or store it, so answer "not collected". Scopes: Drive app data and email (to show the connected account).
 
 ## Permissions to declare / explain
-Camera, microphone, precise location, notifications, vibration, biometrics, Google Play billing, network and Wi-Fi state, internet (required by the WebView and Billing). Each is requested only when a tool needs it; see the privacy policy table.
+Camera, microphone, precise location, notifications, vibration, biometrics, Google Play billing, network and Wi-Fi state, nearby Bluetooth devices and Wi-Fi scan (Bluetooth Scan, Wi-Fi Scanner; results stay on screen), NFC (NFC Reader, read only), internet (required by the WebView and Billing). Each is requested only when a tool needs it; see the privacy policy table.
 
 ## Content rating
-Everyone. Contains no user-generated content, no ads, simple games without violence. Answer the questionnaire as "Utility / Tools".
+Everyone. Contains no user-generated content, no ads, simple games without violence (no real-money gambling). Answer the questionnaire as "Utility / Tools".
 
 ## In-app product
 - Product ID: `pocketkit_pro` (managed, one-time). Suggested price: a low one-time price in local currencies.

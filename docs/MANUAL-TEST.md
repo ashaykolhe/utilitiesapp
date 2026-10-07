@@ -49,6 +49,14 @@ _Free. Needs: network, storage_
 - [ ] Switch between Wi-Fi and mobile data: connection type or speed class changes.
 - [ ] In a browser without the Battery API the battery card says it is not available and nothing breaks.
 
+### Battery Health
+_Free_
+
+- [ ] Open Battery Health: percent, a bar, status and Health (usually Good) appear.
+- [ ] Plug in a charger: status changes to Charging and Plugged in shows AC or USB within a few seconds.
+- [ ] Temperature is shown in both °C and °F and matches the Battery Temperature in other apps closely.
+- [ ] Leave the tool: updates stop.
+
 ### Birthdays
 _Free. Needs: notifications, storage_
 
@@ -79,7 +87,7 @@ _Free. Needs: storage_
 ### Device Info
 _Free_
 
-- [ ] Open it. All rows have values. Battery matches the phone's level.
+- [ ] Open it. All rows have values. Battery matches the phone's level. Tap Copy details and paste somewhere: one line per row.
 - [ ] Turn on airplane mode and reopen. Online shows No.
 
 ### Expense Tracker (Pro)
@@ -89,7 +97,7 @@ _Pro. Needs: storage_
 - [ ] The "Last 6 months" chart shows a bar for the current month. Set the currency to "EUR": amounts show it.
 - [ ] Add an expense dated last month: the view jumps to that month; use the arrows to return.
 - [ ] Delete an entry: totals and charts update.
-- [ ] Add with an empty or zero amount: a toast asks for an amount. The amount is limited to 0.01 to 1,000,000,000 and the list to 5000 entries.
+- [ ] Add with an empty or zero amount: a toast asks for an amount. The amount is limited to 0 to 1,000,000,000 (0 is refused with a message) and the list to 5000 entries.
 - [ ] Export: with no expenses tap "Export all as CSV": a message says there is nothing to export. Add two expenses (one with the note =1+1), tap Export: the share sheet opens with expenses-YYYY-MM-DD.csv that opens in a spreadsheet with columns Date, Category, Amount, Note; the note shows as '=1+1 (text), never as a formula.
 
 ### Flashlight
@@ -100,6 +108,15 @@ _Free. Needs: camera_
 - [ ] Leave the tool while on. The torch goes out.
 - [ ] Deny the permission. A message says the camera permission was denied (a phone without a torch says the torch is not available).
 - [ ] Tap Turn on and leave the tool before answering the prompt, or double tap quickly. The camera indicator goes away and only one stream is used.
+
+### Fuel Log
+_Free. Needs: storage_
+
+- [ ] Add a full-tank fill-up at 10000 km with 40 L, then another at 10500 km with 35 L: consumption shows 14.3 km/L (7.0 L/100km).
+- [ ] Switch the unit to mpg (US): the same figures convert.
+- [ ] Try adding an entry with an odometer lower than the previous one: a message refuses it.
+- [ ] Add a partial fill: its consumption is not shown, and the next full fill includes the partial amounts.
+- [ ] Tap Export CSV: a file with all entries is saved or shared.
 
 ### Holiday Calendar
 _Free. Needs: storage_
@@ -157,6 +174,14 @@ _Free_
 - [ ] Add a runner called "Alex" and remove another with the cross.
 - [ ] Tap Lap before starting: a toast says to start the clock first. Reset clears all laps.
 
+### NFC Reader
+_Free_
+
+- [ ] Open NFC Reader: it says Ready (or that NFC is off, with how to turn it on).
+- [ ] Hold an NFC tag or transit card to the back of the phone: the phone buzzes and a card shows the tag ID and type.
+- [ ] Tap a tag with a text or link record: the value is shown and Copy puts it on the clipboard.
+- [ ] Tap Clear list: the list empties. Leave the tool and tap a tag: nothing happens in PocketKit.
+
 ### Pomodoro
 _Free. Needs: notifications, storage_
 
@@ -196,6 +221,7 @@ _Free (limit: 3 active reminders (Pro: unlimited)). Needs: notifications_
 - [ ] Delete a reminder with the cross. It disappears and no notification arrives for it.
 - [ ] Try a time in the past. A message says to enter a future time. The date picker does not offer past dates or dates beyond 5 years.
 - [ ] Deny notifications: the reminder is saved, a toast and a red line say notifications are blocked.
+- [ ] After a reminder has fired it is struck through and the Clear finished button appears; tap it: finished reminders go and the waiting ones stay.
 
 ### Screen Light
 _Free_
@@ -228,13 +254,21 @@ _Free. Needs: camera (torch, optional)_
 ### Stopwatch
 _Free_
 
-- [ ] Tap Start. The time runs. Tap Lap three times. Three laps appear, newest first.
+- [ ] Tap Start. The time runs. Tap Lap three times. Three laps appear, newest first, each with its lap time and the total.
 - [ ] Tap Pause, wait, tap Resume. The time continues without jumping.
 - [ ] Tap Reset. Time and laps clear.
+
+### Storage Info
+_Free_
+
+- [ ] Open Storage Info: used percent, a bar, free and total appear and are close to the phone's Settings > Storage.
+- [ ] Share something (for example a quote picture) so a temporary file exists, reopen the tool: Temporary files shows a size.
+- [ ] Tap Clear temporary files: a message appears and Temporary files drops to near zero. Your notes and other data are still there.
 
 ### Timer
 _Free. Needs: notifications_
 
+- [ ] Tap the 10m button: the display shows 10:00. Start, then tap 3m: a message says to reset first. Pause, tap 3m: the display shows 03:00 and the button says Start. Leave and reopen: the time you last started is filled in.
 - [ ] Open Timer, set 0 min 5 sec, tap Start. The display counts down and a tone plays at 00:00 with a "Time is up" message.
 - [ ] Start 1 min, tap Pause after 5 s, then Resume. It continues from where it stopped.
 - [ ] Tap Reset. The display shows the entered time again.
@@ -261,6 +295,24 @@ _Free. Needs: storage_
 - [ ] The list holds 500 tasks; when full the oldest completed task is dropped (with a toast), and open tasks are never dropped.
 - [ ] Export: with an empty list tap "Share checklist (text)": a message says there is nothing to share. Add tasks, tick one, tap Share: the share sheet opens with a text checklist, "[ ] task (Category, due date)" for open tasks and "[x] ..." for done ones.
 
+### Trip Odometer
+_Free. Needs: location_
+
+- [ ] Tap Start and allow location: the distance, time and speed begin to update outdoors.
+- [ ] Tap Pause: the time stops. Tap Resume: it carries on.
+- [ ] Tap Lap: a lap row appears with its distance and time.
+- [ ] Tap Stop and save: the trip is listed under Saved trips; delete it to remove.
+- [ ] Deny location permission: a clear message appears and nothing crashes.
+
+### Vehicle Service
+_Free. Needs: storage, notifications_
+
+- [ ] Add a vehicle, then a service item "Oil change" due in 5 days: it shows in the list with "in 5 days".
+- [ ] Add an item due by odometer and enter the current odometer: the remaining distance shows and urgent items rise to the top.
+- [ ] Tap Done on an item and choose a new due date: the due date moves.
+- [ ] Turn on notifications and allow the permission: a note says reminders are set. Deny: a message says reminders are off.
+- [ ] Delete an item and a vehicle: they are removed after confirming.
+
 ### World Clock
 _Free. Needs: storage_
 
@@ -278,6 +330,7 @@ _Free. Needs: location_
 - [ ] Open it outdoors and allow location. Altitude, latitude, longitude and accuracy fill in.
 - [ ] On a phone without altitude data the value shows "n/a".
 - [ ] Deny location: "Location permission denied" shows. Turn GPS off: "Location unavailable" shows. A timeout shows its own message.
+- [ ] Tap feet: the altitude and its accuracy convert (1000 m = 3281 ft). Tap Copy coordinates and paste somewhere: "lat, lon" appears.
 
 ### Compass
 _Free. Needs: motion_
@@ -285,6 +338,7 @@ _Free. Needs: motion_
 - [ ] Hold the phone flat and turn around. The dial rotates and the heading changes. North matches another compass app within about 15 degrees.
 - [ ] On a phone without a compass sensor a message says so after a few seconds.
 - [ ] Tilt the phone about 30 degrees while turning: the heading stays steady. Turn slowly through north (359 to 0): the dial does not spin the long way round. Leave the tool right after opening: no errors.
+- [ ] Under the dial a hint about figure-8 calibration is shown. Open the tool on a phone with permission denied: "Sensor permission denied" and nothing keeps listening.
 
 ### Leveler
 _Free. Needs: motion_
@@ -293,6 +347,7 @@ _Free. Needs: motion_
 - [ ] Lift one edge. The bubble moves toward the lower side and the angle grows.
 - [ ] Tap "Set current position as zero" on a slightly tilted surface. The readout becomes 0.
 - [ ] On a device without an orientation sensor (or with permission denied) a message says so after a few seconds.
+- [ ] Lay the phone flat and adjust until both numbers are under 0.5: the bubble turns green and says Level.
 
 ### My PIN Code
 _Free. Needs: location, storage_
@@ -331,6 +386,7 @@ _Free. Needs: location_
 - [ ] Deny the permission. A message says location permission was denied.
 - [ ] Walk slowly for 100 m: distance reads about 0.10 km and speed about 4 to 6 km/h. Stand still for two minutes: the distance stays put. With a weak signal (accuracy 30 m or worse) "Weak GPS signal" shows and distance pauses.
 - [ ] With an odd GPS reading (no position) the numbers show "--" or stay put, never NaN.
+- [ ] Tap mph: speed, max speed and distance convert (10 m/s = 22 mph, 1 km = 0.62 mi) and the choice is still mph the next time the tool opens.
 
 ### Sunrise & Sunset
 _Free. Needs: location (optional)_
@@ -351,6 +407,14 @@ _Free. Needs: motion_
 - [ ] Type 5000 in Sea-level pressure: the field is limited to 1100 and a message shows. Clear it: it falls back to 1013.25.
 - [ ] Climb a flight of stairs and wait: the height estimate changes by a few metres.
 - [ ] On a phone without a barometer a message says so.
+
+### Bluetooth Scan
+_Free. Needs: location_
+
+- [ ] Open Bluetooth Scan, keep 6 s, tap Scan for devices and allow the Nearby devices prompt. The button counts down, then devices are listed with signal bars.
+- [ ] Move the slider to 15 s and scan: the countdown starts at 15.
+- [ ] A phone or earbuds you have paired show a Paired badge; unnamed devices show Unknown device.
+- [ ] Turn Bluetooth off and scan: a message says Bluetooth is off.
 
 ### Distance Finder
 _Free. Needs: motion_
@@ -388,6 +452,7 @@ _Free. Needs: motion_
 - [ ] Mark a base angle that points upward (positive): no result appears (needs a downward base angle or a distance).
 - [ ] Switch to feet: the eye height converts (1.6 m becomes 5.25 ft). Aim almost straight up (over 85 degrees): the result shows "--" instead of a huge number.
 - [ ] Type 50 in Eye height: a message shows and the value is limited to 10. Type -5 in Distance: the minus sign is refused.
+- [ ] Switch to feet, enter 6 ft, leave and reopen (also open Distance Finder): both show feet and 6.
 
 ### Light Meter
 _Free. Needs: motion (ambient light sensor)_
@@ -477,6 +542,7 @@ _Free_
 - [ ] Tap "Grid overlay": a 10 dp grid with bold lines every 100 dp fills the screen; tap to close.
 - [ ] Tap "Dead pixel test": the screen turns red, green, blue, white, black on each tap and closes after black.
 - [ ] Rotate the phone: the viewport row updates.
+- [ ] Tap "Copy these details" and paste: the rows (Physical pixels, Pixel ratio, ...) appear.
 
 ### Sensor List (Pro)
 _Pro. Needs: motion_
@@ -519,6 +585,7 @@ _Free. Needs: microphone_
 - [ ] Open it and allow the microphone. After half a second the value changes with the sound around you and Min is above 0.
 - [ ] Clap near the phone. The maximum jumps up.
 - [ ] Deny the permission. A message says it was denied.
+- [ ] Tap Reset min and max after a clap: both show -- and fill again from the next reading.
 
 ### Speed Calc
 _Free_
@@ -528,6 +595,7 @@ _Free_
 - [ ] Time tab: 100 km at 50 km/h gives 2 h 0 min 0 s.
 - [ ] Empty or zero fields show "--" and a hint, never an error.
 - [ ] Enter -5 in Distance (a minus sign is refused) and 99999999999 (a message shows and the value is limited). Result stays a number or "--", never NaN.
+- [ ] Choose Time mode with miles and mph, leave and reopen: the same mode and units are selected.
 
 ### Stride & Pace
 _Free. Needs: storage_
@@ -554,6 +622,14 @@ _Free. Needs: motion_
 - [ ] Min and Max update; Reset clears them.
 - [ ] On a device without sensors a clear message appears.
 
+### Wi-Fi Scanner
+_Free. Needs: location_
+
+- [ ] Open Wi-Fi Scanner and tap Scan for networks: the first time, allow the Location prompt. Networks appear sorted by signal with security, band and channel.
+- [ ] A bar chart of channels in use and a channel suggestion appear.
+- [ ] Switch Location off in quick settings and scan again: a message says to turn Location on. Switch Wi-Fi off: a message says Wi-Fi is off.
+- [ ] Tap Scan again twice quickly: the second tap is ignored while scanning.
+
 ## 4. Calculate
 
 ### Age Calculator
@@ -563,8 +639,8 @@ _Free_
 - [ ] Set "Age on" to a birthday itself: it says "Today! Turning N".
 - [ ] Birth date 2000-02-29: it works in non-leap years (birthday counts as Mar 1).
 - [ ] The date fields accept 1900 to 2200 only; a date outside that shows an "Earliest is..." or "Latest is..." message.
-- [ ] Set "Age on" earlier than the birth date: shows the prompt, no error.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Area & Volume
 _Free_
@@ -574,6 +650,7 @@ _Free_
 - [ ] Sphere radius 3: volume 113.09734. Cone radius 3 height 4: slant height 5.
 - [ ] Change shape: the input boxes change to match. Zero or empty values show a prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Close and reopen the tool: the shape and the sizes you entered are still there; choosing another shape starts with its own default sizes.
 
 ### Billing (Pro)
 _Pro. Needs: storage_
@@ -593,6 +670,7 @@ _Free_
 - [ ] Add profit target 20,000: 700 units needed.
 - [ ] Price equal to or below variable cost shows an explanatory message.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Calculator
 _Free_
@@ -611,6 +689,7 @@ _Free_
 - [ ] Switch ingredient to honey with the same 1 cup: 340 g.
 - [ ] Amount 0 shows the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Currency
 _Free. Needs: storage_
@@ -632,6 +711,7 @@ _Free. Needs: storage_
 - [ ] Save an event "Trip" a week from now: "in 7 days". Save one in the past: "N days ago". Save one today: "Today".
 - [ ] Close and reopen: the events are still listed. Delete one with the cross.
 - [ ] History: change the "To" date and wait 2 seconds: the clock button appears and lists "Days from ... to ..."; pressing Add or Subtract lists the date it gives. Opening the tool adds nothing.
+- [ ] Add or subtract days with the Days field cleared shows "Enter a date and number of days" (it no longer treats an empty field as 0).
 
 ### Discount & GST
 _Free_
@@ -640,6 +720,7 @@ _Free_
 - [ ] Price 1180, discount 0, tax 18%, "Including tax": price before tax 1,000.00, tax 180.00, final 1,180.00.
 - [ ] Discount above 100 or a negative number shows the prompt, not a wrong result.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### EMI Calculator
 _Free_
@@ -648,9 +729,11 @@ _Free_
 - [ ] Set loan 1,000,000, rate 10, tenure 10 years: EMI is about 13,215.07.
 - [ ] Set rate 0, loan 1200, tenure 12 months: EMI is 100.00 and total interest is 0.00.
 - [ ] Switch "Tenure in" to Months and enter 6: the table shows 6 rows ending with balance 0.00.
-- [ ] Clear the loan amount: the result is replaced by "Enter the values above." with no error.
+- [ ] Clear the loan amount: the result is replaced by "Enter the values above." with no error. A field that is filled but gives no answer (for example a 0 where a positive number is needed) says "These values give no result".
 - [ ] Limits: type 250 in the interest field: a red "Maximum is 200" appears under it, the result says "enter a value from 0 up to 200", and leaving the field sets it back to 200. Tenure 101 years shows "Maximum is 100"; switching the unit to Months allows up to 1200. Letters, e and + cannot be typed.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
+- [ ] Remembered inputs: type a loan of 123456, leave the tool and open it again: the loan amount is still there (the same for every calculator with number fields, except date fields that start at today).
 
 ### FD / RD
 _Free_
@@ -659,6 +742,16 @@ _Free_
 - [ ] RD 5,000 per month at 6.5% for 24 months: maturity a little above 120,000 deposited (interest roughly 8,000).
 - [ ] Zero months or years shows the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
+
+### FIRE Calculator
+_Free_
+
+- [ ] Use the defaults: a number of years and a target amount appear with the note "illustration, not advice".
+- [ ] Raise the monthly saving: the years go down.
+- [ ] Set the return equal to inflation: the result still shows without error.
+- [ ] If the target is already reached the tool says so.
+- [ ] Very low saving that never reaches the target within 80 years shows "not within 80 years".
 
 ### Fractions
 _Free_
@@ -668,6 +761,7 @@ _Free_
 - [ ] Enter "1 1/2" and "0.25" with +: result 7/4.
 - [ ] Divide by 0 shows "Cannot divide by zero"; typing "abc" shows a prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Close and reopen the tool: the two fractions and the operation are as you left them.
 
 ### Fuel Cost
 _Free_
@@ -678,14 +772,16 @@ _Free_
 - [ ] Mileage: 420 km with 30 L gives 14.00 km/L and 7.14 L per 100 km.
 - [ ] Efficiency 0 shows the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### GCD & LCM
 _Free_
 
 - [ ] 12, 18, 30 gives GCD 6 and LCM 180.
 - [ ] 4 6 10 gives GCD 2 and LCM 60.
-- [ ] A single number, a zero or a decimal shows the prompt.
+- [ ] A single number says "Enter at least two whole numbers"; a zero or a decimal says "Use whole numbers from 1 to 1,000,000,000,000".
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Growth Rate
 _Free_
@@ -694,6 +790,7 @@ _Free_
 - [ ] 100 to 200 over 1 year: 100% per year.
 - [ ] Zero or negative values show the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Investment
 _Free_
@@ -704,6 +801,7 @@ _Free_
 - [ ] Set return to 0 for the SIP: value equals the amount invested.
 - [ ] Years 0 or empty: shows the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Loan Compare
 _Free_
@@ -712,6 +810,16 @@ _Free_
 - [ ] Make both offers identical: shows "Same total cost".
 - [ ] Months 0 shows the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
+
+### Loan Prepayment
+_Free_
+
+- [ ] Enter 1000000 principal, 9% a year, 20 years, extra 5000 a month: the new tenure is much shorter and interest saved is positive.
+- [ ] Set extra to 0 and a lump sum of 200000 at month 24: tenure is reduced.
+- [ ] Set rate to 0: EMI is principal divided by months and interest saved is 0.
+- [ ] Press Save result: it appears in the history (clock button).
+- [ ] Empty or zero principal shows a message instead of a result.
 
 ### Marks & GPA
 _Free_
@@ -721,14 +829,16 @@ _Free_
 - [ ] Add a line of garbage text: it is ignored, the rest still calculates.
 - [ ] Empty box shows the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Markup & Margin
 _Free_
 
 - [ ] Cost 80, price 100: margin 20%, markup 25%, profit 20.
 - [ ] Cost 80, 25% margin: price 106.67. Cost 80, 25% markup: price 100.
-- [ ] A margin of 100% or more shows the prompt.
+- [ ] A margin of 100% in "Price I need" says "A margin must be below 100% of the price".
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Matrix Calc (Pro)
 _Pro_
@@ -747,6 +857,7 @@ _Free_
 - [ ] Amounts with commas (1,500) and decimals (80.50) are read correctly; lines without a number are ignored.
 - [ ] Close and reopen: the lists are still there.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Number Patterns
 _Free_
@@ -765,6 +876,7 @@ _Free_
 - [ ] 12.5 gives "... and fifty hundredths"; -5 starts with "Minus".
 - [ ] 0 gives "Zero". A number of one quadrillion or more shows the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Percentage
 _Free_
@@ -775,6 +887,8 @@ _Free_
 - [ ] Value 250 and 12%: plus 280, minus 220, percent itself 30.
 - [ ] "X is what % of Y" with Y = 0 and "percent change" from 0 show the prompt instead of an error.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
+- [ ] "X is what % of Y" with Y = 0 says "Y cannot be 0"; "Percent change" from 0 says a change from 0 cannot be shown as a percentage. Big results use thousands separators.
 
 ### Power Cost
 _Free_
@@ -782,6 +896,7 @@ _Free_
 - [ ] 1500 W, 1 unit, 2 h/day, 8 per kWh: 3 kWh per day, 24.00 per day, 90 kWh and 720.00 per month, 8,760.00 per year.
 - [ ] Hours per day above 24 shows the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Prime Check
 _Free_
@@ -790,6 +905,7 @@ _Free_
 - [ ] 97 gives "Yes, prime", next prime 101, previous 89.
 - [ ] 999999937 is reported prime almost instantly.
 - [ ] 1, a decimal or a negative number shows the prompt.
+- [ ] Close and reopen the tool: the last valid number is shown and analysed.
 
 ### Quadratic
 _Free_
@@ -799,6 +915,7 @@ _Free_
 - [ ] a=1, b=0, c=1: roots 0 + 1i and 0 - 1i.
 - [ ] a=0, b=2, c=-4: "Linear: x = 2". a=0 and b=0 shows a message.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Random
 _Free_
@@ -808,6 +925,7 @@ _Free_
 - [ ] Min 10 and Max 1 (reversed): still works, giving a number from 1 to 10.
 - [ ] Enter three names, tap Pick one: one of them is shown. Tap Shuffle: the lines are reordered. With an empty list a message asks to add items.
 - [ ] Pick a random date between two dates: a date inside the range and its weekday appear.
+- [ ] Min, Max and How many are remembered next time. Tap a drawn number, the picked name or the random date: it is copied ("Copied" message).
 
 ### Ratio
 _Free_
@@ -815,15 +933,16 @@ _Free_
 - [ ] 24 : 36 simplifies to 2 : 3.
 - [ ] Proportion 3 : 5 = 12 : x gives x = 20.
 - [ ] Split 1000 as 2 : 3: A gets 400.00 and B gets 600.00.
-- [ ] Decimals in the simplify box show "Use whole numbers".
+- [ ] Decimals in the simplify box show "Use whole numbers"; a 0 shows "A and B cannot be 0". Proportion with a = 0 says "a cannot be 0"; splitting with both shares 0 says so too.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Recipe Scaler
 _Free. Needs: storage_
 
 - [ ] Open the tool with the sample recipe (serves 4). Set "I want to serve" to 8: 2 cups flour becomes 4 cups, 1 1/2 tsp becomes 3 tsp, 3/4 cup becomes 1 1/2 cup, 2.5 tbsp becomes 5 tbsp and "Pinch of salt" is unchanged.
 - [ ] Tap Half: servings become 2 and amounts halve (3/4 cup becomes 3/8 cup).
-- [ ] Type "2-3 cloves garlic" and "1/3 cup oil" and scale to triple: results are "6-9 cloves garlic" and "1 cup oil".
+- [ ] Type "2-3 cloves garlic", "1/3 cup oil" and "200g flour" and scale to triple: results are "6-9 cloves garlic", "1 cup oil" and "600g flour".
 - [ ] Enter 0 in either servings box: the result says to enter servings above zero. Tap Save recipe with empty ingredients: a message asks for ingredients.
 - [ ] Name the recipe and tap Save recipe, tap New, then open it from Saved recipes: name, servings and text return. The bin icon deletes it. Copy scaled copies the scaled text.
 - [ ] Enter 0 or 5000 in a servings box: a message shows and the value is limited to the range 0.5 to 1000. At most 100 recipes can be saved.
@@ -836,6 +955,7 @@ _Free_
 - [ ] Change "Per" to Year and enter 60,000: per hour 28.85.
 - [ ] Hours per week 0 shows the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Scientific
 _Free_
@@ -846,6 +966,7 @@ _Free_
 - [ ] 1/0 and sqrt(-1) show an error in red, nothing crashes. A missing closing bracket is accepted.
 - [ ] M+ stores the current result (shown as "M = ..." at the top), MR inserts it, MC clears it. Tap the display to type with the keyboard.
 - [ ] History: type sqrt(16)+2 and press = (or Enter): the clock button appears and lists "sqrt(16)+2" with 6; copy works. Live typing before = adds nothing. Trig results are labelled [DEG] or [RAD].
+- [ ] Tap the grey "= result" line under the display: the number is copied (nothing is copied for an error). The symbol keys have spoken names for screen readers (for example "Divide", "Square root").
 
 ### Simple Interest
 _Free_
@@ -854,6 +975,7 @@ _Free_
 - [ ] Change time to 6 months at the same inputs (time 6): interest 1,750.00.
 - [ ] Negative values show the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Size Converter
 _Free_
@@ -863,6 +985,16 @@ _Free_
 - [ ] Women's clothing UK 10: US 6, EU 38.
 - [ ] Chest 40 inches: 101.6 cm, EU 50, letter M.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
+
+### Split by Items
+_Free_
+
+- [ ] Add people Asha, Ben; add Pizza 20 shared by both and Beer 6 for Ben only: Asha 10.00, Ben 16.00 before tax.
+- [ ] Add tax 10% and tip 5%: each person's extra is proportional and the totals sum to the grand total.
+- [ ] Add an item with no one ticked: a warning says it is unassigned.
+- [ ] Remove a person: items shared by them are re-split.
+- [ ] Tap Share: a text summary is shared or copied.
 
 ### Statistics
 _Free_
@@ -872,6 +1004,7 @@ _Free_
 - [ ] 1 2 3 4: mode shows "none".
 - [ ] A single number: sample deviation shows a dash. Text with stray letters is skipped.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Tally Counter
 _Free. Needs: storage_
@@ -892,6 +1025,7 @@ _Free_
 - [ ] Start 22:00, End 06:00: 8:00 and a "passes midnight" note.
 - [ ] Break longer than the shift shows an error message.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Tip Splitter
 _Free_
@@ -900,6 +1034,7 @@ _Free_
 - [ ] Bill 100, tip 15%, 3 people, "Round each share up": each pays 39.00, total 117.00, tip total 17.00.
 - [ ] People 0 or blank shows the prompt instead of dividing by zero.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ### Triangle
 _Free_
@@ -909,6 +1044,7 @@ _Free_
 - [ ] Switch to "Two sides and the angle": 3, 4 and 90 degrees gives side c = 5.
 - [ ] Angle 0 or 180 shows an error message.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Close and reopen the tool: the mode (three sides or two sides and an angle) and the numbers are remembered.
 
 ### Trig Circle
 _Free_
@@ -923,6 +1059,7 @@ _Free_
 ### Unit Converter
 _Free_
 
+- [ ] Length: 2 mile to km, tap Swap: the units exchange and the result is 1.242742384 mile. Leave and reopen: the same category and units are selected.
 - [ ] Length: 1 mile to km gives 1.609344.
 - [ ] Temperature: 100 C to F gives 212.
 - [ ] Data: 1 GB to MB gives 1024.
@@ -938,6 +1075,7 @@ _Free_
 - [ ] Choose "Fri + Sat" weekend: the result skips Fridays and Saturdays instead.
 - [ ] End date before start date shows the prompt.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed with what was calculated and the answer, and its copy button copies it. Opening the tool without typing adds nothing, and an empty or invalid input is never added.
+- [ ] Copy result: every calculator with a result card has a "Copy result" button under it (not shown while an error is shown). Tap it and paste: the first line says what was calculated and the following lines hold the big number, every row and any table lines.
 
 ## 5. Text & Data
 
@@ -1190,6 +1328,15 @@ _Free_
 - [ ] Flags `gi` with pattern `HELLO` matches `hello`. Pattern `a*` (can match empty) does not hang.
 - [ ] Tap Copy result.
 
+### Resume Builder
+_Free. Needs: storage_
+
+- [ ] Fill in name, email and a summary, add one job and one school: the preview updates.
+- [ ] Switch templates: the preview style changes.
+- [ ] Enter text with < and & characters: they show literally in the preview and in the HTML export.
+- [ ] Export HTML, open it and print: it is a clean page.
+- [ ] Export text: a plain text resume is saved or shared.
+
 ### Roman Numerals
 _Free_
 
@@ -1421,6 +1568,7 @@ _Free_
 - [ ] Type a sentence and tap Speak. It is read aloud.
 - [ ] Change the speed and speak again. The pace changes.
 - [ ] Tap Stop while speaking. It stops. Leaving the tool also stops it.
+- [ ] Choose another voice and speed, leave and reopen: both are still selected.
 
 ### Tone Generator
 _Free_
@@ -1432,6 +1580,7 @@ _Free_
 - [ ] Set volume above 70% and press Play at 5000 Hz: a confirmation about hearing damage appears; Cancel keeps it stopped.
 - [ ] Leave the tool while playing: sound fades out without a click.
 - [ ] Enter 99999 in Frequency: a message shows and the value is limited to 20000. Clear the field and leave it: it returns to 440.
+- [ ] Choose Triangle and 1000 Hz, leave and reopen: both are still set and the volume is back at 25%. After a sweep press Stop then Play: the tone starts at the typed frequency, not where the sweep ended.
 
 ### Tone Sequencer (Pro)
 _Pro_
@@ -1457,6 +1606,7 @@ _Free. Needs: microphone_
 - [ ] Slide up to a high note and hold: Highest updates; the range text shows semitones and octaves and a voice type guess.
 - [ ] Brief noises or speech do not change the range (only held notes do).
 - [ ] Reopen the tool: the saved range is displayed. Press Reset range: both values clear.
+- [ ] Sing from about C3 up to C5: the guess says Tenor. From about F3 up to F5 it says Alto.
 
 ### Voice Recorder
 _Free (limit: 3 saved recordings (Pro: unlimited)). Needs: microphone, storage_
@@ -1468,6 +1618,7 @@ _Free (limit: 3 saved recordings (Pro: unlimited)). Needs: microphone, storage_
 - [ ] As a free user with 3 recordings, press Record: the Pro sheet opens and nothing records.
 - [ ] Deny the microphone: a permission message shows.
 - [ ] Double tap Record quickly: only one recording starts.
+- [ ] Start a recording and press the back button without pressing Stop: reopen the tool, the memo is in the list.
 
 ## 7. Camera
 
@@ -1488,6 +1639,7 @@ _Free. Needs: camera_
 - [ ] Tap Scan again, then scan a Code 128 label or a small EAN-8 code. Expected: scanning resumes and the new type and digits are shown; the history lists them with the newest first.
 - [ ] Tap Scan from a picture and choose a photo or screenshot of a product barcode and then of a QR code. Expected: each is decoded; a picture with no code shows No code found.
 - [ ] Point at a barcode with a wrong digit or at a plain textured surface. Expected: nothing is reported (no wrong or made-up numbers). Check History keeps the last 20 scans and Clear history empties it. Denied camera shows a message.
+- [ ] On a phone with a torch, tap Torch while scanning in a dim room: the light switches on and off.
 
 ### Collage (Pro)
 _Pro. Needs: storage_
@@ -1542,6 +1694,7 @@ _Free. Needs: camera, motion_
 - [ ] Change Grid to Cross and None. Expected: the overlay changes.
 - [ ] Tap Capture photo. Expected: a clean photo (no grid drawn in) is offered for saving.
 - [ ] On a device with no motion sensor or denied permission, a message says the level line is off and the camera still works.
+- [ ] On a phone or browser with no motion sensor: after about 2.5 seconds the level line and degree badge disappear and a line says there is no sensor reading.
 
 ### Image Palette
 _Free. Needs: storage_
@@ -1673,6 +1826,7 @@ _Free. Needs: storage_
 - [ ] Reopen the tool: last values and unit are restored.
 - [ ] The colour bar bands match the categories: BMI 18.4 is in the narrow blue band, 18.6 in the green band, 26 in the amber band; the arrow and the 15/18.5/25/30/35/40 labels sit at the same positions.
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed (only the result and tool name, never your height, weight or dates). Due Date does not keep a history.
+- [ ] At 200 cm, 99.9 kg shows 25.0 and Overweight; 63.9 kg shows 16.0 and Underweight.
 
 ### Body Fat
 _Free. Needs: storage_
@@ -1691,6 +1845,16 @@ _Free. Needs: none (vibration optional)_
 - [ ] Press Stop mid-session: the circle resets. Let a session finish: "Well done" and a vibration.
 - [ ] Leave the tool while running: the timer and vibration stop.
 - [ ] Start a session and lock the screen: the screen stays on while it runs (and where the app can, an end-of-session notification is scheduled). If neither is available a note says to keep the screen on.
+- [ ] Pick Custom 3-0-3-0, 7 minutes, leave and reopen: the same settings are there.
+
+### Bucket List
+_Free. Needs: storage_
+
+- [ ] Add an item "See the Northern Lights", category Travel, target date next year: it appears in the list.
+- [ ] Tick it done: it shows today's date as done and the progress bar moves.
+- [ ] Untick it: the done date is removed.
+- [ ] Delete an item: it is removed after confirming.
+- [ ] Tap Export: a text file lists done and open items.
 
 ### Calorie & BMR
 _Free. Needs: storage_
@@ -1740,6 +1904,15 @@ _Free. Needs: storage_
 - [ ] Change the goal during a fast: "of N hours" updates.
 - [ ] During a fast the caption under the ring reads like "Hours 4-12 of your fast" (neutral wording, no health claims).
 
+### Gratitude Log
+_Free. Needs: storage_
+
+- [ ] Fill in the three lines and Save: today shows as saved and the streak shows 1 day.
+- [ ] Edit today's lines and Save again: the entry is replaced, not duplicated.
+- [ ] With older entries present tap Remember this: a random older day is shown.
+- [ ] Save with all three lines empty: a message asks for at least one and nothing is saved.
+- [ ] Tap Export: a text file with dates and the three lines is saved or shared.
+
 ### Habit Streaks (Pro)
 _Pro. Needs: storage_
 
@@ -1778,6 +1951,15 @@ _Free_
 - [ ] Height under 100 cm: "Enter a height".
 - [ ] History: change a value (type a new number), wait 2 seconds: the clock button appears in the header. Open it: the result is listed (only the result and tool name, never your height, weight or dates). Due Date does not keep a history.
 
+### Journal
+_Free. Needs: storage_
+
+- [ ] Tap New entry, type a title and text, pick a mood, add tags "work, idea" and Save: the entry appears under the current month.
+- [ ] Search for a word from the text: only matching entries stay. Search for a tag: same.
+- [ ] Open the entry, change the text, Save: the list shows the edit. Delete it and confirm: it disappears.
+- [ ] Tap Export Markdown: a .md file is saved or shared and contains the date, title, mood and tags.
+- [ ] Try saving an entry with empty title and text: a message says to write something and nothing is saved.
+
 ### Macro Calculator
 _Free. Needs: storage_
 
@@ -1796,6 +1978,15 @@ _Free_
 - [ ] Type 1 as custom minutes: the display shows 1:00; Begin and wait: the end bell rings 3 times and "Session complete" shows.
 - [ ] End session early: the ring resets.
 - [ ] Begin a session: the screen is kept awake and, in the Android app, an end-of-session notification is scheduled; leaving the tool cancels it.
+
+### Mood Calendar
+_Free. Needs: storage_
+
+- [ ] Log a few moods in Mood Log, then open Mood Calendar: those days are coloured.
+- [ ] Tap the previous month arrow: the grid changes and an empty month says there is no data.
+- [ ] Tap a coloured day: the mood and note for that day are shown.
+- [ ] Check the best and worst day and the counts match what was logged.
+- [ ] With no Mood Log data the grid is plain and a hint points to Mood Log.
 
 ### Mood Log
 _Free. Needs: storage_
@@ -1879,15 +2070,15 @@ _Free. Needs: storage_
 
 - [ ] First open shows the edit form. Date of birth is a date picker (not in the future, not before 1900); phone fields take at most 20 characters of digits, spaces and + ( ) - only. Fill in a name, blood group O+, an allergy and a contact phone, then Save.
 - [ ] The card shows the name in large type, a big red blood group and a Call button for the contact; tapping it opens the dialer with the number.
-- [ ] Tap Edit card, clear the allergy, Save: it disappears from the card. Cancel on the edit screen returns to the card without changes.
-- [ ] Close and reopen the app: the card is still there.
+- [ ] Tap Edit card, clear the allergy, Save: it disappears from the card. A phone typed as "+91 98765-43210 abc" is saved without the letters and without trailing spaces. Cancel on the edit screen returns to the card without changes.
+- [ ] Close and reopen the app: the card is still there. In Edit card, tap Delete this card and confirm: the saved card is erased from the phone and the form is empty again (the Cancel button is gone because there is nothing to go back to).
 
 ### File Locker
 _Free (limit: 3 locked files (Pro: unlimited)). Needs: storage_
 
 - [ ] Open File Locker. Enter a password under 8 characters: an error appears. Enter two different passwords: mismatch error. Enter "password123" twice and tick the box: a "too easy to guess" message and a "Use this weak password anyway" button appear. Use a strong password (for example 7 random words) twice without ticking the box: asked to confirm; tick it and tap Create: the locker opens empty.
 - [ ] Tap Choose files and pick two photos and a PDF (free plan allows 3). They appear with names, sizes and image thumbnails. Pick one more file: the Pro sheet opens and the file is not added.
-- [ ] Tap View on a photo: it opens in a dialog. Tap Export on a file: the share sheet (or a download in a desktop browser) offers the decrypted file. Tap Delete and confirm: it disappears.
+- [ ] Tap View on a photo: it opens in a dialog. Tap Export on a file: the share sheet (or a download in a desktop browser) offers the decrypted file. If you close the share sheet without sending, the tool says "Export cancelled. Nothing was saved." instead of "Exported". Tap Delete and confirm: it disappears.
 - [ ] Tap Lock, then enter a wrong password 5 times: after the fifth, the Unlock button is disabled with a countdown of about 30 s. Wait, then enter the right password: it unlocks.
 - [ ] Open Security and backup, change the password (wrong current password is rejected; a weak new password asks for "Use anyway"), then lock and unlock with the new one: all files still open and the old password is rejected. Choose a file over 200 MB: it is skipped with a message.
 - [ ] Unlock, send the app to the background for over 60 s and return: the locker is locked. Leave it untouched for 2 minutes: it locks. Leave the tool and re-enter: it is locked. On Android the screen cannot be screenshotted while it is unlocked. On a phone with biometrics: Security and backup shows "Turn on biometric unlock" (hidden if the plugin or biometrics are missing); after enabling, the Unlock screen shows a biometrics button and a fingerprint or face check is required. Add a fingerprint in Android settings: the button stops working, a message explains it, and the password still works.
@@ -1909,7 +2100,7 @@ _Free (limit: 5 entries (Pro: unlimited)). Needs: storage_
 - [ ] Tap Show, then Copy password: the toast says it clears in 30 s only when this phone does it natively; otherwise it says it may not clear by itself. Paste elsewhere to check it, wait 30 s and paste again: on a phone with the native helper the clipboard is empty.
 - [ ] Add entries up to 5: the sixth opens the Pro sheet. Search for part of a title: the list filters.
 - [ ] Security and backup > Export backup: a .pkbackup.json file is shared/downloaded. Delete an entry, choose Import backup, pick the file and enter the master password: the deleted entry returns. Enter a wrong password: a clear error and nothing changes.
-- [ ] Lock and unlock with a wrong password: "Wrong password." After 5 wrong tries a 30 s lockout appears.
+- [ ] Lock and unlock with a wrong password: "Wrong password." From the 3rd wrong try it says how many tries are left (2, then 1); after 5 wrong tries a 30 s lockout appears, it survives leaving the tool and moving the phone clock back, and the next round is 60 s. When creating the vault the hint under the strength meter suggests 7 random words.
 
 ### PIN & Passphrase
 _Free_
@@ -1957,6 +2148,42 @@ _Free_
 - [ ] Tap Copy text and paste it into the Notes tool: the lines are intact. Tap Save .txt: a file is saved or shared.
 - [ ] Tap Copy text before choosing a photo: "Pick a picture first" appears.
 
+### Contact QR
+_Free_
+
+- [ ] Enter a name and phone and tap Create: a QR code appears.
+- [ ] Scan it with another phone: it offers to add the contact.
+- [ ] Use commas, semicolons and a new line in the address: the QR still builds and scans correctly.
+- [ ] Enter an invalid email: a message asks to fix it.
+- [ ] Tap Save PNG: an image is shared or downloaded.
+
+### Images to PDF (Pro)
+_Pro. Needs: storage_
+
+- [ ] Open Images to PDF, tap Choose pictures and pick three photos: thumbnails, names and sizes are listed with a total.
+- [ ] Tap the down arrow on picture 1: it moves to position 2. Tap the rotate button on one picture: its thumbnail turns and "turned 90°" shows. Tap the cross on one: it is removed.
+- [ ] Choose A4, margin 10, Medium, tap Make PDF: progress text shows, then a result row with the file size. Tap Share / save, open the PDF: pages are in the listed order, rotated pictures are turned, pages are A4 (landscape for wide pictures).
+- [ ] Switch to "Fit to each picture" with margin 0 and make again: each page has the shape of its picture. Try Low quality: the file is clearly smaller than High.
+- [ ] Edge cases: choose a non-image file (refused with a message); try to add more than 60 pictures (only 60 are kept, a message appears); set margin to 99: the field shows a maximum of 40.
+
+### Merge PDFs (Pro)
+_Pro. Needs: storage_
+
+- [ ] Open Merge PDFs, tap Choose PDFs and pick two or three PDFs: they are listed with sizes.
+- [ ] Move one file up or down and remove another with the cross: the list follows.
+- [ ] With one file only, tap Merge: "Choose at least two PDFs to merge." appears.
+- [ ] Add a second PDF and tap Merge: progress shows, a result with the total page count appears. Share / save it and open it: the pages follow the list order.
+- [ ] Choose a .txt file: "That is not a PDF file". Choose a password protected PDF and merge: the message names that file and says it is password protected.
+
+### Mind Map
+_Free. Needs: storage_
+
+- [ ] Create a map, tap the centre node and tap Add child twice: two child nodes appear.
+- [ ] Drag a node: it moves. Tap Auto layout: nodes arrange without overlapping.
+- [ ] Rename a node and change its colour.
+- [ ] Delete a branch: the node and its children are removed (the centre cannot be deleted).
+- [ ] Drag the background to pan, pinch or use + / - to zoom. Export PNG saves a picture.
+
 ### Paint
 _Free. Needs: storage_
 
@@ -1964,6 +2191,7 @@ _Free. Needs: storage_
 - [ ] Tap Undo. The last stroke disappears. Tap Eraser and erase part of a line.
 - [ ] Tap Save. On the phone the share sheet opens with a PNG; in a browser a PNG downloads and Saved is shown. The word Saved is only shown when the save worked.
 - [ ] Draw a long continuous line with a thick brush. It stays smooth and does not slow down.
+- [ ] Tap the red quick colour while the eraser is on: the brush is red and the button says Eraser again. Leave and reopen: red and the brush size are still set.
 
 ### Paint Mixer
 _Free_
@@ -1973,6 +2201,16 @@ _Free_
 - [ ] Set all parts to 0: the result says "Add some parts" and the palettes disappear.
 - [ ] Type a HEX in a colour box such as #0f0 or ff8000: the colour picker updates. Typing an invalid value such as "zz" changes nothing.
 - [ ] Tap a palette swatch or Copy HEX: "Copied" appears. Settings persist after reopening the tool.
+
+### PDF Pages (Pro)
+_Pro. Needs: storage_
+
+- [ ] Open PDF Pages and open a multi-page PDF: the page count and a list of pages with size show.
+- [ ] Tick pages 2 and 3, tap Extract selected: a result with 2 pages appears; open it and check they are the right pages.
+- [ ] Tick one page, tap Rotate 90° then make "Make PDF of the pages as listed": that page is turned in the new file. Use Move up and Move down with ticked pages: the numbering changes, "(was N)" shows the original number.
+- [ ] Tick a page and tap Delete selected: it leaves the list. Select all and Delete: "That would delete every page" appears.
+- [ ] Type 1-3,5 in the pages box and tap Make PDF of these pages: a 4-page file. Type 5-3, 99, or abc: a clear message each time.
+- [ ] Set Split after page 2 and tap Split into two PDFs: two results, the first with 2 pages, the second with the rest. Open a password protected PDF: refused with a message.
 
 ### Pixel Art (Pro)
 _Pro. Needs: storage_
@@ -1992,6 +2230,24 @@ _Pro_
 - [ ] With an empty pad tap Save / share PNG: the message "Sign first" appears and no file is produced.
 - [ ] Tap once without dragging: a dot is drawn and saved correctly.
 
+### Sticky Board
+_Free. Needs: storage_
+
+- [ ] Tap Add note, type text: a yellow note appears.
+- [ ] Drag it to a new place, reload the tool: it stays there.
+- [ ] Change its colour and edit its text.
+- [ ] Delete the note.
+- [ ] Add notes until 100: a message says the board is full.
+
+### Text to PDF (Pro)
+_Pro. Needs: storage_
+
+- [ ] Open Text to PDF and tap Make PDF with empty text: "Type or paste some text first."
+- [ ] Type a title and a few paragraphs, tap Make PDF, then Share / save: the PDF opens with the bold title and wrapped text.
+- [ ] Paste about 20,000 characters with font size 10: several pages are made and the page count shows in the result.
+- [ ] Type "Hello 😀 世界": the PDF shows "Hello ? ??" and the message says 3 characters were replaced.
+- [ ] Set font size 99 or margin 80: the fields show their limits; Letter size gives Letter pages.
+
 ## 11. Fun
 
 ### 2048
@@ -2000,6 +2256,7 @@ _Free_
 - [ ] Swipe left/right/up/down: tiles slide and equal tiles merge, adding to Score; one new tile appears after each move.
 - [ ] A swipe that changes nothing shakes the board and spawns nothing.
 - [ ] Fill the board with no merges: Game over shows. New game restarts; Best remains after reopening.
+- [ ] Make a few moves and tap New game: a question appears and No keeps the board.
 
 ### 24 Game
 _Free. Needs: storage_
@@ -2008,6 +2265,24 @@ _Free. Needs: storage_
 - [ ] If the last number is 24: "24! Solved" with the time and Solved increases. If not, a message says what it made; tap Undo to step back.
 - [ ] Edge case: divide by a card with value 0 (for example 5 - 5 then divide by it): "Cannot divide by zero". Divisions can produce fractions that are shown as n / d.
 - [ ] Tap Hint: a working solution is shown. New deals four new numbers; Reset restores the current four.
+
+### Anagram Race
+_Free. Needs: storage_
+
+- [ ] Open Anagram Race and tap "Start": scrambled letters show and the 60 second timer runs.
+- [ ] Tap letters (or type) to build the answer: a correct word scores, the streak grows and a new word appears. A wrong word shakes and keeps the streak.
+- [ ] Tap "Skip": a new word shows and the streak resets.
+- [ ] When time is up the final score and best score show. Reload the tool: the best score is kept.
+- [ ] The scramble is never identical to the word.
+
+### Backgammon
+_Free. Needs: storage_
+
+- [ ] Start a game vs Phone: the standard opening position shows (15 checkers each). Tap Roll: two dice appear and only checkers that can legally move are highlighted.
+- [ ] Tap a highlighted checker: its legal landing points are marked; tap one to move. The phone then rolls and plays by itself.
+- [ ] Get hit (or hit the phone): the checker goes on the bar and must enter before anything else moves; if the entry points are blocked the turn is skipped with a message.
+- [ ] Edge case: when only one die can be played, only moves with the larger die are offered; with no legal move the turn passes ("No legal move").
+- [ ] Bring all checkers home: bearing off is offered; bear off all 15 to win and the result is shown. Switch to Pass and play and Easy/Normal in the menu: a new game starts in that mode.
 
 ### Balance Ball
 _Free. Needs: motion, storage_
@@ -2032,6 +2307,7 @@ _Free. Needs: storage_
 - [ ] Double: only available with two cards and enough chips; the bet doubles, you get one card and the hand ends.
 - [ ] Edge case: Deal with no bet: "Place a bet first". A natural 21 pays 3 to 2 (a bet of 10 wins 15). All in then lose: "Out of chips" button restores 1000.
 - [ ] Leave and reopen: the chip total is kept.
+- [ ] Deal several hands: hearts and diamonds are red, spades and clubs black.
 
 ### Block Stack
 _Free. Needs: storage_
@@ -2041,6 +2317,7 @@ _Free. Needs: storage_
 - [ ] Complete a row: it flashes, disappears, Score and Lines increase; after 10 lines the Level goes up and pieces fall faster.
 - [ ] Tap Pause: the game stops with a Paused overlay; Resume continues. Switch to another app and back: the game is paused.
 - [ ] Edge case: stack to the top: Game over appears with the score; Best updates and survives reopening the tool. Leave the tool mid-game and reopen: the game is idle again and nothing keeps running in the background.
+- [ ] Hold ◀ or ▶ for a moment and release while a piece is falling: the piece keeps falling afterwards (the hold timer used to be able to cancel the game loop).
 
 ### Bottle Spinner
 _Free_
@@ -2056,6 +2333,42 @@ _Free. Needs: storage_
 - [ ] Let the ball fall: Lives drop by one and the ball returns to the paddle. At zero lives: Game over and Best updates.
 - [ ] Edge case: clear all bricks: Level increases and a fuller brick wall appears. Tap Pause: the ball freezes; Resume continues.
 
+### Bubble Pop
+_Free. Needs: storage_
+
+- [ ] Tap Start: a board of coloured bubbles hangs from the top. Press and drag: a dotted aim line follows. Release: a bubble flies, bounces off a side wall if aimed that way, and sticks to the board.
+- [ ] Make a group of three or more of the same colour: they pop and the score rises by 10 each. Pop a bubble that holds up others: the loose ones fall and add 20 each.
+- [ ] Miss on purpose a few times: "Drop in" counts down and then a new row appears at the top.
+- [ ] Let the bubbles reach the dashed red line near the bottom: Game over with score and best.
+- [ ] Clear the whole board: "Level 2" starts with a new board. Pause and the app-switch pause work.
+
+### Charades & Draw
+_Free_
+
+- [ ] Open Charades & Draw: pick 2 teams, 60 seconds, all categories, any difficulty and tap "Start game". The first team's "Ready" screen shows.
+- [ ] Tap "Start turn": a word appears and the timer counts down. Tap Correct: the score goes up by 1 and a new word shows. Tap Skip: a new word shows and the score is unchanged.
+- [ ] Let the timer reach 0: the turn ends with the number of correct words and the next team is announced. After the last round the winner (or a draw) is shown.
+- [ ] Untick every category chip and tap Start: a message asks you to pick at least one category.
+- [ ] Leave during a turn and return: the setup screen shows again with no timer still running.
+
+### Checkers
+_Free. Needs: storage_
+
+- [ ] Open Checkers, keep "Play the phone", Red (you move first), Medium, tap Start. Tap a red piece in the front row: dots show its moves. Tap a dot: the piece moves, the phone answers.
+- [ ] When a capture is available, only pieces that can capture are marked with a ring and any other move is refused with a message. After a jump that can continue, the same piece stays selected and you must keep jumping.
+- [ ] Reach the far row with a piece: it becomes a king (crown) and can move backwards. A piece that reaches the far row by a jump ends its turn there.
+- [ ] Tap Undo: your last move and the phone's reply are taken back. Tap New game then 2 players: after each move the turn label changes, and when one side has no pieces or no moves "Red wins" or "Black wins" is shown.
+- [ ] Edge: leave mid-game and reopen: the game resumes. Forty moves by both sides with only kings and no captures ends in a draw.
+
+### Chess
+_Free. Needs: storage_
+
+- [ ] Open Chess, leave "Play the phone", White and Medium, tap Start. The board shows the standard position. Tap the e2 pawn: green outline and dots on e3 and e4. Tap e4: the pawn moves, then "Phone is thinking" appears and the phone replies within a few seconds. The move list shows both moves.
+- [ ] Tap Undo: both moves are taken back and it is your turn again. Tap Flip: the board turns around. Tap an empty square or an enemy piece with nothing selected: nothing happens.
+- [ ] Start a 2-player game and play 1.f3 e5 2.g4 Qh4: the board says "Checkmate, Black wins" and the king's square is red. Undo brings the position back.
+- [ ] In a 2-player game push a pawn to the last rank: a row with Queen, Rook, Bishop and Knight appears; choose Knight and the pawn becomes a knight. Try castling: with the squares between king and rook empty the king shows a dot two squares away; castling through an attacked square is not offered.
+- [ ] Edge: choose Black in the phone game: the phone plays White first. Leave the tool mid-game and reopen: the same position resumes. Tap New game: back to the setup card.
+
 ### Coin Flip
 _Free_
 
@@ -2069,6 +2382,7 @@ _Free_
 - [ ] Tap any column: a red disc falls to the bottom; the phone answers with yellow.
 - [ ] Make four in a row: the winning discs glow and the score updates.
 - [ ] Hard level takes a moment to think; 2 Players alternates red and yellow. Fill the board: Draw.
+- [ ] Drop a disc, then tap New game or switch to 2 Players: it asks first; No keeps the game and the old mode selected.
 
 ### Daily Challenge
 _Free. Needs: storage_
@@ -2078,6 +2392,15 @@ _Free. Needs: storage_
 - [ ] Leave and reopen the tool: it still shows Solved and the same puzzle (same date gives the same puzzle).
 - [ ] Edge case: leave an input empty and tap Check answer: "Fill in your answer first" and no try is used. Use up all three tries: the correct answer is revealed and the inputs lock.
 - [ ] Change the phone date to the next day and reopen: a new puzzle and 3 tries; the streak from yesterday still shows. Skip a day: the streak shows 0.
+
+### Dice Five
+_Free. Needs: storage_
+
+- [ ] Open the tool (Solo): tap Roll dice; five dice appear. Tap two dice: they get an accent border (held). Roll again: only the unheld dice change; the button shows the rolls left.
+- [ ] After a roll the scorecard shows outlined buttons with the points each open box would give. Tap one: the box fills, the dice reset and the next turn starts. Fill all 13 boxes: "Game over", total and a new best when higher.
+- [ ] Tap Hint after a roll: the dice worth keeping are highlighted. With no rolls left it names a box to try.
+- [ ] Switch to vs Phone: you play a turn, then the phone rolls, holds and scores on its own with short pauses and a message. At the end the winner is shown and the win record (e.g. 1-0) updates.
+- [ ] Edge case: roll a second Dice Five after scoring 50 in the Dice Five box: only the matching upper box (or lower boxes with full values) can be picked and +100 is added.
 
 ### Dice Roller
 _Free_
@@ -2111,6 +2434,15 @@ _Free. Needs: storage_
 - [ ] Edge case: tap a line that is already drawn, or tap while the phone is thinking: nothing happens. Press New game while the phone is thinking: the phone's pending move is cancelled.
 - [ ] Change grid size: a new game of that size starts.
 
+### Farkle
+_Free. Needs: storage_
+
+- [ ] Open the tool: choose 2 players (you and the phone), keep the 500 rule on and tap Start game. Tap Roll 6 dice: six dice appear and the message asks you to set scoring dice aside.
+- [ ] Tap a 1 or 5 (or a triple) so it is outlined, check Selected shows the points, tap Set aside: it moves to the small row and the turn total grows. Tap a non-scoring die and Set aside: the button stays disabled or says only scoring dice can be set aside.
+- [ ] Tap Bank with less than 500 as a new player: "You need 500 to get on the board". Reach 500 and Bank: your total updates and the phone plays (dice highlight, short pauses).
+- [ ] Roll a roll with no scoring dice: "Farkle!" appears, the turn total is lost and play passes. Use all six dice: "Hot dice!" and Roll shows six dice again.
+- [ ] Choose 3 or 4 players and switch a seat to Friend: the scoreboard lists You, Friend and Phone. When someone passes 10,000 everyone else gets one more turn, then the winner is shown and the record updates.
+
 ### Finger Chooser
 _Free_
 
@@ -2123,6 +2455,15 @@ _Free_
 
 - [ ] Tap the game to start; each tap lifts the bird. Passing a pipe adds 1.
 - [ ] Hit a pipe or the ground: Game over; tap after half a second to retry.
+
+### Futoshiki
+_Free. Needs: storage_
+
+- [ ] Open the tool: a 4x4 grid with < > and up/down arrows between cells. Tap a cell and a pad number: it is entered in blue.
+- [ ] Enter two numbers that break a sign (for example a larger number where the sign says the cell must be smaller): the sign and both cells turn red. A repeated number in a row turns red too.
+- [ ] Turn Notes on and tap pad numbers in an empty cell: small pencil digits appear. Tap an outlined (given) cell and a number: nothing changes.
+- [ ] Tap Check with a wrong number entered: it flashes red. Hint fills a correct number. Show solution fills the grid and stops the timer.
+- [ ] Switch to 6x6: a new puzzle appears quickly and fits the screen width. Solve one properly: "Solved in m:ss" and Best updates (not after Hint or Show solution).
 
 ### Gem Match
 _Free. Needs: storage_
@@ -2150,6 +2491,15 @@ _Free_
 - [ ] Guess the word: You got it and Won increases. Use all 6 lives: the word is revealed in red.
 - [ ] New word starts again.
 
+### Heads Up
+_Free. Needs: motion_
+
+- [ ] Open Heads Up, choose a deck and tap "Start". A 3 second countdown, then a word appears and the 60 second timer runs.
+- [ ] Tap Correct and Pass: the score goes up only for Correct and a new word shows each time.
+- [ ] On a phone, hold it in landscape and tilt it down (screen facing the floor) then back up: a green "Correct" flash then a new word; tilt up for an orange "Pass". Without a motion sensor the tap buttons still work.
+- [ ] When time is up the round ends with the score, the words you got right and the ones you passed. Tap "Play again" for a new round with the score list kept.
+- [ ] Leaving the tool stops the sensor and the timer.
+
 ### Higher or Lower
 _Free. Needs: storage_
 
@@ -2157,6 +2507,51 @@ _Free. Needs: storage_
 - [ ] A wrong guess ends the game with the final streak; the buttons are disabled until New game.
 - [ ] Edge case: when the next card has the same value, "Same value: a push" appears and the streak is unchanged. Tap the buttons twice quickly: only one guess counts.
 - [ ] Best updates and is remembered after reopening the tool.
+
+### Kakuro
+_Free. Needs: storage_
+
+- [ ] Open the tool: a board with split black clue cells and white squares appears. Tap a white square and a pad number: it is entered.
+- [ ] Type the same digit twice in one run: both cells turn red. Complete a run with the wrong total: the whole run turns red.
+- [ ] Tap a bold pre-filled cell and a number: nothing changes (givens are locked).
+- [ ] Tap Check with a wrong digit entered: it flashes red. Hint fills a correct digit. Show solution fills the board and stops the timer.
+- [ ] Switch to Large (8x8): a new board appears quickly. Solve one fully: "Solved in m:ss" and Best updates (not after Hint or Show solution).
+
+### KenKen
+_Free. Needs: storage_
+
+- [ ] Open the tool: a 4x4 grid with thick cage outlines and a target label (like 6× or 3+) in each cage corner. Tap a cell and a pad number: it is entered in blue.
+- [ ] Enter the same number twice in a row: both cells turn red. Fill a whole cage with numbers that miss its target: its label turns red.
+- [ ] Turn Notes on and tap pad numbers in an empty cell: small pencil digits appear (tap again to remove); with Notes off, entering a number clears the notes.
+- [ ] Tap Check with a wrong number entered: it turns red briefly. Tap Hint: a correct number is filled in. Tap Show solution: the grid fills and the timer stops.
+- [ ] Switch to 6x6: a new puzzle appears in under a second. Solve one properly: "Solved in m:ss" and Best updates (not after using Hint or Show solution).
+
+### Killer Sudoku
+_Free. Needs: storage_
+
+- [ ] Open the tool: a 9x9 grid with dashed cage outlines and small sums appears. Tap a cell and a pad number: it is entered in blue and other cells with the same number are tinted.
+- [ ] Enter the same digit twice in a row, column, box or cage: both cells turn red. Fill a cage with the wrong total: the cage turns red.
+- [ ] Turn Notes on and tap pad numbers in an empty cell: small pencil digits appear in a 3x3 pattern; entering a real number clears them.
+- [ ] Tap Check with a wrong number entered: it flashes red. Hint fills a correct number. Show solution fills the grid and stops the timer.
+- [ ] Switch Easy / Medium / Hard: a new puzzle each time. Leave mid-puzzle and reopen: the grid, notes and elapsed time are restored. Solving properly shows "Solved in m:ss" and updates Best.
+
+### Klondike Solitaire
+_Free. Needs: storage_
+
+- [ ] Open the tool: seven columns with 1 to 7 cards (only the last face up), a stock pile and an empty waste. Moves 0 and a timer start counting after the first move.
+- [ ] Tap the stock: one card (or three in Draw 3) moves to the waste. Tap the waste card or an Ace: it jumps to the foundation when legal; a card with no legal place shakes and nothing moves.
+- [ ] Tap Undo several times: each move is reverted exactly (including a flipped card turning face down again). The move counter goes back too.
+- [ ] Tap Draw 3 / Draw 1: the mode switches and a new deal starts. Tap New deal: a fresh deal and timer reset.
+- [ ] Edge case: play until all cards are face up: Auto-complete appears; tap it and the cards fly to the foundations and the win message shows. Leave and reopen the tool: the game continues where it was.
+
+### Liar's Dice
+_Free. Needs: storage_
+
+- [ ] Open the tool, keep 1 opponent, 5 dice and wild ones on, tap Start game. Your five dice are shown, the phone's dice appear as question marks. If the phone opens, its bid shows as "Current bid".
+- [ ] Use the minus and plus buttons and the face dice to build a bid. A bid that is not higher than the current one shows "Bid must be higher" and the Bid button is disabled; a higher bid is accepted and the phone answers after a short pause.
+- [ ] Tap Hint: it shows the percentage chance that the current bid is true and whether to raise or call Liar. Tap Liar!: all dice are revealed, matching dice are highlighted and the message says who loses a die.
+- [ ] Tap Next round: new dice are rolled, the loser starts and dice counts update. Count with wild ones on: a one counts toward every face except a bid on ones.
+- [ ] Play to the end: "You win the game!" or the winner's name is shown with Play again, and the games won record updates. New game returns to the setup (try 3 opponents).
 
 ### Lights Out
 _Free_
@@ -2170,6 +2565,25 @@ _Free_
 - [ ] Choose 6 of 49 and tap Draw: six different numbers 1-49 appear in ascending order.
 - [ ] Choose 5/50 + 2: five balls plus two stars (1-12).
 - [ ] Custom: Pick 3 from 1 to 10 gives three different numbers; Pick 20 from 5 is limited to 5.
+
+### Ludo
+_Free. Needs: storage_
+
+- [ ] Open the tool, choose 4 players with seat 1 Human and the rest Phone, tap Start: the cross-shaped board shows with four yards of four tokens.
+- [ ] Tap the dice until a six: tokens in the yard that can leave are highlighted; tap one and it moves to your start square and you roll again.
+- [ ] Land on an opponent token on an unsafe square: it is sent back to its yard. On a starred or start square both tokens coexist.
+- [ ] Edge case: with a token two steps from home roll a larger number: that token cannot move (exact roll needed); if nothing can move the turn passes. Roll three sixes in a row: the third six is ignored and the turn passes.
+- [ ] Finish all four tokens: you get a place (1st, 2nd ...) and play continues for the others until only one is left; the final ranking is shown.
+
+### Mafia Moderator
+_Free_
+
+- [ ] Open Mafia Moderator: set 8 players. The suggested role counts add up to 8. Tap "Deal roles".
+- [ ] For each player press and hold "Hold to reveal" to see their role privately, release to hide, tap "Next".
+- [ ] Tap "Start night 1": read the prompts, pick the mafia's victim, the doctor's save and the detective's check (the detective's answer shows). Tap "Dawn" then "Announce what happened".
+- [ ] The morning screen announces who died (nobody if the doctor saved them). Vote out a player on the Day screen. The player list marks the dead.
+- [ ] When mafia are as many as the town, or no mafia remain, the winner is announced.
+- [ ] Increase mafia so roles exceed the player count: it is capped and a note appears.
 
 ### Magic 8-Ball
 _Free. Needs: motion_
@@ -2193,6 +2607,16 @@ _Free_
 - [ ] Tap Start and answer using the keypad: right answers advance instantly and increase Score.
 - [ ] A wrong answer shakes, counts as a miss and clears your input.
 - [ ] When the bar runs out Time! shows your score; Best updates per level.
+- [ ] Start a round and keep typing with a hardware keyboard: digits and Backspace work for the whole round (also after you pressed Start). Minimise the app for 20 seconds mid-round: the bar does not lose that time.
+
+### Maze Chase
+_Free. Needs: storage_
+
+- [ ] Tap Start: after a short pause the muncher moves. Swipe in each direction: it turns at the next opening; swiping the opposite way reverses at once. It never passes through walls.
+- [ ] Eat dots: the score rises by 10 each; a large pellet gives 50 and turns the bugs blue and slower for a few seconds.
+- [ ] Touch a blue bug: it returns to its home and you score 200, then 400 and so on. Touch a normal bug: a life is lost and everyone returns to the start (dots stay eaten).
+- [ ] Lose three lives: Game over with score and best. Eat every dot: "Level 2" begins with a different maze.
+- [ ] Pause with the button or by leaving the app: everything freezes. Blue bugs fade in tone (about one change per second) before they recover.
 
 ### Maze Runner
 _Free. Needs: storage_
@@ -2208,6 +2632,7 @@ _Free_
 - [ ] Tap two cards: matching ones stay up with a green border, others flip back after ~0.7 s.
 - [ ] Timer starts at the first flip; Moves counts pairs tried.
 - [ ] Clear the board: message shows moves and time and Best updates. Changing size starts a new game.
+- [ ] Flip a pair, then tap New game: it asks; No keeps your cards and move count. Minimise the app for a minute during a game: the timer does not include that minute.
 
 ### Minesweeper
 _Free_
@@ -2215,6 +2640,16 @@ _Free_
 - [ ] Tap a cell: a safe area opens and the timer starts. Numbers show neighbouring mines.
 - [ ] Long-press a cell (or switch to Flag mode): a flag appears and Left decreases; again removes it.
 - [ ] Tap a mine: all mines show and Boom appears. Clear all safe cells: win message and Best time.
+- [ ] Dig a cell, then change level or tap New game: it asks first. Minimise the app for a minute: the timer does not count it.
+
+### Mini Crossword
+_Free. Needs: storage_
+
+- [ ] Open the tool: a 5x5 grid with black squares, a clue bar and the Across and Down clue lists appear. Tap a square: its word is highlighted and the clue shows. Tap the same square again: the direction switches.
+- [ ] Type letters with the on-screen keyboard: the cursor moves along the word; the backspace key clears and steps back. Tap a clue in the list: the cursor jumps to that word.
+- [ ] Fill a wrong letter and tap Check: wrong letters turn red for a few seconds. Tap Reveal letter / Reveal word: the letters appear in green.
+- [ ] Fill every square correctly: "Solved in m:ss" appears and Best updates (not when letters were revealed). Edge case: fill every square with a wrong letter: "Some letters are wrong. Tap Check."
+- [ ] Tap Show solution: the full grid appears and the timer stops. New crossword gives a different grid; leaving and reopening restores the unfinished grid and time.
 
 ### Nonogram
 _Free. Needs: storage_
@@ -2263,6 +2698,24 @@ _Free. Needs: storage_
 - [ ] When one side has no move, the message says so and the other side plays again. When neither can move the game ends with the final count.
 - [ ] Win a game: Games won increases and is remembered. New game restarts, even during the phone's turn.
 
+### Road Hopper
+_Free. Needs: storage_
+
+- [ ] Tap Start, then tap the screen: the frog hops one lane forward and the score becomes 1. Swipe left, right and down: the frog hops sideways and back (it cannot go off the bottom of the view).
+- [ ] Hop into a car lane without waiting: the game ends. Wait for a gap and cross: the score keeps rising.
+- [ ] Reach a river: hop onto a log and the frog is carried sideways; hop into water or ride off the edge: game over.
+- [ ] Stand still near the bottom of the screen: the view creeps up and finally catches the frog (game over).
+- [ ] Pause with the button or by leaving the app: traffic freezes. Game over shows score and best; Play again starts new lanes.
+
+### Rock Blaster
+_Free. Needs: storage_
+
+- [ ] Tap Start: the ship sits in the middle with rocks drifting. Drag a finger: the ship turns toward the drag direction. Hold Thrust: the ship accelerates and a flame shows; release: it slowly drifts to a stop.
+- [ ] Shoot a large rock: it splits into two medium rocks; shoot those: small ones; shoot a small one: it disappears. Score rises by 20, 50, 100.
+- [ ] Fly off one edge: the ship appears on the opposite edge.
+- [ ] Hit a rock: a life is lost, the ship returns to the centre and is faint for about two seconds.
+- [ ] Clear all rocks: a new wave with more rocks starts away from the ship. Pause and the visibility pause work; Game over shows score and best.
+
 ### RPS Showdown
 _Free_
 
@@ -2294,6 +2747,15 @@ _Free_
 - [ ] Repeat correctly: Nice, the pattern grows by one. A wrong tap shakes and shows the round reached.
 - [ ] Best updates to your highest completed round.
 
+### Sky Jumper
+_Free. Needs: motion, storage_
+
+- [ ] Tap Start: the jumper bounces up from the bottom platform. Drag a finger left and right: it steers toward the finger. Leave the screen at the left edge: it re-appears on the right.
+- [ ] Tilt the phone left and right: it steers the same way. If it goes the wrong way, tap Flip tilt. Tap Steering to switch to Drag only.
+- [ ] On a device or browser without a motion sensor the button shows "Tilt (waiting)" and dragging still works, with no error.
+- [ ] Land on a spring (red coil): a much higher bounce. Land on a brown platform: it crumbles.
+- [ ] Fall below the screen: Game over with height and best. Pause and leaving the app pause; the screen no longer stays awake after leaving the tool.
+
 ### Slide Puzzle
 _Free_
 
@@ -2306,6 +2768,26 @@ _Free_
 - [ ] Tap the board to start; swipe or use the arrows to turn. Eating an apple grows the snake and adds 1.
 - [ ] Pressing the opposite direction does nothing (no instant reversal).
 - [ ] Hit a wall or yourself: Game over with score; tap to play again.
+- [ ] Tap Pause mid-game: the snake stops and the button reads Resume; tap the board, the button, or press an arrow to go on. Switch to another app and back: the game is paused and does not resume by itself.
+- [ ] Change the speed while playing: a question asks first; Fast starts moving every 110 ms, Slow every 190 ms. Each speed shows its own best.
+
+### Snakes & Ladders
+_Free. Needs: storage_
+
+- [ ] Pick the number of players and who is Phone, tap Start: all tokens sit beside square 1 and the board numbers run in zigzag from the bottom left.
+- [ ] Tap Roll: the dice animates, then the token hops forward square by square. Land on a ladder foot to climb, on a snake head to slide.
+- [ ] Phone players roll by themselves after a short pause; the turn marker shows whose turn it is.
+- [ ] Edge case: near 100, roll more than needed: the token goes up to 100 and bounces back by the surplus. Landing exactly on 100 wins.
+- [ ] After a win the winner is announced and New game starts again; the player setup is remembered.
+
+### Spelling Bee
+_Free. Needs: storage_
+
+- [ ] Open Spelling Bee: seven letter tiles show with the centre letter highlighted. Tap tiles to build a word and tap "Enter".
+- [ ] A valid word is added to the found list with its points; a word that is too short, misses the centre letter or is not in the dictionary shows a short message.
+- [ ] Find a pangram: "Pangram!" bonus shows. The rank updates as the score grows.
+- [ ] Tap "Hint": the number of words, pangrams and a first-letter count show. "Shuffle" rearranges the outer letters.
+- [ ] "New random" gives a different puzzle; "Today's puzzle" returns to the daily one with your found words kept.
 
 ### Spin Wheel
 _Free_
@@ -2314,6 +2796,24 @@ _Free_
 - [ ] Tap Spin: it spins ~4 s, slows down and the pointer at the top lands on the winner, shown below the wheel.
 - [ ] Enable Remove the winner after each spin: after a spin the winner vanishes from the list.
 - [ ] With fewer than 2 options, Spin shows the message Add at least two options. Options persist after reopening.
+
+### Sprint Runner
+_Free. Needs: storage_
+
+- [ ] Tap Start: the runner moves and cacti approach. Tap: a short jump; tap and hold: a clearly higher jump.
+- [ ] Jump over a cactus: the run continues and the score rises. Run into one: Game over with score and best.
+- [ ] After a few seconds a flying obstacle appears at head height: swipe down to slide under it (tapping to jump into it ends the run).
+- [ ] The speed readout in the corner rises over time and stops at 520 px/s.
+- [ ] Pause and Resume work; leaving and returning to the app pauses. Play again starts from the slow speed.
+
+### Star Defender
+_Free. Needs: storage_
+
+- [ ] Open the tool and tap Start: the ship appears at the bottom and fires by itself. Drag a finger left and right: the ship follows.
+- [ ] Shoot an alien: it disappears and the score rises. Clear the whole wave: "Wave 2" appears with faster aliens and fresh shields.
+- [ ] Get hit by an alien shot: lives drop by one and the ship turns faint for about a second (no rapid flashing).
+- [ ] Tap Pause: the game freezes with a Paused panel; Resume continues. Switch to another app and back: the game is paused.
+- [ ] Lose all lives (or let aliens reach the ship): Game over shows score and best; Play again restarts. Leave the tool: no sound or movement continues.
 
 ### Stroop Test
 _Free. Needs: storage_
@@ -2329,6 +2829,16 @@ _Free_
 - [ ] Open: Making a puzzle appears briefly, then a grid. Tap an empty cell and a number: it fills in accent colour.
 - [ ] Enter a duplicate in a row: both cells turn red. Check marks entries that differ from the solution.
 - [ ] Hint fills the selected (or a random) cell. Fill the grid correctly: solved message with time.
+- [ ] Enter a number that repeats in its row: both the selected cell and the other one turn red. With the keyboard, digits and Backspace fill and erase the selected cell for the whole game (also after New). Enter numbers, then tap New: it asks first.
+
+### Tangram
+_Free. Needs: storage_
+
+- [ ] Open the tool: a grey silhouette on top and seven coloured pieces below. Drag a piece onto the grey shape: it follows the finger and snaps to nearby corners when released.
+- [ ] Tap a piece without dragging: it turns by 45 degrees and is highlighted. Use Turn piece, Flip piece and Next piece to change the selected piece (flipping only changes the parallelogram).
+- [ ] Tap Hint: a dashed outline shows where a piece belongs and the message names it. Pieces that overlap each other do not count as solved.
+- [ ] Fill the whole silhouette: "Shape solved in m:ss" appears, Best is saved and the solved count goes up. Use the arrows or Random shape for another silhouette.
+- [ ] Tap Show solution: the pieces fly to their places and the timer stops (no best time saved). Leave mid-puzzle and reopen: pieces are where you left them.
 
 ### Team Maker
 _Free_
@@ -2342,6 +2852,7 @@ _Free_
 - [ ] In vs Phone, tap a cell: your X draws with an animation and the phone replies in under a second. Try to win: the best you can get is a draw.
 - [ ] Choose I play O (second): the phone moves first automatically.
 - [ ] 2 Players: taps alternate X and O; a win highlights the line and updates the score. Reset score zeroes it.
+- [ ] Pick Easy phone and play 10 games with sensible moves: you win some. Switch to Unbeatable: you can only draw. Mid-game, tap New game: a question appears; No keeps the board.
 
 ### Tower of Hanoi
 _Free_
@@ -2349,6 +2860,25 @@ _Free_
 - [ ] Tap the first peg: its top disc lifts; tap another peg: it moves.
 - [ ] Try placing a big disc on a small one: a message says it cannot, and the disc is dropped.
 - [ ] Solve with 3 discs in 7 moves: message says perfect.
+- [ ] Make a move, then change the disc count or tap Restart: a question asks first.
+
+### Tower Stack
+_Free. Needs: storage_
+
+- [ ] Tap Start: a block slides left and right above the tower. Tap: it drops and sticks; the part hanging over the edge falls off and the next block is that narrower width.
+- [ ] Line a block up almost exactly: it snaps, a white outline flashes briefly and the block gets slightly wider; "Perfect x1" shows.
+- [ ] The score and "Height" rise by one for each block and the view scrolls down when the tower gets tall.
+- [ ] Drop a block with no overlap (miss the tower entirely): it falls and Game over shows height and best.
+- [ ] Pause, Resume and the app-switch pause work; Play again restarts with a full-width block.
+
+### Trivia Packs
+_Free. Needs: storage_
+
+- [ ] Open Trivia Packs and tap Flags: a flag emoji and four country names show. Tap an answer: right turns green, wrong turns red and the right one is highlighted.
+- [ ] Finish the 10 questions: the score, the best score for the pack and your longest streak show. "Review mistakes" lists each wrong answer with the right one.
+- [ ] Tap "Daily Five": five questions; leave and come back the same day: the same five questions show in the same order.
+- [ ] Open another pack (Science): the explanation line shows after answering where one exists.
+- [ ] Leave and reopen: best scores per pack are remembered.
 
 ### Trivia Quiz
 _Free_
@@ -2385,6 +2915,15 @@ _Free_
 - [ ] Tap Start: moles pop up randomly. Tap one: it shows a hit and Score increases.
 - [ ] Moles that are not hit hide on their own; at 0 s the game ends with the final score.
 
+### Who Am I?
+_Free_
+
+- [ ] Open Who Am I?, set 4 players and tap "Deal". The first screen asks player 1 to take the phone.
+- [ ] Press and hold "Hold to reveal": the identity shows; release: it hides. Tap "Next player".
+- [ ] After the last player a "Everyone has seen their card" screen shows; "Show all" lists every identity for the host to check.
+- [ ] Change the category filter and deal again: identities come from the chosen category. Players are never given the same identity twice in one deal.
+- [ ] Set the player count to 1 or 99: it is limited to the allowed range (2 to 12).
+
 ### Word Guess
 _Free. Needs: storage_
 
@@ -2393,6 +2932,7 @@ _Free. Needs: storage_
 - [ ] Win or lose a game: the message appears (the word is revealed on a loss), Share appears and the stats card updates. Tap Share: the share sheet opens or the grid is copied.
 - [ ] Edge case with repeated letters: guess a word with two of the same letter when the answer has one: only one of them is coloured yellow or green, the other stays grey.
 - [ ] Tap the Colours button: the palette switches between green/yellow and blue/orange and the choice is remembered. New word starts a fresh game.
+- [ ] Win a word, then press New word within a second: the old result ("The word was ..." / congratulation) does not appear on the new board and Share stays hidden.
 
 ### Word Scramble
 _Free_
@@ -2400,6 +2940,15 @@ _Free_
 - [ ] Tap letter tiles in order: letters fill the slots; tap a slot to take a letter back.
 - [ ] Spell it correctly: success message and a new word. A wrong word shakes and clears.
 - [ ] Skip breaks the streak and reveals the word.
+
+### Word Search
+_Free. Needs: storage_
+
+- [ ] Open the tool: a 10x10 grid, a word list and a running timer are shown. Drag along a listed word (any direction, including backwards and diagonals): the cells colour in, the word is struck through and Found goes up.
+- [ ] Drag across letters that are not a listed word: the cells flash red and nothing is marked. Tap one letter and then another letter on the same line: that line is checked too.
+- [ ] Tap Hint: a square turns green and the message names a word starting there. Tap Show solution: every word is marked, the timer stops and no best time is saved.
+- [ ] Pick a Theme such as Animals and a size of 8x8: a new puzzle with only animal words; the size and theme are remembered after reopening.
+- [ ] Find every word: "All found in m:ss" appears and Best updates. Leave mid-puzzle and reopen: the same grid, found words and elapsed time are restored.
 
 ### Would You Rather
 _Free_
